@@ -5,7 +5,7 @@
 
 ## 폴더 구조
 - `frontend/`: Next.js(App Router) + TypeScript + Tailwind. 학생이 보는 화면 (Vercel 배포 예정)
-- `backend/`: Python + FastAPI. `/health`, `/ask` API (Render 배포 예정). 지금 `/ask`는 demo 답변
+- `backend/`: Python + FastAPI (Render 배포 예정). `/health`, `/ask`(demo 답변), `/mentors`, `/mentors/recommend`, `/contact-requests`(메일 미발송, 로그만). 멘토는 `backend/app/data/mentors_demo.json`의 가짜 데이터
 - `docs/`: CONTEXT(맥락), DECISIONS(결정 기록), DATA(데이터 구조 초안)
 - `scripts/`: 나중에 데이터 정제·적재 스크립트를 넣을 곳
 
@@ -24,4 +24,6 @@ cd frontend && npm run dev
 - 처음 개발하는 팀원도 읽을 수 있게 변경 내용을 쉽게 설명한다.
 - 중요한 결정이 생기면 `docs/DECISIONS.md`에 한 줄 추가를 제안한다.
 - API 키, 인터뷰 원문, 개인정보는 커밋하지 않는다 (`.env`, `data/raw/`는 .gitignore에 있다).
-- `/ask`의 응답 형식을 바꾸면 `backend/app/schemas.py`와 `frontend/src/lib/api.ts`를 함께 바꾼다.
+- API 요청·응답 형식을 바꾸면 `backend/app/schemas.py`와 `frontend/src/lib/api.ts`를 함께 바꾼다.
+- 멘토 이메일 등 연락처는 어떤 API 응답에도 넣지 않는다. 참여 동의(`consent`)가 false인 멘토는 어디에도 노출하지 않는다.
+- backend를 바꾸면 `cd backend && pytest`, frontend를 바꾸면 `npm run lint && npm run build`로 확인한다.
