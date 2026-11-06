@@ -1,0 +1,6 @@
+/* 전체 공통 스타일. 대부분의 스타일은 각 컴포넌트의 className(Tailwind)에 쓴다. */
+@import "tailwindcss";
+
+body {
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+}

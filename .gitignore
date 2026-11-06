@@ -1,0 +1,26 @@
+# ===== 비밀 정보 (절대 커밋 금지) =====
+.env
+.env.*
+!.env.example
+
+# ===== 인터뷰 원문·개인정보 데이터 (절대 커밋 금지) =====
+data/raw/
+data/private/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ===== Node / Next.js =====
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# ===== 기타 =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
