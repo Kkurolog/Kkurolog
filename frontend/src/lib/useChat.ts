@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import { askQuestion } from "./api";
+import { askQuestion, recommendMentors } from "./api";
 import type { AssistantMessage, ChatMessage } from "./types";
 
 // 메시지마다 붙이는 고유 ID (화면에서 목록을 그릴 때 key 로 쓴다)
@@ -28,7 +28,12 @@ export function useChat() {
     // 2. backend 에 묻고, 답변 메시지를 만든다
     let reply: AssistantMessage;
     try {
-      const result = await askQuestion(question);
+      // 답변과 멘토 추천을 동시에 요청한다.
+      // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
+      const [result, recommend] = await Promise.all([
+        askQuestion(question),
+        recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
+      ]);
       reply = {
         id: newId(),
         role: "assistant",
@@ -36,6 +41,7 @@ export function useChat() {
         question,
         sources: result.sources,
         hasEnoughEvidence: result.has_enough_evidence,
+        mentors: recommend.recommendations,
       };
     } catch {
       reply = {
@@ -45,6 +51,7 @@ export function useChat() {
         question,
         sources: [],
         hasEnoughEvidence: true,
+        mentors: [],
         isError: true,
       };
     }

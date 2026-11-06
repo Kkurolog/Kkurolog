@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
 import QuestionForm from "@/components/QuestionForm";
+import type { Mentor } from "@/lib/api";
 import { useChat } from "@/lib/useChat";
 
 // 처음 들어왔을 때 눌러볼 수 있는 예시 질문
@@ -23,6 +24,11 @@ export default function Home() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  function handleContact(mentor: Mentor, question: string) {
+    // 연락 팝업은 다음 단계에서 연결한다
+    alert(`${mentor.name} 선배에게 연락하기 (준비 중): ${question}`);
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
@@ -49,7 +55,7 @@ export default function Home() {
 
       <div className="flex flex-col gap-5">
         {messages.map((message) => (
-          <ChatMessageView key={message.id} message={message} />
+          <ChatMessageView key={message.id} message={message} onContact={handleContact} />
         ))}
         {loading && <p className="text-sm text-gray-400">꾸로록이 선배들의 경험을 찾는 중...</p>}
         <div ref={bottomRef} />

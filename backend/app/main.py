@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import AskRequest, AskResponse, Mentor
+from app.schemas import AskRequest, AskResponse, Mentor, RecommendRequest, RecommendResponse
 from app.services.answer import make_answer
-from app.services.mentors import list_mentors
+from app.services.mentors import list_mentors, recommend_mentors
 
 # .env 파일이 있으면 환경변수로 읽어온다
 load_dotenv()
@@ -48,6 +48,11 @@ def mentors() -> list[Mentor]:
     return list_mentors()
 
 
+@app.post("/mentors/recommend", response_model=RecommendResponse)
+def mentors_recommend(request: RecommendRequest) -> RecommendResponse:
+    """질문에 맞는 멘토를 최대 3명 추천한다. (/ask 와 따로 부른다 → docs/DECISIONS.md)"""
+    return recommend_mentors(request.question)
+
+
 # 나중에 추가할 라우트 자리 (지금은 만들지 않음)
-# - POST /mentors/recommend  질문에 맞는 멘토 추천
 # - POST /contact-requests   멘토에게 첫 연락 전달 (이메일)

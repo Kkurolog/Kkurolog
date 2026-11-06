@@ -63,3 +63,32 @@ class Mentor(BaseModel):
     tags: list[str] = Field(default_factory=list, description="주요 경험 태그")
     topics: list[str] = Field(default_factory=list, description="답변 가능 주제")
     available: bool = Field(..., description="지금 연락을 받을 수 있는지")
+
+
+class RecommendRequest(BaseModel):
+    """멘토 추천 요청: 학생이 한 질문."""
+
+    question: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="학생이 입력한 질문",
+        examples=["창업하다가 대학에 간 선배 이야기가 궁금해"],
+    )
+
+
+class MentorRecommendation(BaseModel):
+    """추천 멘토 한 명 + 추천 이유."""
+
+    mentor: Mentor
+    reason: str = Field(..., description="이 멘토를 추천한 이유 한 줄")
+
+
+class RecommendResponse(BaseModel):
+    """멘토 추천 결과."""
+
+    recommendations: list[MentorRecommendation] = Field(default_factory=list, description="추천 멘토 (최대 3명)")
+    is_fallback: bool = Field(
+        ...,
+        description="질문과 맞는 멘토를 못 찾아서 '다양한 경험' 멘토를 대신 보여주는지",
+    )

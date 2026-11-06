@@ -53,3 +53,28 @@ export async function fetchMentors(): Promise<Mentor[]> {
   }
   return res.json();
 }
+
+// 추천 멘토 한 명 + 추천 이유
+export type MentorRecommendation = {
+  mentor: Mentor;
+  reason: string;
+};
+
+// /mentors/recommend 응답
+export type RecommendResponse = {
+  recommendations: MentorRecommendation[];
+  is_fallback: boolean; // 질문과 맞는 멘토가 없어 '다양한 경험' 멘토를 대신 보여주는지
+};
+
+// 질문에 맞는 멘토를 추천받는다 (/ask 와 따로 부른다).
+export async function recommendMentors(question: string): Promise<RecommendResponse> {
+  const res = await fetch(`${API_URL}/mentors/recommend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    throw new Error(`서버 오류 (${res.status})`);
+  }
+  return res.json();
+}
