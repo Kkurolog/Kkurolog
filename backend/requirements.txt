@@ -1,0 +1,11 @@
+# backend에서 쓰는 Python 패키지 목록
+# 설치: pip install -r requirements.txt
+fastapi>=0.115,<1.0     # API 서버 프레임워크
+uvicorn[standard]>=0.30 # FastAPI를 실행하는 서버
+pydantic>=2.7,<3.0      # 요청/응답 데이터 형식 정의
+python-dotenv>=1.0      # .env 파일에서 환경변수 읽기
+
+# 나중에 추가할 것 (지금은 설치하지 않음)
+# supabase      # DB + pgvector
+# openai        # 임베딩
+# anthropic     # Claude 답변 생성
