@@ -31,3 +31,93 @@ export async function askQuestion(question: string): Promise<AskResponse> {
   }
   return res.json();
 }
+
+// 멘토 프로필 (공개해도 되는 필드만. 이메일은 backend가 절대 보내지 않는다)
+export type Mentor = {
+  id: string;
+  name: string; // 이름 또는 별명
+  exit_year: number; // 엑시트(졸업) 연도
+  career_paths: string[]; // 진로 경로 (대학 진학 / 해외 대학 / 취업 / 창업 / 디자인·예술 / 개발 / 기타 경로)
+  path_summary: string; // 진로 경로 한 줄 요약
+  summary: string; // 경험 요약 1~2줄
+  tags: string[]; // 경험 태그
+  topics: string[]; // 답변 가능 주제
+  available: boolean; // 지금 연락 가능한지
+};
+
+// 멘토 목록을 받아온다 (참여에 동의한 멘토만 온다).
+export async function fetchMentors(): Promise<Mentor[]> {
+  const res = await fetch(`${API_URL}/mentors`);
+  if (!res.ok) {
+    throw new Error(`서버 오류 (${res.status})`);
+  }
+  return res.json();
+}
+
+// 추천 멘토 한 명 + 추천 이유
+export type MentorRecommendation = {
+  mentor: Mentor;
+  reason: string;
+};
+
+// /mentors/recommend 응답
+export type RecommendResponse = {
+  recommendations: MentorRecommendation[];
+  is_fallback: boolean; // 질문과 맞는 멘토가 없어 '다양한 경험' 멘토를 대신 보여주는지
+};
+
+// 질문에 맞는 멘토를 추천받는다 (/ask 와 따로 부른다).
+export async function recommendMentors(question: string): Promise<RecommendResponse> {
+  const res = await fetch(`${API_URL}/mentors/recommend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    throw new Error(`서버 오류 (${res.status})`);
+  }
+  return res.json();
+}
+
+// /contact-requests 요청: 학생 → 꾸로록 → 멘토 첫 연락
+export type ContactRequest = {
+  mentor_id: string;
+  sender_name: string; // 내 이름 또는 별명 (1~30자)
+  reply_email: string; // 답장 받을 이메일
+  subject: string; // 메일 제목 (1~100자)
+  message: string; // 질문 내용 (10~2000자)
+};
+
+// /contact-requests 응답
+export type ContactResponse = {
+  status: "delivered";
+  message: string; // 학생에게 보여줄 안내 문구
+};
+
+// 멘토에게 첫 연락을 보낸다. 실패하면 화면에 보여줄 문구를 담아 오류를 던진다.
+export async function sendContactRequest(request: ContactRequest): Promise<ContactResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/contact-requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    // 서버에 아예 닿지 못한 경우 (backend 가 꺼져 있거나 인터넷 문제)
+    throw new Error("서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
+  }
+
+  if (!res.ok) {
+    // 404, 409 는 backend 가 한국어 안내(detail)를 보내준다. 422 는 입력 형식 오류.
+    const body = await res.json().catch(() => null);
+    const detail =
+      typeof body?.detail === "string"
+        ? body.detail
+        : res.status === 422
+          ? "입력한 내용을 다시 확인해 주세요. (이메일 형식, 질문은 10자 이상)"
+          : `서버 오류 (${res.status})`;
+    throw new Error(detail);
+  }
+  return res.json();
+}

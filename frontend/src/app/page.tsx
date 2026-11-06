@@ -1,40 +1,81 @@
-// 메인 화면 (주소 "/")
-// 질문 입력 → backend /ask 호출 → 답변과 출처 표시
+// 메인 화면 (주소 "/"): 꾸로록과 대화하는 채팅 화면.
+// 메시지가 위에서 아래로 쌓이고, 입력창은 아래에 있다.
+// 대화 상태는 lib/useChat.ts 에서 관리한다.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import ChatMessageView from "@/components/ChatMessageView";
+import ContactModal from "@/components/ContactModal";
 import QuestionForm from "@/components/QuestionForm";
-import AnswerView from "@/components/AnswerView";
-import { askQuestion, type AskResponse } from "@/lib/api";
+import type { Mentor } from "@/lib/api";
+import { useChat } from "@/lib/useChat";
+
+// 처음 들어왔을 때 눌러볼 수 있는 예시 질문
+const EXAMPLE_QUESTIONS = [
+  "대학을 바로 가지 않고 취업한 선배들은 왜 그렇게 선택했어?",
+  "창업하다가 대학에 간 선배 이야기가 궁금해",
+  "근거없음 (근거 부족 화면 확인용)",
+];
 
 export default function Home() {
-  const [result, setResult] = useState<AskResponse | null>(null); // 받은 답변
-  const [loading, setLoading] = useState(false); // 기다리는 중인지
-  const [error, setError] = useState<string | null>(null); // 오류 메시지
+  const { messages, loading, ask } = useChat();
+  const bottomRef = useRef<HTMLDivElement>(null);
+  // 연락 팝업: 누구에게, 어떤 질문을 미리 채울지. null 이면 닫힘
+  const [contact, setContact] = useState<{ mentor: Mentor; question: string } | null>(null);
 
-  async function handleAsk(question: string) {
-    setLoading(true);
-    setError(null);
-    try {
-      setResult(await askQuestion(question));
-    } catch {
-      setError("답변을 가져오지 못했어요. backend 서버가 켜져 있는지 확인해 주세요.");
-    } finally {
-      setLoading(false);
-    }
+  // 새 메시지가 생기면 맨 아래로 스크롤
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  function handleContact(mentor: Mentor, question: string) {
+    setContact({ mentor, question });
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-12">
-      <header>
-        <h1 className="text-3xl font-bold text-gray-900">꾸로록</h1>
-        <p className="mt-1 text-gray-500">한 사람의 경험이 다음 학생의 선택지가 되도록.</p>
-      </header>
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+      {messages.length === 0 && (
+        <section className="flex flex-col gap-3 py-8">
+          <h1 className="text-2xl font-bold text-gray-900">무엇이든 물어보세요</h1>
+          <p className="text-gray-500">
+            한 사람의 경험이 다음 학생의 선택지가 되도록. 선배들의 선택 이유, 고민, 시행착오를 찾아드려요.
+          </p>
+          <div className="flex flex-col items-start gap-2">
+            {EXAMPLE_QUESTIONS.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => ask(q)}
+                className="rounded-full bg-white px-3 py-1.5 text-left text-sm text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <QuestionForm onSubmit={handleAsk} loading={loading} />
+      <div className="flex flex-col gap-5">
+        {messages.map((message) => (
+          <ChatMessageView key={message.id} message={message} onContact={handleContact} />
+        ))}
+        {loading && <p className="text-sm text-gray-400">꾸로록이 선배들의 경험을 찾는 중...</p>}
+        <div ref={bottomRef} />
+      </div>
 
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {result && <AnswerView result={result} />}
+      {/* 입력창은 화면 아래에 붙어 있게 한다 */}
+      <div className="sticky bottom-0 bg-gray-50 pb-4 pt-2">
+        <QuestionForm onSubmit={ask} loading={loading} />
+      </div>
+
+      {contact && (
+        <ContactModal
+          key={contact.mentor.id} // 다른 멘토를 열면 입력칸을 새로 시작
+          mentor={contact.mentor}
+          initialMessage={contact.question}
+          onClose={() => setContact(null)}
+        />
+      )}
     </main>
   );
 }

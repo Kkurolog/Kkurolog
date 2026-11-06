@@ -46,6 +46,9 @@
 | 연락 가능 여부 | 지금 연락을 받을 수 있는지 |
 
 - 연락처(이메일)는 학생에게 직접 보여주지 않는다. 꾸로록이 첫 연락을 전달한다.
+- demo 데이터(`backend/app/data/mentors_demo.json`)의 필드 이름: `id`, `name`, `exit_year`, `career_paths`,
+  `path_summary`(경로 한 줄 요약), `summary`(경험 요약), `tags`, `topics`, `consent`, `available`, `email`(내부 전용).
+  `career_paths` 값은 `대학 진학 / 해외 대학 / 취업 / 창업 / 디자인·예술 / 개발 / 기타 경로` 중에서 고른다 (멘토 찾기 탭과 같음).
 
 ## 4. 최소 사실 데이터
 기본 진로 경로, 인터뷰 시점, 주요 프로젝트, 출처 정보. 정량 정보는 핵심이 아니므로 최소한으로만 둔다.
