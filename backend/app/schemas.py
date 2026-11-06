@@ -39,3 +39,27 @@ class AskResponse(BaseModel):
         ...,
         description="근거가 충분한지. false면 프론트에서 '멘토 찾아보기' 안내를 보여준다",
     )
+
+
+# ---------------------------------------------------------------------------
+# 멘토
+# ---------------------------------------------------------------------------
+# 주의: 멘토의 이메일(email)과 동의 여부(consent)는 일부러 여기에 넣지 않는다.
+#       응답 스키마에 없는 필드는 API 응답에 절대 나가지 않는다.
+
+
+class Mentor(BaseModel):
+    """학생에게 보여줄 멘토 프로필 (공개해도 되는 필드만)."""
+
+    id: str = Field(..., description="멘토 ID")
+    name: str = Field(..., description="화면에 보여줄 이름 또는 별명")
+    exit_year: int = Field(..., description="엑시트(졸업) 연도")
+    career_paths: list[str] = Field(
+        ...,
+        description="진로 경로 (대학 진학 / 해외 대학 / 취업 / 창업 / 디자인·예술 / 개발 / 기타 경로)",
+    )
+    path_summary: str = Field(..., description="진로 경로 한 줄 요약")
+    summary: str = Field(..., description="경험 요약 1~2줄")
+    tags: list[str] = Field(default_factory=list, description="주요 경험 태그")
+    topics: list[str] = Field(default_factory=list, description="답변 가능 주제")
+    available: bool = Field(..., description="지금 연락을 받을 수 있는지")

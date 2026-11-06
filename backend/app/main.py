@@ -11,8 +11,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import AskRequest, AskResponse
+from app.schemas import AskRequest, AskResponse, Mentor
 from app.services.answer import make_answer
+from app.services.mentors import list_mentors
 
 # .env 파일이 있으면 환경변수로 읽어온다
 load_dotenv()
@@ -41,6 +42,12 @@ def ask(request: AskRequest) -> AskResponse:
     return make_answer(request.question)
 
 
+@app.get("/mentors", response_model=list[Mentor])
+def mentors() -> list[Mentor]:
+    """멘토 목록 (참여에 동의한 멘토만). 진로 탭·검색은 프론트에서 처리한다."""
+    return list_mentors()
+
+
 # 나중에 추가할 라우트 자리 (지금은 만들지 않음)
-# - GET  /mentors         멘토 탐색/추천
-# - POST /contact         멘토에게 첫 연락 전달 (이메일)
+# - POST /mentors/recommend  질문에 맞는 멘토 추천
+# - POST /contact-requests   멘토에게 첫 연락 전달 (이메일)
