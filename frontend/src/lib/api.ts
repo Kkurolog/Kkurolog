@@ -31,3 +31,25 @@ export async function askQuestion(question: string): Promise<AskResponse> {
   }
   return res.json();
 }
+
+// 멘토 프로필 (공개해도 되는 필드만. 이메일은 backend가 절대 보내지 않는다)
+export type Mentor = {
+  id: string;
+  name: string; // 이름 또는 별명
+  exit_year: number; // 엑시트(졸업) 연도
+  career_paths: string[]; // 진로 경로 (대학 진학 / 해외 대학 / 취업 / 창업 / 디자인·예술 / 개발 / 기타 경로)
+  path_summary: string; // 진로 경로 한 줄 요약
+  summary: string; // 경험 요약 1~2줄
+  tags: string[]; // 경험 태그
+  topics: string[]; // 답변 가능 주제
+  available: boolean; // 지금 연락 가능한지
+};
+
+// 멘토 목록을 받아온다 (참여에 동의한 멘토만 온다).
+export async function fetchMentors(): Promise<Mentor[]> {
+  const res = await fetch(`${API_URL}/mentors`);
+  if (!res.ok) {
+    throw new Error(`서버 오류 (${res.status})`);
+  }
+  return res.json();
+}
