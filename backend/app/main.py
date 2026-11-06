@@ -8,12 +8,21 @@ backend의 시작점. API 주소(라우트)를 정의한다.
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.schemas import AskRequest, AskResponse, Mentor, RecommendRequest, RecommendResponse
+from app.schemas import (
+    AskRequest,
+    AskResponse,
+    ContactRequest,
+    ContactResponse,
+    Mentor,
+    RecommendRequest,
+    RecommendResponse,
+)
 from app.services.answer import make_answer
-from app.services.mentors import list_mentors, recommend_mentors
+from app.services.contact import deliver_contact_request
+from app.services.mentors import get_mentor, list_mentors, recommend_mentors
 
 # .env 파일이 있으면 환경변수로 읽어온다
 load_dotenv()
@@ -54,5 +63,19 @@ def mentors_recommend(request: RecommendRequest) -> RecommendResponse:
     return recommend_mentors(request.question)
 
 
-# 나중에 추가할 라우트 자리 (지금은 만들지 않음)
-# - POST /contact-requests   멘토에게 첫 연락 전달 (이메일)
+@app.post("/contact-requests", response_model=ContactResponse, status_code=201)
+def contact_requests(request: ContactRequest) -> ContactResponse:
+    """
+    학생이 멘토에게 보내는 첫 연락을 받아 꾸로록이 전달한다. (지금은 실제 메일을 보내지 않음)
+    - 입력 형식이 틀리면 422 (이메일 형식, 길이 등은 schemas.ContactRequest 가 검사)
+    - 없는 멘토(또는 동의하지 않은 멘토)면 404
+    - 지금 연락을 받지 않는 멘토면 409
+    """
+    mentor = get_mentor(request.mentor_id)
+    if mentor is None:
+        raise HTTPException(status_code=404, detail="찾을 수 없는 멘토예요.")
+    if not mentor.available:
+        raise HTTPException(status_code=409, detail="이 선배는 지금 연락을 받지 않아요.")
+
+    deliver_contact_request(request, mentor)
+    return ContactResponse(status="delivered", message=f"{mentor.name} 선배에게 전달했어요.")

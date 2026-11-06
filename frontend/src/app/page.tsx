@@ -3,8 +3,9 @@
 // 대화 상태는 lib/useChat.ts 에서 관리한다.
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
+import ContactModal from "@/components/ContactModal";
 import QuestionForm from "@/components/QuestionForm";
 import type { Mentor } from "@/lib/api";
 import { useChat } from "@/lib/useChat";
@@ -19,6 +20,8 @@ const EXAMPLE_QUESTIONS = [
 export default function Home() {
   const { messages, loading, ask } = useChat();
   const bottomRef = useRef<HTMLDivElement>(null);
+  // 연락 팝업: 누구에게, 어떤 질문을 미리 채울지. null 이면 닫힘
+  const [contact, setContact] = useState<{ mentor: Mentor; question: string } | null>(null);
 
   // 새 메시지가 생기면 맨 아래로 스크롤
   useEffect(() => {
@@ -26,8 +29,7 @@ export default function Home() {
   }, [messages, loading]);
 
   function handleContact(mentor: Mentor, question: string) {
-    // 연락 팝업은 다음 단계에서 연결한다
-    alert(`${mentor.name} 선배에게 연락하기 (준비 중): ${question}`);
+    setContact({ mentor, question });
   }
 
   return (
@@ -65,6 +67,15 @@ export default function Home() {
       <div className="sticky bottom-0 bg-gray-50 pb-4 pt-2">
         <QuestionForm onSubmit={ask} loading={loading} />
       </div>
+
+      {contact && (
+        <ContactModal
+          key={contact.mentor.id} // 다른 멘토를 열면 입력칸을 새로 시작
+          mentor={contact.mentor}
+          initialMessage={contact.question}
+          onClose={() => setContact(null)}
+        />
+      )}
     </main>
   );
 }

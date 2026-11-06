@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ContactModal from "@/components/ContactModal";
 import MentorCard from "@/components/MentorCard";
 import { fetchMentors, type Mentor } from "@/lib/api";
 
@@ -24,6 +25,7 @@ export default function MentorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState("전체"); // 선택한 진로 경로 탭
   const [search, setSearch] = useState(""); // 검색어
+  const [contactMentor, setContactMentor] = useState<Mentor | null>(null); // 연락 팝업을 연 멘토 (null 이면 닫힘)
 
   // 화면이 처음 열릴 때 멘토 목록을 한 번 받아온다
   useEffect(() => {
@@ -36,11 +38,6 @@ export default function MentorsPage() {
   const visibleMentors = mentors.filter(
     (mentor) => (tab === "전체" || mentor.career_paths.includes(tab)) && matchesSearch(mentor, search),
   );
-
-  function handleContact(mentor: Mentor) {
-    // 연락 팝업은 다음 단계에서 연결한다
-    alert(`${mentor.name} 선배에게 연락하기 (준비 중)`);
-  }
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8">
@@ -84,9 +81,13 @@ export default function MentorsPage() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         {visibleMentors.map((mentor) => (
-          <MentorCard key={mentor.id} mentor={mentor} onContact={handleContact} />
+          <MentorCard key={mentor.id} mentor={mentor} onContact={setContactMentor} />
         ))}
       </div>
+
+      {contactMentor && (
+        <ContactModal key={contactMentor.id} mentor={contactMentor} onClose={() => setContactMentor(null)} />
+      )}
     </main>
   );
 }

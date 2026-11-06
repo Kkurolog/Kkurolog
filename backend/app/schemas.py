@@ -7,7 +7,9 @@ API에서 주고받는 데이터의 "모양"을 정의하는 파일.
   모양을 바꿔야 하면 프론트엔드 담당자와 먼저 이야기하자.
 """
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AskRequest(BaseModel):
@@ -92,3 +94,32 @@ class RecommendResponse(BaseModel):
         ...,
         description="질문과 맞는 멘토를 못 찾아서 '다양한 경험' 멘토를 대신 보여주는지",
     )
+
+
+# ---------------------------------------------------------------------------
+# 멘토에게 첫 연락 (연락 요청)
+# ---------------------------------------------------------------------------
+
+# 간단한 이메일 형식 검사 (아이디@도메인.끝). 추가 패키지 없이 정규식으로 검사한다.
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+class ContactRequest(BaseModel):
+    """학생이 멘토에게 보내는 첫 연락. 꾸로록이 멘토의 이메일로 전달한다."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)  # 앞뒤 공백은 자동으로 지운다
+
+    mentor_id: str = Field(..., min_length=1, max_length=50, description="연락할 멘토 ID")
+    sender_name: str = Field(..., min_length=1, max_length=30, description="학생 이름 또는 별명")
+    reply_email: str = Field(
+        ..., max_length=254, pattern=EMAIL_PATTERN, description="멘토가 답장을 보낼 학생 이메일"
+    )
+    subject: str = Field(..., min_length=1, max_length=100, description="메일 제목")
+    message: str = Field(..., min_length=10, max_length=2000, description="질문 내용 (10~2000자)")
+
+
+class ContactResponse(BaseModel):
+    """연락 요청 결과."""
+
+    status: Literal["delivered"] = Field(..., description="전달 결과")
+    message: str = Field(..., description="학생에게 보여줄 안내 문구")
