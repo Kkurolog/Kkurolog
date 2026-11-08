@@ -1,12 +1,13 @@
 """
 질문을 받아 답변을 만드는 곳.
 
-지금은 실제 데이터가 없어서 **가짜(demo) 답변**을 돌려준다.
-나중에 실제 RAG를 붙일 때는 이 파일의 `make_answer` 함수 안쪽만 바꾸면 된다.
-(main.py 와 schemas.py 는 그대로 둔다)
+두 가지 방식이 있다 (app/config.py 의 RAG_ENABLED 로 고른다):
+  - false(기본): **가짜(demo) 답변**. API 키·데이터 없이 화면 흐름을 확인할 때
+  - true: 실제 RAG (app/rag/pipeline.py). 결과는 app/rag/adapter.py 가 /ask 응답 형식으로 바꾼다
+어느 쪽이든 위기 신호 안전장치(looks_like_crisis)를 가장 먼저 거친다.
 
-나중에 들어갈 흐름 (제안: docs/proposals/ask-plan.md, 팀 논의 전):
-  0. 위기 신호 안전장치 → 아래 _looks_like_crisis (이건 RAG 를 붙여도 그대로 둔다)
+RAG 흐름 (자세한 건 app/rag/pipeline.py, 제안: docs/proposals/ask-plan.md, 팀 논의 전):
+  0. 위기 신호 안전장치 → 아래 looks_like_crisis
   1. 질문을 OpenAI 임베딩으로 벡터로 바꾼다
   2. Supabase(pgvector)에서 비슷한 chunk Top-K를 찾는다 (visibility L0 제외)
   3. 유사도 하한보다 낮은 chunk는 버린다. 하나도 안 남으면 Claude 를 부르지 않고 no_evidence
@@ -21,7 +22,12 @@ has_enough_evidence 규칙 (현재 프론트와의 하위 호환):
     off_topic·safety 안내 문구가 보이려면 true 여야 한다.
 """
 
+import logging
+
+from app import config
 from app.schemas import AnswerType, AskResponse, Source
+
+logger = logging.getLogger("uvicorn.error")
 
 # 가짜 인터뷰 구간. 실제 인물이 아니다.
 DEMO_SOURCES = [
@@ -64,6 +70,13 @@ OFF_TOPIC_MESSAGE = (
 
 NO_EVIDENCE_MESSAGE = "현재 자료만으로는 답하기 어려워요. 비슷한 경험을 가진 사람을 찾아볼까요?"
 
+# 검색·Claude 호출이 실패했을 때. answer_type 은 no_evidence 로 보내서 프론트가 멘토 찾기로 이어 준다.
+# (새 오류 코드를 만들지 않아 프론트를 고칠 필요가 없다)
+TEMPORARY_ERROR_MESSAGE = (
+    "지금은 자료를 찾는 데 잠깐 문제가 생겼어요. 잠시 후 다시 물어봐 주세요. "
+    "그동안 비슷한 경험을 가진 선배를 찾아볼 수도 있어요."
+)
+
 
 def looks_like_crisis(question: str) -> bool:
     """위기 단어가 있는지. main.py 가 호출 횟수 제한보다 먼저 부른다 (막힌 학생도 안내를 받도록)."""
@@ -86,12 +99,47 @@ def _special_answer(answer_type: AnswerType, message: str) -> AskResponse:
     )
 
 
+# 실제 RAG 파이프라인 (처음 쓸 때 한 번만 만든다)
+_pipeline = None
+
+
+def get_rag_pipeline():
+    """
+    RAG 파이프라인을 돌려준다. RAG_ENABLED=false 면 None (demo 답변을 쓴다).
+    만들다 실패하면(패키지 미설치, API 키 없음 등) 오류를 그대로 낸다 → make_answer 가 안내 문구로 바꾼다.
+    """
+    global _pipeline
+    if not config.RAG_ENABLED:
+        return None
+    if _pipeline is None:
+        # 여기서 import 한다: app.rag.messages 가 이 파일을 import 하므로, 파일 맨 위에서 하면 서로 물고 물린다
+        from app.rag.pipeline import build_pipeline_from_env
+
+        _pipeline = build_pipeline_from_env(local_chunks_path=config.RAG_LOCAL_CHUNKS)
+    return _pipeline
+
+
+def _rag_answer(question: str) -> AskResponse:
+    from app.rag.adapter import to_ask_response
+
+    try:
+        pipeline = get_rag_pipeline()
+    except Exception:
+        logger.exception("RAG 파이프라인을 만들지 못했어요 (requirements-rag.txt 설치, API 키를 확인하세요)")
+        return _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
+    return to_ask_response(pipeline.answer(question))  # pipeline.answer 는 스스로 오류를 처리한다
+
+
 def make_answer(question: str) -> AskResponse:
-    """질문을 받아 답변을 돌려준다. (위기 안전장치는 실제 동작, 나머지는 가짜 답변)"""
+    """질문을 받아 답변을 돌려준다."""
 
     if looks_like_crisis(question):  # main.py 에서도 먼저 거르지만, 다른 곳에서 불러도 안전하게 한 번 더
         return safety_answer()
 
+    if config.RAG_ENABLED:
+        return _rag_answer(question)
+
+    # ---- 아래는 demo 답변 ----
     if any(word in question for word in OFF_TOPIC_KEYWORDS):
         return _special_answer("off_topic", OFF_TOPIC_MESSAGE)
 

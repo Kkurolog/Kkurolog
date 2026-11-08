@@ -1,0 +1,9 @@
+# Packages needed only to run the real RAG (search + Claude answers).
+# Not needed for the demo or for pytest (tests use fake objects).
+# Install: pip install -r requirements-rag.txt
+# Keep this file ASCII-only: pip can fail on Korean Windows when it contains Korean text.
+-r requirements.txt
+
+anthropic>=2.6,<3     # Claude answers (app/rag/generator.py)
+openai>=3.46,<4       # embeddings (app/rag/embedding.py)
+supabase>=2.34,<3     # pgvector storage and search (app/rag/store.py)

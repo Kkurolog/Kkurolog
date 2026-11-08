@@ -11,15 +11,17 @@
 | # | 제안 | 상태 |
 |---|---|---|
 | 1 | 데이터는 gschool.kr 공개 글 (사용 허락받음) | 결정 대기 |
-| 2 | 글 종류별 chunking 규칙 | 결정 대기 (스크립트 미구현) |
-| 3 | 검색 → 유사도 하한 → Claude 판단, 출처는 실제로 쓴 chunk만 | 결정 대기 (미구현) |
-| 4 | Claude에는 검색 chunk + 앞뒤 chunk만 넘김 (최대 3개 글) | 결정 대기 (미구현) |
+| 2 | 글 종류별 chunking 규칙 | **구현함** (`app/rag/chunking.py`, `scripts/build_chunks.py`). 크롤러는 미구현 |
+| 3 | 검색 → 유사도 하한 → Claude 판단, 출처는 실제로 쓴 chunk만 | **구현함** (`app/rag/pipeline.py`). 실제 API로는 아직 미검증 |
+| 4 | Claude에는 검색 chunk + 앞뒤 chunk만 넘김 (최대 3개 글) | **구현함** |
 | 5 | 응답에 `answer_type`, 출처에 `visibility/date/url` 추가 | **이 브랜치에서 구현함** |
-| 6 | 공개 등급 L1은 원문(excerpt) 숨김, L0은 출처 불가 | **이 브랜치에서 구현함** |
+| 6 | 공개 등급 L1은 원문(excerpt) 숨김, L0은 출처 불가, url·제목은 L3만 | **이 브랜치에서 구현함** |
 | 7 | 위기 신호는 고정 안내 문구로 응답 | **이 브랜치에서 구현함 (문구는 초안)** |
-| 8 | 호출 횟수 제한 3단계 (익명 ID·IP·전체) | **이 브랜치에서 구현함** |
+| 8 | 호출 횟수 제한 3단계 (익명 ID·IP·전체, 최근 60초 기준) | **이 브랜치에서 구현함** |
 | 9 | 대화 맥락 없이 질문 하나씩 답함 (MVP) | 결정 대기 (지금 동작과 같음) |
-| 10 | 질문 세트 20~30개로 성능 측정 | 결정 대기 (미구현) |
+| 10 | 질문 세트 20~30개로 성능 측정 | 스크립트 구현함 (`scripts/eval_ask.py`). 질문 세트는 예시 5개뿐 |
+| 11 | RAG는 `RAG_ENABLED=true`일 때만 사용 (기본은 demo) | **이 브랜치에서 구현함** |
+| 12 | API 오류 시 500 대신 `no_evidence` + 임시 안내 (프론트 수정 불필요) | **이 브랜치에서 구현함** |
 
 ---
 
@@ -123,10 +125,19 @@ MVP에서는 질문을 하나씩 따로 답합니다 (지금 동작과 같음). 
 
 ## 10. 구현 순서 (PR 단위 제안)
 1. 응답 형식 + 위기 안전장치 + 호출 제한 ← **이 브랜치**
-2. 크롤링·정제·chunking 스크립트 (먼저 JSON 파일로 출력)
-3. 임베딩 + Supabase 적재, 검색 함수
-4. Claude 답변 생성 + 출처 구성 → `services/answer.py`의 `make_answer()` 교체
-5. 성능 측정 스크립트로 수치 조정
+2. chunking 스크립트 ← **이 브랜치** (크롤링·개인정보 정제는 아직)
+3. 임베딩 + Supabase 적재, 검색 함수 ← **이 브랜치** (실제 키로 미검증)
+4. Claude 답변 생성 + 출처 구성 → `make_answer()`에 연결 ← **이 브랜치** (`RAG_ENABLED=true`로 켬)
+5. 실제 데이터로 성능 측정 → 유사도 하한·K 값 등 조정 ← 다음 단계
+
+### RAG 켜 보기 (로컬)
+```bash
+cd backend
+pip install -r requirements-rag.txt          # .env 에 OPENAI_API_KEY, ANTHROPIC_API_KEY
+python ../scripts/build_chunks.py ../scripts/examples/sample_posts.json ../data/raw/chunks.jsonl
+python ../scripts/load_chunks.py ../data/raw/chunks.jsonl --local ../data/raw/chunks_embedded.jsonl  # ⚠️ 임베딩 비용 발생
+# .env 에 RAG_ENABLED=true, RAG_LOCAL_CHUNKS=../data/raw/chunks_embedded.jsonl 넣고 서버 실행
+```
 
 ## 팀 논의가 필요한 것
 - [ ] 위 1~10 제안 전체를 확정할지

@@ -46,6 +46,16 @@ RATE_LIMIT_IP_PER_DAY = _int_env("RATE_LIMIT_IP_PER_DAY", 1000)
 # 서비스 전체 하루 상한 (API 비용 안전장치)
 RATE_LIMIT_GLOBAL_PER_DAY = _int_env("RATE_LIMIT_GLOBAL_PER_DAY", 2000)
 
+# ---------------------------------------------------------------------------
+# 실제 RAG 사용 여부
+# ---------------------------------------------------------------------------
+# false(기본): /ask 는 demo 답변을 돌려준다. API 키가 없어도 된다.
+# true: app/rag 파이프라인을 쓴다. requirements-rag.txt 설치 + OPENAI_API_KEY, ANTHROPIC_API_KEY 필요.
+#       RAG_LOCAL_CHUNKS 에 임베딩 포함 jsonl 경로를 주면 Supabase 대신 그 파일로 검색한다 (로컬 개발용).
+#       비우면 SUPABASE_URL, SUPABASE_KEY 로 Supabase 를 쓴다.
+RAG_ENABLED = _bool_env("RAG_ENABLED", False)
+RAG_LOCAL_CHUNKS = os.getenv("RAG_LOCAL_CHUNKS") or None
+
 # true 면 X-Forwarded-For 헤더에서 학생 IP를 읽는다.
 # Render 같은 배포 환경은 프록시를 거치므로 true 로 둬야 한다. (로컬 개발은 false)
 TRUST_PROXY_HEADERS = _bool_env("TRUST_PROXY_HEADERS", False)

@@ -9,6 +9,9 @@
   2. IP — 봇 방지용 (느슨하게)
   3. 서비스 전체 하루 상한
 
+- '분당'은 **최근 60초** 기준이다 (슬라이딩 윈도우). 시계의 '분'으로 자르면 12:00:59 에 5번,
+  12:01:00 에 5번처럼 경계에서 2배가 몰릴 수 있어서다.
+- '하루'는 한국 시간 자정 기준이다.
 - 카운터는 서버 메모리에만 있다. 서버가 재시작되면 0으로 돌아간다. (MVP라 충분, DB·Redis 안 씀)
 - 서버를 여러 대 띄우면 서버마다 따로 센다. 지금(Render 1대)은 문제없다.
 - X-Client-Id 가 없는 요청(옛 프론트 등)은 IP·전체 기준만 적용한다. 그래서 프론트가 헤더를 보내기 전에도 안 깨진다.
@@ -17,6 +20,7 @@
 import re
 import threading
 import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request
@@ -24,6 +28,7 @@ from fastapi import HTTPException, Request
 from app import config
 
 KST = timezone(timedelta(hours=9))  # 하루 기준은 한국 시간 자정
+WINDOW_SECONDS = 60
 
 # 익명 ID로 받아들일 형식: 영문·숫자·하이픈 8~64자 (보통 UUID). 이상한 값은 없는 것으로 친다.
 CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{8,64}$")
@@ -34,52 +39,77 @@ GLOBAL_LIMIT_MESSAGE = "오늘은 꾸로록 이용량이 많아 질문을 받을
 
 
 class RateLimiter:
-    """시간 구간(1분, 하루)마다 횟수를 세는 단순한 카운터."""
+    """
+    대상(익명 ID, IP, 전체)마다 최근 60초 동안의 요청 시각과 오늘 횟수를 기억한다.
+    clock 은 테스트에서 시간을 직접 움직이려고 바꿔 끼울 수 있게 했다.
+    """
 
-    def __init__(self) -> None:
-        self._counts: dict[tuple[str, str], int] = {}  # (구간, 대상) → 횟수
+    def __init__(self, clock=time.time) -> None:
+        self._clock = clock
         self._lock = threading.Lock()  # FastAPI 가 요청을 동시에 처리할 수 있어서 잠금을 건다
+        self._recent: dict[str, deque[float]] = {}  # 대상 → 최근 60초 안의 요청 시각들
+        self._today: dict[str, int] = {}  # 대상 → 오늘 횟수
+        self._day = ""  # _today 가 어느 날짜의 기록인지
 
     def reset(self) -> None:
         """카운터를 모두 지운다. (테스트용)"""
         with self._lock:
-            self._counts.clear()
+            self._recent.clear()
+            self._today.clear()
+            self._day = ""
 
     def check_and_count(self, client_id: str | None, ip: str) -> None:
         """
         제한을 넘었으면 429 오류를 낸다. 통과하면 횟수를 1 올린다.
         (하나라도 막히면 아무것도 세지 않는다 → 막힌 요청이 다른 카운터를 깎지 않는다)
         """
-        now = time.time()
-        minute = f"m{int(now // 60)}"
-        day = "d" + datetime.fromtimestamp(now, KST).strftime("%Y%m%d")
+        now = self._clock()
 
-        # (구간, 대상, 상한, 막혔을 때 문구, 다시 시도까지 초)
-        rules: list[tuple[str, str, int, str, int]] = [
-            (day, "global", config.RATE_LIMIT_GLOBAL_PER_DAY, GLOBAL_LIMIT_MESSAGE, _seconds_until_midnight(now)),
-            (minute, f"ip:{ip}", config.RATE_LIMIT_IP_PER_MINUTE, LIMIT_MESSAGE, 60),
-            (day, f"ip:{ip}", config.RATE_LIMIT_IP_PER_DAY, DAILY_LIMIT_MESSAGE, _seconds_until_midnight(now)),
+        # (대상, 60초 상한, 하루 상한, 하루 상한에 걸렸을 때 문구). 60초 상한 0 은 '분당 제한 없음'
+        rules: list[tuple[str, int, int, str]] = [
+            ("global", 0, config.RATE_LIMIT_GLOBAL_PER_DAY, GLOBAL_LIMIT_MESSAGE),
+            (f"ip:{ip}", config.RATE_LIMIT_IP_PER_MINUTE, config.RATE_LIMIT_IP_PER_DAY, DAILY_LIMIT_MESSAGE),
         ]
         if client_id:
-            rules += [
-                (minute, f"client:{client_id}", config.RATE_LIMIT_CLIENT_PER_MINUTE, LIMIT_MESSAGE, 60),
-                (day, f"client:{client_id}", config.RATE_LIMIT_CLIENT_PER_DAY, DAILY_LIMIT_MESSAGE,
-                 _seconds_until_midnight(now)),
-            ]
+            rules.append(
+                (f"client:{client_id}", config.RATE_LIMIT_CLIENT_PER_MINUTE, config.RATE_LIMIT_CLIENT_PER_DAY,
+                 DAILY_LIMIT_MESSAGE)
+            )
 
         with self._lock:
-            self._drop_old_windows(minute, day)
-            for window, target, limit, message, retry_after in rules:
-                if self._counts.get((window, target), 0) >= limit:
-                    raise HTTPException(status_code=429, detail=message, headers={"Retry-After": str(retry_after)})
-            for window, target, _, _, _ in rules:
-                self._counts[(window, target)] = self._counts.get((window, target), 0) + 1
+            self._start_new_day_if_needed(now)
+            self._drop_old_requests(now)
 
-    def _drop_old_windows(self, minute: str, day: str) -> None:
-        """지난 구간의 카운터를 지워 메모리가 계속 늘지 않게 한다."""
-        stale = [key for key in self._counts if key[0] not in (minute, day)]
-        for key in stale:
-            del self._counts[key]
+            for target, per_minute, per_day, day_message in rules:
+                if self._today.get(target, 0) >= per_day:
+                    raise _too_many(day_message, _seconds_until_midnight(now))
+                recent = self._recent.get(target)
+                if per_minute and recent and len(recent) >= per_minute:
+                    # 가장 오래된 요청이 60초 창에서 빠지는 시각까지 기다리면 된다
+                    raise _too_many(LIMIT_MESSAGE, max(1, int(recent[0] + WINDOW_SECONDS - now) + 1))
+
+            for target, per_minute, _, _ in rules:
+                if per_minute:
+                    self._recent.setdefault(target, deque()).append(now)
+                self._today[target] = self._today.get(target, 0) + 1
+
+    def _start_new_day_if_needed(self, now: float) -> None:
+        today = datetime.fromtimestamp(now, KST).strftime("%Y%m%d")
+        if today != self._day:
+            self._day, self._today = today, {}
+
+    def _drop_old_requests(self, now: float) -> None:
+        """60초가 지난 요청 시각을 지우고, 빈 대상은 통째로 지운다 (메모리가 계속 늘지 않게)."""
+        for target in list(self._recent):
+            recent = self._recent[target]
+            while recent and recent[0] <= now - WINDOW_SECONDS:
+                recent.popleft()
+            if not recent:
+                del self._recent[target]
+
+
+def _too_many(message: str, retry_after: int) -> HTTPException:
+    return HTTPException(status_code=429, detail=message, headers={"Retry-After": str(retry_after)})
 
 
 def _seconds_until_midnight(now: float) -> int:
@@ -112,5 +142,5 @@ ask_limiter = RateLimiter()
 
 
 def limit_ask(request: Request) -> None:
-    """/ask 라우트에 붙이는 FastAPI 의존성(Depends). 제한을 넘으면 429."""
+    """/ask 라우트 안에서 부른다 (입력 검사·위기 신호 검사 다음). 제한을 넘으면 429."""
     ask_limiter.check_and_count(client_id(request), client_ip(request))

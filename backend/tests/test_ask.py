@@ -1,11 +1,15 @@
 """POST /ask 테스트: 응답 형식, 답변 종류(answer_type), 공개 등급 규칙, 호출 횟수 제한."""
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app import config
 from app.main import app
+from app.rag.models import RagAnswer, RagSource
+from app.rate_limit import RateLimiter
 from app.schemas import Source
+from app.services import answer as answer_service
 
 client = TestClient(app)
 
@@ -173,9 +177,125 @@ def test_invalid_client_id_is_ignored(monkeypatch):
     assert ask("질문", bad).status_code == 200
 
 
+# ---------------------------------------------------------------------------
+# 최근 60초 기준 (슬라이딩 윈도우) — 가짜 시계로 시간을 직접 움직인다
+# ---------------------------------------------------------------------------
+
+NOON_KST = 1_762_570_800.0  # 2025-11-08 12:00:00 KST
+
+
+class FakeClock:
+    def __init__(self, now: float = NOON_KST):
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def blocked(limiter: RateLimiter, client: str = "client-aaaa-1111") -> bool:
+    try:
+        limiter.check_and_count(client, "1.1.1.1")
+        return False
+    except HTTPException as e:
+        assert e.status_code == 429
+        return True
+
+
+def test_minute_limit_recovers_after_60_seconds(monkeypatch):
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_MINUTE", 2)
+    clock = FakeClock()
+    limiter = RateLimiter(clock=clock)
+    assert not blocked(limiter) and not blocked(limiter)
+    assert blocked(limiter)
+    clock.now += 61
+    assert not blocked(limiter)
+
+
+def test_no_double_burst_at_minute_boundary(monkeypatch):
+    """12:00:59 에 2번 → 12:01:00 에는 막혀야 한다 (시계의 '분'으로 자르면 통과해 버림)."""
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_MINUTE", 2)
+    clock = FakeClock(NOON_KST + 59)
+    limiter = RateLimiter(clock=clock)
+    assert not blocked(limiter) and not blocked(limiter)
+    clock.now += 1  # 12:01:00
+    assert blocked(limiter)
+
+
+def test_daily_limit_resets_at_kst_midnight(monkeypatch):
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_DAY", 2)
+    clock = FakeClock()
+    limiter = RateLimiter(clock=clock)
+    assert not blocked(limiter)
+    clock.now += 61
+    assert not blocked(limiter)
+    clock.now += 61
+    assert blocked(limiter)
+    clock.now = NOON_KST + 12 * 3600 + 1  # 다음 날 00:00:01 KST
+    assert not blocked(limiter)
+
+
 def test_forwarded_ip_used_when_trusted(monkeypatch):
     monkeypatch.setattr(config, "TRUST_PROXY_HEADERS", True)
     monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
     assert ask("질문", {"X-Forwarded-For": "203.0.113.1, 10.0.0.1"}).status_code == 200
     assert ask("질문", {"X-Forwarded-For": "203.0.113.1, 10.0.0.1"}).status_code == 429
     assert ask("질문", {"X-Forwarded-For": "203.0.113.2, 10.0.0.1"}).status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# RAG 연결 (RAG_ENABLED) — 실제 API 대신 가짜 파이프라인을 끼운다
+# ---------------------------------------------------------------------------
+
+
+class FakePipeline:
+    def __init__(self, result: RagAnswer):
+        self.result = result
+        self.questions: list[str] = []
+
+    def answer(self, question: str) -> RagAnswer:
+        self.questions.append(question)
+        return self.result
+
+
+def use_fake_pipeline(monkeypatch, result: RagAnswer) -> FakePipeline:
+    fake = FakePipeline(result)
+    monkeypatch.setattr(config, "RAG_ENABLED", True)
+    monkeypatch.setattr(answer_service, "_pipeline", fake)
+    return fake
+
+
+def test_rag_answer_is_used_when_enabled(monkeypatch):
+    source = RagSource(chunk_id="p1#0", post_id="p1", alumni="새벽", excerpt="원문", visibility="L3",
+                       url="https://example.com/p1", date="2023-05-10")
+    fake = use_fake_pipeline(monkeypatch, RagAnswer(answer_type="answer", answer="RAG 답변", sources=[source]))
+    data = ask("창업 이야기").json()
+    assert fake.questions == ["창업 이야기"]
+    assert data["answer"] == "RAG 답변" and data["answer_type"] == "answer"
+    assert data["sources"][0]["interview_id"] == "p1" and data["sources"][0]["url"] == "https://example.com/p1"
+
+
+def test_demo_keywords_do_not_apply_when_rag_enabled(monkeypatch):
+    use_fake_pipeline(monkeypatch, RagAnswer(answer_type="answer", answer="RAG 답변"))
+    assert ask("주제밖 질문").json()["answer"] == "RAG 답변"  # demo 트리거 단어는 RAG 에서는 무시
+
+
+def test_crisis_is_checked_before_rag(monkeypatch):
+    fake = use_fake_pipeline(monkeypatch, RagAnswer(answer_type="answer", answer="RAG 답변"))
+    assert ask("요즘 너무 죽고 싶어").json()["answer_type"] == "safety"
+    assert fake.questions == []  # 위기 질문은 RAG(유료 API)를 부르지 않는다
+
+
+def test_rag_build_failure_returns_temporary_message(monkeypatch):
+    """패키지 미설치·API 키 없음 등으로 파이프라인을 못 만들면 500 대신 안내 문구."""
+    monkeypatch.setattr(config, "RAG_ENABLED", True)
+    monkeypatch.setattr(answer_service, "_pipeline", None)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("OPENAI_API_KEY 없음")
+
+    monkeypatch.setattr("app.rag.pipeline.build_pipeline_from_env", broken)
+    res = ask("창업 이야기")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["answer_type"] == "no_evidence" and data["has_enough_evidence"] is False
+    assert data["answer"] == answer_service.TEMPORARY_ERROR_MESSAGE
