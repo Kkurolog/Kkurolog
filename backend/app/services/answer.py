@@ -65,9 +65,15 @@ OFF_TOPIC_MESSAGE = (
 NO_EVIDENCE_MESSAGE = "현재 자료만으로는 답하기 어려워요. 비슷한 경험을 가진 사람을 찾아볼까요?"
 
 
-def _looks_like_crisis(question: str) -> bool:
+def looks_like_crisis(question: str) -> bool:
+    """위기 단어가 있는지. main.py 가 호출 횟수 제한보다 먼저 부른다 (막힌 학생도 안내를 받도록)."""
     compact = question.replace(" ", "")
     return any(word in compact for word in CRISIS_KEYWORDS)
+
+
+def safety_answer() -> AskResponse:
+    """위기 신호일 때의 고정 안내 답변."""
+    return _special_answer("safety", SAFETY_MESSAGE)
 
 
 def _special_answer(answer_type: AnswerType, message: str) -> AskResponse:
@@ -83,8 +89,8 @@ def _special_answer(answer_type: AnswerType, message: str) -> AskResponse:
 def make_answer(question: str) -> AskResponse:
     """질문을 받아 답변을 돌려준다. (위기 안전장치는 실제 동작, 나머지는 가짜 답변)"""
 
-    if _looks_like_crisis(question):
-        return _special_answer("safety", SAFETY_MESSAGE)
+    if looks_like_crisis(question):  # main.py 에서도 먼저 거르지만, 다른 곳에서 불러도 안전하게 한 번 더
+        return safety_answer()
 
     if any(word in question for word in OFF_TOPIC_KEYWORDS):
         return _special_answer("off_topic", OFF_TOPIC_MESSAGE)

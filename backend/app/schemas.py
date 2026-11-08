@@ -30,9 +30,12 @@ class Source(BaseModel):
 
     공개 등급(visibility, docs/DATA.md):
       - L0: 사용 불가 → 출처로 만들 수 없다 (만들려고 하면 오류)
-      - L1: 익명으로 답변 근거만 → excerpt·url 을 자동으로 비운다 (원문 비공개)
-      - L2, L3: 원문 구간 노출 가능 → excerpt 를 채운다
-    visibility 를 안 주면(None) 예전처럼 excerpt 를 그대로 보여준다. (demo·하위 호환)
+      - L1: 익명으로 답변 근거만 → excerpt 를 자동으로 비운다 (원문 비공개)
+      - L2: 익명 원문 구간 노출 → excerpt 는 채운다
+      - L3: 실명·멘토 연결 가능 → excerpt 를 채우고 url 도 보여준다
+    url(원문 글 주소)은 L3 일 때만 남긴다. gschool.kr 원문에는 작성자 이름이 있어서,
+    L1·L2(익명) 글의 링크를 주면 누구인지 드러나기 때문이다.
+    visibility 를 안 주면(None) 예전처럼 excerpt 를 그대로 보여준다. (demo·하위 호환, url 은 비움)
     """
 
     alumni: str = Field(..., description="화면에 보여줄 이름 (예: '졸업생 A'). 공개 등급에 따라 익명")
@@ -43,17 +46,20 @@ class Source(BaseModel):
     # --- 아래는 새로 추가한 선택 필드 (docs/proposals/ask-plan.md) ---
     visibility: Literal["L1", "L2", "L3"] | None = Field(None, description="공개 등급. 없으면 demo 데이터")
     date: str | None = Field(None, description="글·인터뷰 날짜 (예: '2021-05'). 오래된 정보인지 알려주는 용도")
-    url: str | None = Field(None, description="원문 글 주소. L1 이면 null")
+    url: str | None = Field(None, description="원문 글 주소. L3 일 때만 채우고, 그 외에는 null (익명 보호)")
 
     @model_validator(mode="before")
     @classmethod
     def _apply_visibility(cls, data: object) -> object:
-        """공개 등급 규칙을 여기서 강제한다. 실수로 L1 원문이 응답에 나가는 일을 막는다."""
+        """공개 등급 규칙을 여기서 강제한다. 실수로 L1 원문이나 익명 글의 링크가 응답에 나가는 일을 막는다."""
         if isinstance(data, dict):
-            if data.get("visibility") == "L0":
+            visibility = data.get("visibility")
+            if visibility == "L0":
                 raise ValueError("L0(사용 불가) 자료는 출처로 쓸 수 없어요")
-            if data.get("visibility") == "L1":
-                data = {**data, "excerpt": None, "url": None}
+            if visibility == "L1":
+                data = {**data, "excerpt": None}
+            if visibility != "L3":
+                data = {**data, "url": None}
         return data
 
 

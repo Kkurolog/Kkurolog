@@ -16,7 +16,7 @@ export type Source = {
   interview_id: string;
   visibility?: "L1" | "L2" | "L3" | null; // [추가] 공개 등급
   date?: string | null; // [추가] 글·인터뷰 날짜 (오래된 정보 표시용)
-  url?: string | null; // [추가] 원문 주소 (L1 이면 null)
+  url?: string | null; // [추가] 원문 주소. L3(실명 공개)일 때만 오고, 그 외에는 null (익명 보호)
 };
 
 // [추가] 답변 종류. safety(위기 신호)면 멘토 추천 대신 상담 안내를 보여주는 게 좋다.
