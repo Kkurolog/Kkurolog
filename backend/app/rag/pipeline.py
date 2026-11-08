@@ -21,19 +21,14 @@ from app.rag.generator import ContextDoc, Generator
 from app.rag.messages import (
     NO_EVIDENCE_MESSAGE,
     OFF_TOPIC_MESSAGE,
-    SAFETY_KEYWORDS,
     SAFETY_MESSAGE,
     TEMPORARY_ERROR_MESSAGE,
+    looks_like_crisis,  # 위기 신호 판정은 app/services/answer.py 의 함수 하나만 쓴다
 )
 from app.rag.models import Chunk, RagAnswer, RagSource, ScoredChunk
 from app.rag.store import VectorStore
 
 logger = logging.getLogger("uvicorn.error")
-
-
-def has_safety_keyword(question: str) -> bool:
-    compact = question.replace(" ", "")
-    return any(k.replace(" ", "") in compact for k in SAFETY_KEYWORDS)
 
 
 def public_title(chunk: Chunk) -> str:
@@ -108,7 +103,7 @@ class RagPipeline:
 
     # ---- 전체 ----
     def answer(self, question: str) -> RagAnswer:
-        if has_safety_keyword(question):
+        if looks_like_crisis(question):
             return RagAnswer(answer_type="safety", answer=SAFETY_MESSAGE)
 
         try:

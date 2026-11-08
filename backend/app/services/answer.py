@@ -23,6 +23,7 @@ has_enough_evidence 규칙 (현재 프론트와의 하위 호환):
 """
 
 import logging
+import re
 
 from app import config
 from app.schemas import AnswerType, AskResponse, Source
@@ -53,9 +54,26 @@ OFF_TOPIC_KEYWORDS = ["주제밖"]
 # 위기 신호 안전장치 (demo 전용이 아니다. RAG 를 붙여도 Claude 판단 전에 먼저 거른다)
 # ---------------------------------------------------------------------------
 # Claude 판단이 실패하거나 API 가 죽어도 최소한의 안내는 나가게 하려는 것.
-# 띄어쓰기를 지우고 비교한다 ('죽고 싶어' ↔ '죽고싶어').
-# ⚠️ 단어 목록과 아래 안내 문구는 '초안'이다. 반드시 코치진과 확인한 뒤 확정한다.
-CRISIS_KEYWORDS = ["죽고싶", "자살", "자해", "살기싫", "사라지고싶", "학대", "폭행당"]
+# ⚠️ 패턴 목록과 아래 안내 문구는 '초안'이다. 반드시 코치진과 확인한 뒤 확정한다.
+#
+# 주의: 띄어쓰기를 지우고 글자 조각으로 비교하면 안 된다.
+#   '가고자 해' → '가고자해' 속에 '자해', '의학대학' 속에 '학대' 가 생겨 진로 질문이 위기로 분류된다.
+#   그래서 (1) 띄어쓰기는 구절 안에서만 있어도 되고 없어도 되게(\s*) 하고,
+#         (2) 짧은 단어(자해·학대)는 '단어의 시작'일 때만 잡는다 (바로 앞 글자가 한글이면 다른 단어의 일부).
+# 패턴을 바꾸면 tests/test_ask.py 의 오탐·미탐 문장 테스트를 꼭 돌린다.
+_WORD_START = r"(?<![가-힣])"  # 앞 글자가 한글이 아님 = 단어의 시작
+CRISIS_PATTERNS = [
+    r"죽고\s*싶",
+    r"자살",  # 일상 단어 속에 거의 섞이지 않아서 위치를 따지지 않는다
+    _WORD_START + r"자해",  # '하고자 해', '가고자해' 는 제외
+    r"살기\s*싫",
+    r"사라지고\s*싶",
+    _WORD_START + r"학대",  # '의학대학', '공학대학원' 은 제외
+    r"아동\s*학대",  # 붙여 쓴 '아동학대' 도 잡는다
+    r"학대\s*(를|당|받)",  # '가정에서학대받아' 처럼 붙여 써도 잡는다
+    r"폭행\s*당",
+]
+_CRISIS_REGEX = re.compile("|".join(CRISIS_PATTERNS))
 
 SAFETY_MESSAGE = (
     "지금 많이 힘든 마음이 느껴져요. 혼자 견디지 말고 믿을 수 있는 코치님이나 어른에게 꼭 이야기해 주세요. "
@@ -79,9 +97,11 @@ TEMPORARY_ERROR_MESSAGE = (
 
 
 def looks_like_crisis(question: str) -> bool:
-    """위기 단어가 있는지. main.py 가 호출 횟수 제한보다 먼저 부른다 (막힌 학생도 안내를 받도록)."""
-    compact = question.replace(" ", "")
-    return any(word in compact for word in CRISIS_KEYWORDS)
+    """
+    위기 신호가 있는지. 판정은 이 함수 하나로만 한다 (RAG 파이프라인도 이 함수를 쓴다).
+    main.py 가 호출 횟수 제한보다 먼저 부른다 (막힌 학생도 안내를 받도록).
+    """
+    return _CRISIS_REGEX.search(question) is not None
 
 
 def safety_answer() -> AskResponse:

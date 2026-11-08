@@ -25,7 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from dotenv import load_dotenv  # noqa: E402
 
 from app.rag.config import RagSettings  # noqa: E402
-from app.rag.pipeline import build_pipeline_from_env, has_safety_keyword  # noqa: E402
+from app.rag.pipeline import build_pipeline_from_env  # noqa: E402
+from app.services.answer import looks_like_crisis  # noqa: E402
 
 
 def main() -> None:
@@ -49,7 +50,7 @@ def main() -> None:
 
     for q in questions:
         expected = set(q.get("expected_post_ids", []))
-        hits = [] if has_safety_keyword(q["question"]) else pipeline.retrieve(q["question"])
+        hits = [] if looks_like_crisis(q["question"]) else pipeline.retrieve(q["question"])
         found = {h.chunk.post_id for h in hits}
         top = ", ".join(f"{h.chunk.chunk_id}({h.score:.2f})" for h in hits[:3]) or "-"
 

@@ -315,3 +315,46 @@ def test_rag_build_failure_returns_temporary_message(monkeypatch):
     data = res.json()
     assert data["answer_type"] == "no_evidence" and data["has_enough_evidence"] is False
     assert data["answer"] == answer_service.TEMPORARY_ERROR_MESSAGE
+
+
+# ---------------------------------------------------------------------------
+# 위기 신호 판정: 오탐(진로 질문이 위기로 분류)·미탐(위기를 놓침) 문장
+# 패턴을 바꿀 때마다 이 테스트가 통과하는지 확인한다.
+# ---------------------------------------------------------------------------
+
+NOT_CRISIS = [
+    # 띄어쓰기를 지우면 '자해'·'학대' 조각이 생기던 진로 질문들
+    "서울시립대학교 전자전기컴퓨터공학부를 가고자 해 관련하여 조언을 줄 선배가 있을까?",
+    "디자인을 배우고자 해요",
+    "창업을 하고자해",
+    "의학대학 가고 싶어",
+    "공학대학원 진학 고민",
+    "약학대학 준비",
+    "대학원 생활 어때?",
+]
+
+CRISIS = [
+    "요즘 자해를 해요",
+    "자해했어",
+    "죽고 싶어",
+    "죽고싶다",
+    "살기 싫어",
+    "그냥 사라지고 싶어",
+    "자살 생각이 들어",
+    "집에서 학대를 당하고 있어",
+    "아동학대 같아",
+    "가정에서학대받아",
+    "학교에서 폭행당했어",
+]
+
+
+@pytest.mark.parametrize("question", NOT_CRISIS)
+def test_career_questions_are_not_crisis(question):
+    assert answer_service.looks_like_crisis(question) is False
+    assert ask(question).json()["answer_type"] != "safety"
+
+
+@pytest.mark.parametrize("question", CRISIS)
+def test_crisis_questions_are_caught(question):
+    assert answer_service.looks_like_crisis(question) is True
+    assert ask(question).json()["answer_type"] == "safety"
