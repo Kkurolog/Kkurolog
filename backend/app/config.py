@@ -35,8 +35,11 @@ def _bool_env(name: str, default: bool) -> bool:
 # 학교 와이파이는 학생 모두가 같은 IP를 쓰므로, 학생 한 명 기준은 IP가 아니라
 # 브라우저별 익명 ID(X-Client-Id 헤더)로 센다. IP 기준은 봇 방지용으로 느슨하게 둔다.
 
+# 분당 상한을 0 으로 두면 '분당 제한 없음'이다.
+
 # 브라우저(익명 ID) 한 개당
-RATE_LIMIT_CLIENT_PER_MINUTE = _int_env("RATE_LIMIT_CLIENT_PER_MINUTE", 5)
+# 분당 제한은 두지 않는다 (0): 학생이 연달아 질문해도 막지 않고, 하루 상한으로만 관리한다
+RATE_LIMIT_CLIENT_PER_MINUTE = _int_env("RATE_LIMIT_CLIENT_PER_MINUTE", 0)
 RATE_LIMIT_CLIENT_PER_DAY = _int_env("RATE_LIMIT_CLIENT_PER_DAY", 30)
 
 # IP 한 개당 (봇 방지용)

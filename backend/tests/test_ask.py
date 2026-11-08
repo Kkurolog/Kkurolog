@@ -118,6 +118,22 @@ def test_client_per_minute_limit(monkeypatch):
     assert ask("질문", CLIENT_B).status_code == 200
 
 
+def test_client_has_no_per_minute_limit_by_default(monkeypatch):
+    """기본값: 학생별 분당 제한 없음 (하루 상한만). 연달아 10번 질문해도 막히지 않는다."""
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_MINUTE", 0)
+    for _ in range(10):
+        assert ask("질문", CLIENT_A).status_code == 200
+
+
+def test_client_daily_limit_still_applies(monkeypatch):
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_MINUTE", 0)
+    monkeypatch.setattr(config, "RATE_LIMIT_CLIENT_PER_DAY", 3)
+    for _ in range(3):
+        assert ask("질문", CLIENT_A).status_code == 200
+    blocked = ask("질문", CLIENT_A)
+    assert blocked.status_code == 429 and "오늘" in blocked.json()["detail"]
+
+
 def test_ip_limit_applies_without_client_id(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 3)
     for _ in range(3):
