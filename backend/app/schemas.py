@@ -9,7 +9,7 @@ API에서 주고받는 데이터의 "모양"을 정의하는 파일.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AskRequest(BaseModel):
@@ -25,11 +25,44 @@ class AskRequest(BaseModel):
 
 
 class Source(BaseModel):
-    """답변의 근거가 된 인터뷰 구간 하나."""
+    """
+    답변의 근거가 된 인터뷰 구간 하나.
+
+    공개 등급(visibility, docs/DATA.md):
+      - L0: 사용 불가 → 출처로 만들 수 없다 (만들려고 하면 오류)
+      - L1: 익명으로 답변 근거만 → excerpt·url 을 자동으로 비운다 (원문 비공개)
+      - L2, L3: 원문 구간 노출 가능 → excerpt 를 채운다
+    visibility 를 안 주면(None) 예전처럼 excerpt 를 그대로 보여준다. (demo·하위 호환)
+    """
 
     alumni: str = Field(..., description="화면에 보여줄 이름 (예: '졸업생 A'). 공개 등급에 따라 익명")
-    excerpt: str = Field(..., description="인터뷰에서 가져온 관련 구간")
+    excerpt: str | None = Field(
+        None, description="인터뷰에서 가져온 관련 구간. L1(원문 비공개)이면 null, 그 외에는 항상 채운다"
+    )
     interview_id: str = Field(..., description="원본 인터뷰를 찾기 위한 ID")
+    # --- 아래는 새로 추가한 선택 필드 (docs/proposals/ask-plan.md) ---
+    visibility: Literal["L1", "L2", "L3"] | None = Field(None, description="공개 등급. 없으면 demo 데이터")
+    date: str | None = Field(None, description="글·인터뷰 날짜 (예: '2021-05'). 오래된 정보인지 알려주는 용도")
+    url: str | None = Field(None, description="원문 글 주소. L1 이면 null")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_visibility(cls, data: object) -> object:
+        """공개 등급 규칙을 여기서 강제한다. 실수로 L1 원문이 응답에 나가는 일을 막는다."""
+        if isinstance(data, dict):
+            if data.get("visibility") == "L0":
+                raise ValueError("L0(사용 불가) 자료는 출처로 쓸 수 없어요")
+            if data.get("visibility") == "L1":
+                data = {**data, "excerpt": None, "url": None}
+        return data
+
+
+# 답변 종류 (프론트가 화면을 다르게 그릴 때 쓴다)
+#   answer      : 근거를 바탕으로 한 일반 답변
+#   no_evidence : 근거 부족 → 멘토 추천으로 연결
+#   off_topic   : 진로·경험과 무관한 질문 → 정중히 안내
+#   safety      : 위기 신호(자해·학대 등) → 상담 안내. 멘토 추천을 띄우지 않는 게 좋다
+AnswerType = Literal["answer", "no_evidence", "off_topic", "safety"]
 
 
 class AskResponse(BaseModel):
@@ -39,8 +72,12 @@ class AskResponse(BaseModel):
     sources: list[Source] = Field(default_factory=list, description="답변에 사용한 출처 목록")
     has_enough_evidence: bool = Field(
         ...,
-        description="근거가 충분한지. false면 프론트에서 '멘토 찾아보기' 안내를 보여준다",
+        description=(
+            "근거가 충분한지. false면 프론트에서 '멘토 찾아보기' 안내를 보여준다. "
+            "answer_type 이 no_evidence 일 때만 false (off_topic·safety 는 안내 문구가 보이도록 true)"
+        ),
     )
+    answer_type: AnswerType = Field("answer", description="답변 종류 (새 필드, 선택)")
 
 
 # ---------------------------------------------------------------------------

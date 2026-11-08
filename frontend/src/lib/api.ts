@@ -4,29 +4,70 @@
 // backend 주소. .env.local 의 NEXT_PUBLIC_API_URL 값을 사용한다.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// [백엔드 제안 브랜치 feat/ask-plan-draft에서 수정: docs/proposals/ask-plan.md]
+// 새 필드는 모두 선택(?) 필드라서, 이 필드를 안 쓰는 기존 화면 코드는 그대로 동작한다.
+
 // 답변의 근거가 된 인터뷰 구간 하나
 export type Source = {
   alumni: string;
-  excerpt: string;
+  // 공개 등급 L1(원문 비공개)이면 null. 그 외에는 지금처럼 항상 문자열이다.
+  // [수정] string → string | null. 실제 L1 데이터가 들어오기 전까지 null 은 오지 않는다.
+  excerpt: string | null;
   interview_id: string;
+  visibility?: "L1" | "L2" | "L3" | null; // [추가] 공개 등급
+  date?: string | null; // [추가] 글·인터뷰 날짜 (오래된 정보 표시용)
+  url?: string | null; // [추가] 원문 주소 (L1 이면 null)
 };
+
+// [추가] 답변 종류. safety(위기 신호)면 멘토 추천 대신 상담 안내를 보여주는 게 좋다.
+export type AnswerType = "answer" | "no_evidence" | "off_topic" | "safety";
 
 // /ask 응답
 export type AskResponse = {
   answer: string;
   sources: Source[];
-  has_enough_evidence: boolean;
+  has_enough_evidence: boolean; // no_evidence 일 때만 false
+  answer_type?: AnswerType; // [추가]
 };
+
+// [추가] 브라우저별 익명 ID. backend 가 '학생 한 명당 질문 횟수'를 셀 때 쓴다.
+// 학교 와이파이는 모두 IP가 같아서 IP로는 학생을 구분할 수 없다.
+// 이름·이메일 같은 개인정보는 들어 있지 않은 무작위 값이다.
+// (쿠키는 프론트·백엔드 도메인이 달라 브라우저가 막을 수 있어서 localStorage + 헤더를 쓴다)
+const CLIENT_ID_KEY = "kkurolog-client-id";
+
+function getClientId(): string | null {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(CLIENT_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    // 사생활 보호 모드 등으로 저장이 막히면 헤더 없이 보낸다 (backend 는 IP 기준 제한만 적용)
+    return null;
+  }
+}
 
 // 질문을 backend로 보내고 답변을 받아온다.
 export async function askQuestion(question: string): Promise<AskResponse> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const clientId = getClientId(); // [추가]
+  if (clientId) headers["X-Client-Id"] = clientId;
+
   const res = await fetch(`${API_URL}/ask`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ question }),
   });
 
   if (!res.ok) {
+    // [추가] 429(질문 횟수 초과)는 backend 가 한국어 안내(detail)를 보내준다.
+    if (res.status === 429) {
+      const body = await res.json().catch(() => null);
+      throw new Error(typeof body?.detail === "string" ? body.detail : "잠시 후 다시 시도해 주세요.");
+    }
     throw new Error(`서버 오류 (${res.status})`);
   }
   return res.json();
