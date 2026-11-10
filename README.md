@@ -8,6 +8,7 @@
 - 프로젝트 맥락: [docs/CONTEXT.md](docs/CONTEXT.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)
 - 데이터 구조 초안: [docs/DATA.md](docs/DATA.md)
+- 팀 작업 방법(브랜치·PR): [docs/WORKFLOW.md](docs/WORKFLOW.md)
 
 ## 지금 되는 것
 > 모든 답변·멘토는 **가짜(demo) 데이터**이며 실존 인물이 아니다.
@@ -83,7 +84,10 @@ npm run dev
 - backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload` (Windows는 activate 부분만 위 표대로)
 - frontend: `cd frontend && npm run dev`
 
+## 팀 작업 방법
+`main`은 보호되어 있어 직접 push할 수 없다. **브랜치 → PR → 다른 팀원 1명 승인 → Squash and merge** 순서로만 합친다.
+처음이라면 [docs/WORKFLOW.md](docs/WORKFLOW.md)를 위에서부터 따라 한다.
+
 ## 협업 규칙
-- `main`에서 바로 작업하지 않는다. 브랜치를 만들고 PR로 올린다.
 - API 키, 인터뷰 원문, 개인정보는 커밋하지 않는다 (`.env`, `data/` 폴더 전체는 자동으로 제외됨).
 - 중요한 결정은 `docs/DECISIONS.md`에 한 줄씩 남긴다.

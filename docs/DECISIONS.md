@@ -22,6 +22,7 @@
 | 2026-11-09 | 태그는 `docs/TAGS.md` 한 곳에서 관리한다. 저장은 영어 code, 표시는 한글. topic / career_path / career_field / speaker_type 네 종류. 맞는 태그가 없으면 `etc` + 상세 칸, 같은 상세 값이 career 3명·topic 5개 이상이면 승격. `check_tags.py`로 검사 | 태그가 사람마다 달라지지 않게 기준 문서를 두고, 개수 제한 대신 실제 데이터가 쌓이면 태그를 늘린다. 승격 기록이 남아 나중에 이유를 찾을 수 있다 |
 | 2026-11-09 | 임베딩은 태그 검수가 끝난 뒤 다음 단계에서 한다. 테이블에 `embedding vector(1536)` 칸만 먼저 만들어 둔다 | 조각·태그가 바뀌면 임베딩을 다시 만들어야 해서, 내용이 확정된 뒤 한 번에 만든다 |
 | 2026-11-09 | Supabase 테이블은 RLS를 켜고 정책 없이 service_role에게만 권한을 준다. 검색은 `match_chunks` 함수로만 하고 L0은 허용 목록 방식으로 막는다. SQL은 `supabase/migrations/`에 두고 `scripts/run_sql.py`로 터미널에서 실행한다 | 학생 화면(anon)에서 DB를 직접 읽을 수 없게 하고, 모든 조회는 백엔드를 거치게 한다. SQL 파일을 git으로 관리하면 누가 언제 무엇을 바꿨는지 남는다 |
+| 2026-11-10 | main 보호 규칙(GitHub Ruleset `protect-main`) 도입: main 직접 push·force push·삭제 금지, PR + 다른 팀원 승인 1개 필요(새 커밋이 오면 승인 취소, 리뷰 댓글 모두 해결), Squash and merge만 사용. 저장소 관리자만 급할 때 승인 없이 PR merge 가능(직접 push는 관리자도 불가). 작업 방법은 `docs/WORKFLOW.md` | 6명이 같은 저장소에서 Claude Code로 작업하므로, 서로의 변경을 한 번씩 확인하고 main이 깨지는 것을 막는다 |
 
 ## 나중에 할 일
 
@@ -31,4 +32,6 @@
 |---|---|---|
 | 2026-11-09 | 멘토 데모 데이터(`backend/app/data/mentors_demo.json`)의 `career_paths`를 `docs/TAGS.md`의 tag code로 바꾸고, 경로(career_path)·분야(career_field) 두 칸으로 나눈다. 멘토 찾기 탭·추천 로직·`schemas.py`·`api.ts`도 함께 바꾼다 (별도 브랜치·PR) | 경험 데이터와 멘토 데이터가 같은 태그를 써야 "이 경험을 가진 멘토" 연결이 쉬워진다. backend/frontend를 건드리는 작업이라 데이터 작업과 분리한다 |
 | 2026-11-09 | 사용 허락을 받으면 gschool 데이터의 visibility를 동의 범위에 맞게 L1에서 올리고, `review_*.csv`로 검수를 계속한다 | 지금은 학교 사용 허락 전이라 전부 L1(익명, 근거로만)이다 |
+| 2026-11-10 | 영역(frontend·backend·data·docs)별 담당자를 정하면 `.github/CODEOWNERS`를 추가한다 | 지금은 팀원 누구의 승인이든 인정된다. 담당자가 정해지면 해당 영역을 아는 사람이 꼭 리뷰하게 할 수 있다 |
+| 2026-11-10 | `@claude` PR 리뷰 자동화(GitHub Actions) 도입을 검토한다 | 사람 리뷰 전에 키·개인정보 노출, schemas.py/api.ts 불일치 같은 규칙 위반을 먼저 걸러 리뷰 부담을 줄인다 |
 | 2026-11-09 | 태그 목록을 `shared/tags.json` 하나로 두고 `docs/TAGS.md`·backend·frontend·scripts가 함께 읽게 한다 | 지금은 TAGS.md만 기준이라, 화면에서 code→한글 이름을 쓰려면 목록을 따로 복사해야 한다. 한 곳에서 관리해야 서로 어긋나지 않는다 |
