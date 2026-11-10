@@ -100,3 +100,55 @@ function testSubmitInquiry() {
       : '❌ 실패했습니다. 위 error와 로그를 확인하세요.'
   );
 }
+
+/**
+ * 4) 답장 본문 정리·문의번호 찾기 확인 (메일 안 보냄, 메일함 안 읽음)
+ * 여러 메일 앱의 답장 모양을 흉내 낸 글로, 학생에게 갈 본문만 남는지 봅니다.
+ */
+function testReplyParser() {
+  const settings = getSettings_();
+  const relay = getRelayAddress_();
+  const footer = requireSetting_(settings, SETTING_KEYS.MENTOR_FOOTER);
+  const intro = buildMentorIntroLine_(requireSetting_(settings, SETTING_KEYS.SERVICE_NAME));
+  const id = 'q20261108-0001';
+  const idLine = buildInquiryIdLine_(id);
+  const original = ['안녕하세요, 테스트멘토님.', intro, '', '- 학생 이름: 테스트학생', '', '학생 문의 내용', '', footer, '', idLine];
+  const quoted = original.map(function (l) { return '> ' + l; });
+  const answer = '좋은 질문이에요.\n제 경험을 말씀드리면 이래요.';
+
+  const parserCases = [
+    ['Gmail 한국어', [answer, '', '2026년 11월 8일 (일) 오후 2:03, 꾸로록 <relay>님이 작성:'].concat(quoted)],
+    ['Gmail 한국어(두 줄)', [answer, '', '2026년 11월 8일 (일) 오후 2:03, 꾸로록 <relay>님이', '작성:'].concat(quoted)],
+    ['Gmail 영어(두 줄)', [answer, '', 'On Sun, Nov 8, 2026 at 2:03 PM 꾸로록 <relay>', 'wrote:', ''].concat(quoted)],
+    ['네이버/아웃룩', [answer, '', '-----Original Message-----', 'From: 꾸로록 <relay>', 'Sent: 2026-11-08'].concat(original)],
+    ['인용 표시 없음', [answer, ''].concat(original)],
+    ['> 인용만', [answer, ''].concat(quoted)],
+    ['안내 문구·번호만 남음', [answer, '', footer, idLine]],
+  ];
+  let failed = 0;
+  parserCases.forEach(function (c) {
+    const out = extractReplyText_(c[1].join('\n'), settings);
+    const pass = out === answer;
+    if (!pass) failed++;
+    console.log(`${pass ? '✅' : '❌'} 본문 정리 - ${c[0]}${pass ? '' : '\n결과:\n' + out}`);
+  });
+  const emptyOut = extractReplyText_(['2026년 11월 8일 (일) 오후 2:03, 꾸로록 <relay>님이 작성:'].concat(quoted).join('\n'), settings);
+  console.log(`${emptyOut === '' ? '✅' : '❌'} 본문 정리 - 멘토가 아무것도 안 씀 → 빈 본문`);
+  if (emptyOut !== '') failed++;
+
+  const plus = toPlusAddress_(relay, id);
+  const idCases = [
+    ['plus 주소(1순위)', { recipients: [`꾸로록 <${plus}>`], plainBody: '' }, id],
+    ['plus 주소 대문자', { recipients: [plus.toUpperCase()], plainBody: '' }, id],
+    ['본문 번호(2순위)', { recipients: [relay], plainBody: answer + '\n> ' + idLine }, id],
+    ['plus가 본문보다 우선', { recipients: [toPlusAddress_(relay, 'q20261108-0002')], plainBody: '> ' + idLine }, 'q20261108-0002'],
+    ['번호 없음', { recipients: [relay], plainBody: answer }, null],
+  ];
+  idCases.forEach(function (c) {
+    const got = findInquiryIdInMessage_(c[1], relay);
+    const pass = got === c[2];
+    if (!pass) failed++;
+    console.log(`${pass ? '✅' : '❌'} 문의번호 찾기 - ${c[0]}: 기대 ${c[2]} / 실제 ${got}`);
+  });
+  console.log(failed === 0 ? '모두 통과했습니다.' : `${failed}개 실패했습니다.`);
+}

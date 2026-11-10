@@ -59,6 +59,9 @@ const PROPERTY_KEYS = Object.freeze({
   API_KEY: 'API_KEY',
   ADMIN_TOKEN: 'ADMIN_TOKEN',
   TEST_STUDENT_EMAIL: 'TEST_STUDENT_EMAIL', // Test.gs에서만 쓰는 테스트용 학생 메일
+  // 아래 두 개는 답장 확인(Replies.gs)이 자동으로 쓰고 관리합니다. 직접 고치지 않습니다.
+  REPLY_LAST_CHECKED_AT: 'REPLY_LAST_CHECKED_AT', // 마지막으로 받은편지함을 확인한 시각(밀리초)
+  REPLY_PROCESSED_IDS: 'REPLY_PROCESSED_IDS', // 이미 처리한 메일 ID 목록(최근 것만)
 });
 
 /** 입력 길이 제한 (API 명세와 같음) */
@@ -72,6 +75,25 @@ const LIMITS = Object.freeze({
 
 /** 동시에 두 요청이 같은 문의번호를 만들지 않도록 기다리는 최대 시간(밀리초) */
 const LOCK_WAIT_MS = 10000;
+
+/** 문의번호 모양 (정규식 조각). 예: q20261108-0001 */
+const INQUIRY_ID_PATTERN = 'q\\d{8}-\\d{4,}';
+
+/** 답장 자동 전달 설정 (Step 4) */
+const REPLY_CONFIG = Object.freeze({
+  TRIGGER_FUNCTION: 'checkReplies', // 시간 트리거가 부르는 함수 이름
+  TRIGGER_EVERY_MINUTES: 5, // 몇 분마다 확인할지 (1, 5, 10, 15, 30 중 하나)
+  FIRST_LOOKBACK_MS: 24 * 60 * 60 * 1000, // 처음 실행할 때 거슬러 올라가 볼 시간 (1일)
+  OVERLAP_MS: 10 * 60 * 1000, // 지난 확인 시각보다 조금 앞부터 다시 봄 (늦게 도착한 메일 대비, 10분)
+  MAX_MESSAGES_PER_RUN: 20, // 한 번 실행에 처리할 최대 메일 수 (실행 시간 6분 제한 대비)
+  PROCESSED_IDS_MAX: 300, // 기억해 둘 처리 완료 메일 ID 개수
+});
+
+/** 중계 Gmail 메일함에 붙이는 라벨 (사람이 메일함에서 상태를 보기 위한 것) */
+const GMAIL_LABELS = Object.freeze({
+  FORWARDED: '메일자동화/전달완료', // 학생에게 전달함
+  NEEDS_REVIEW: '메일자동화/확인필요', // 보낸 사람이 멘토가 아님, 내용이 비어 있음, 전달 실패 등
+});
 
 // ---------------------------------------------------------------------------
 // 비밀값 (Script Properties)
@@ -161,9 +183,34 @@ function getRelayAddress_() {
  * @return {string}
  */
 function toPlusAddress_(address, tag) {
+  const parts = splitAddress_(address);
+  return `${parts.local}+${tag}@${parts.domain}`;
+}
+
+/**
+ * 메일 주소를 + 앞부분(local)과 도메인으로 나눕니다. 예: a+b@gmail.com → {local:'a', domain:'gmail.com'}
+ * @param {string} address
+ * @return {{local: string, domain: string}}
+ */
+function splitAddress_(address) {
   const at = address.lastIndexOf('@');
-  const local = address.slice(0, at).split('+')[0];
-  return `${local}+${tag}${address.slice(at)}`;
+  return { local: address.slice(0, at).split('+')[0], domain: address.slice(at + 1) };
+}
+
+/**
+ * "이름 <주소>" 모양에서 주소만 꺼내 소문자로 바꿉니다.
+ * @param {string} from 예: "홍길동 <Mentor@Example.com>"
+ * @return {string} 예: mentor@example.com
+ */
+function extractAddress_(from) {
+  const text = String(from || '');
+  const match = text.match(/<([^>]+)>/);
+  return (match ? match[1] : text).trim().toLowerCase();
+}
+
+/** 정규식 특수문자를 글자 그대로 찾도록 바꿉니다. */
+function escapeRegExp_(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ---------------------------------------------------------------------------
