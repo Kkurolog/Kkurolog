@@ -1,7 +1,7 @@
 mentorId,이름,이메일,활성여부
-m001,테스트멘토1,mentor1@example.com,TRUE
-m002,테스트멘토2,mentor2@example.com,TRUE
-m003,테스트멘토3,mentor3@example.com,TRUE
-m004,테스트멘토4,mentor4@example.com,TRUE
-m005,테스트멘토5,mentor5@example.com,TRUE
-m006,테스트멘토6,mentor6@example.com,FALSE
+mt-01,새벽 (demo),mentor1@example.com,TRUE
+mt-02,도토리 (demo),mentor2@example.com,TRUE
+mt-03,바람 (demo),mentor3@example.com,TRUE
+mt-04,하람 (demo),mentor4@example.com,TRUE
+mt-05,모래 (demo),mentor5@example.com,TRUE
+mt-06,누리 (demo),mentor6@example.com,FALSE
