@@ -7,10 +7,31 @@
  * - 테스트용 학생 메일은 코드에 적지 않고 Script Properties의 TEST_STUDENT_EMAIL에서 읽습니다.
  */
 
+/**
+ * 테스트용으로 Script Properties 값을 읽습니다.
+ * 값이 없으면 "무엇이 빠졌는지"를 실행 로그에 그대로 보여줍니다.
+ * (웹앱 응답용 getSecret_은 보안상 원인을 숨기기 때문에, 테스트에서는 이 함수를 씁니다)
+ * @param {string} key PROPERTY_KEYS 중 하나
+ * @return {string}
+ */
+function testProperty_(key) {
+  const value = PropertiesService.getScriptProperties().getProperty(key);
+  if (!value) {
+    throw new Error(
+      `Script Properties에 "${key}" 값이 없습니다. ` +
+        '⚙ 프로젝트 설정 → 스크립트 속성에서 속성 이름(대소문자·공백 포함)과 값을 확인하세요. ' +
+        (key === PROPERTY_KEYS.TEST_STUDENT_EMAIL
+          ? '이 값은 직접 추가해야 합니다 (README 6-2의 5번).'
+          : '편집기에서 initSecrets()를 실행하면 만들어집니다.')
+    );
+  }
+  return value;
+}
+
 /** 1) 활성 멘토 목록 확인 (메일 안 보냄) */
 function testGetMentors() {
   const res = handleRequest_(
-    JSON.stringify({ apiKey: getSecret_(PROPERTY_KEYS.API_KEY), action: 'getMentors' })
+    JSON.stringify({ apiKey: testProperty_(PROPERTY_KEYS.API_KEY), action: 'getMentors' })
   );
   console.log(JSON.stringify(res, null, 2));
   const leaked = JSON.stringify(res).indexOf('@') >= 0;
@@ -19,7 +40,7 @@ function testGetMentors() {
 
 /** 2) 검증 오류가 제대로 나는지 확인 (메일 안 보냄) */
 function testValidationErrors() {
-  const apiKey = getSecret_(PROPERTY_KEYS.API_KEY);
+  const apiKey = testProperty_(PROPERTY_KEYS.API_KEY);
   const mentors = readActiveMentors_();
   if (mentors.length === 0) throw new Error('"멘토" 탭에 활성 멘토가 없습니다.');
   const valid = {
@@ -57,12 +78,12 @@ function testValidationErrors() {
 
 /** 3) 실제로 문의 1건 저장 + 첫 번째 활성 멘토에게 메일 발송 (메일 1통 사용) */
 function testSubmitInquiry() {
-  const studentEmail = getSecret_(PROPERTY_KEYS.TEST_STUDENT_EMAIL);
+  const studentEmail = testProperty_(PROPERTY_KEYS.TEST_STUDENT_EMAIL);
   const mentor = readActiveMentors_()[0];
   if (!mentor) throw new Error('"멘토" 탭에 활성 멘토가 없습니다.');
   const res = handleRequest_(
     JSON.stringify({
-      apiKey: getSecret_(PROPERTY_KEYS.API_KEY),
+      apiKey: testProperty_(PROPERTY_KEYS.API_KEY),
       action: 'submitInquiry',
       mentorId: mentor.mentorId,
       studentName: '테스트학생',
