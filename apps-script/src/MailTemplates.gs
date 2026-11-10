@@ -6,7 +6,22 @@
  * - 서비스 이름, 말머리, 맨 아래 안내 문구는 "설정" 탭 값을 씁니다.
  * - 학생의 메일 주소는 멘토에게 보여주지 않습니다. (멘토 답장은 중계 주소를 거쳐 학생에게 전달)
  * - 학생이 쓴 글은 HTML로 해석되지 않게 바꿔서(escape) 넣습니다.
+ * - 문의번호는 제목에 넣지 않고, 본문 맨 아래 작은 글씨 한 줄로만 넣습니다.
+ *   답장 매칭은 Reply-To의 plus 주소(+문의번호)가 1순위이고,
+ *   이 줄은 멘토 답장의 인용 부분에서 문의번호를 찾는 보조 단서입니다. (Step 4)
  */
+
+/** 본문 맨 아래 문의번호 줄의 앞말. Step 4에서 이 줄을 찾고, 학생에게 전달할 때 지웁니다. */
+const INQUIRY_ID_LINE_LABEL = '문의번호';
+
+/**
+ * 본문 맨 아래 문의번호 한 줄. 예: "문의번호: q20261108-0001"
+ * @param {string} inquiryId
+ * @return {string}
+ */
+function buildInquiryIdLine_(inquiryId) {
+  return `${INQUIRY_ID_LINE_LABEL}: ${inquiryId}`;
+}
 
 /**
  * HTML 특수문자를 안전한 글자로 바꿉니다.
@@ -39,9 +54,8 @@ function buildMentorInquiryMail_(settings, mentor, inquiry) {
   const prefix = requireSetting_(settings, SETTING_KEYS.MENTOR_SUBJECT_PREFIX);
   const footer = requireSetting_(settings, SETTING_KEYS.MENTOR_FOOTER);
 
-  // 제목 끝에 문의번호를 붙여 둡니다. 멘토·관리자가 메일함에서 문의를 찾기 쉽고,
-  // Step 4에서 답장을 찾을 때 보조 단서로 쓸 수 있습니다.
-  const subject = `${prefix} ${inquiry.title} (${inquiry.inquiryId})`;
+  const subject = `${prefix} ${inquiry.title}`;
+  const idLine = buildInquiryIdLine_(inquiry.inquiryId);
 
   const textBody = [
     `안녕하세요, ${mentor.name}님.`,
@@ -49,13 +63,14 @@ function buildMentorInquiryMail_(settings, mentor, inquiry) {
     '',
     `- 학생 이름: ${inquiry.studentName}`,
     `- 제목: ${inquiry.title}`,
-    `- 문의번호: ${inquiry.inquiryId}`,
     '',
     '──────────',
     inquiry.body,
     '──────────',
     '',
     footer,
+    '',
+    idLine,
   ].join('\n');
 
   const e = escapeHtml_;
@@ -65,10 +80,10 @@ function buildMentorInquiryMail_(settings, mentor, inquiry) {
     '<table style="border-collapse:collapse;margin:8px 0">',
     `<tr><td style="padding:2px 12px 2px 0;color:#666">학생 이름</td><td>${e(inquiry.studentName)}</td></tr>`,
     `<tr><td style="padding:2px 12px 2px 0;color:#666">제목</td><td>${e(inquiry.title)}</td></tr>`,
-    `<tr><td style="padding:2px 12px 2px 0;color:#666">문의번호</td><td>${e(inquiry.inquiryId)}</td></tr>`,
     '</table>',
     `<div style="border-left:3px solid #ccc;padding:8px 12px;margin:12px 0;background:#fafafa">${nl2br_(e(inquiry.body))}</div>`,
     `<p style="margin-top:24px;font-weight:bold">${nl2br_(e(footer))}</p>`,
+    `<p style="margin-top:16px;font-size:11px;color:#999">${e(idLine)}</p>`,
     '</div>',
   ].join('');
 
