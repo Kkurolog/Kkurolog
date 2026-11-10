@@ -62,6 +62,8 @@ const PROPERTY_KEYS = Object.freeze({
   // 아래 두 개는 답장 확인(Replies.gs)이 자동으로 쓰고 관리합니다. 직접 고치지 않습니다.
   REPLY_LAST_CHECKED_AT: 'REPLY_LAST_CHECKED_AT', // 마지막으로 받은편지함을 확인한 시각(밀리초)
   REPLY_PROCESSED_IDS: 'REPLY_PROCESSED_IDS', // 이미 처리한 메일 ID 목록(최근 것만)
+  // setup()이 자동으로 씁니다. 계정이 바뀌었는지(기관이 사본을 만들었는지) 알아채는 용도입니다.
+  SETUP_OWNER: 'SETUP_OWNER', // 마지막으로 setup()을 실행한 계정의 메일 주소
 });
 
 /** 입력 길이 제한 (API 명세와 같음) */

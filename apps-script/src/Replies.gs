@@ -14,16 +14,18 @@
  */
 
 /**
- * [시간 트리거가 부르는 함수] 편집기에서 직접 실행해도 됩니다. (5분을 기다리지 않고 바로 확인)
+ * [시간 트리거가 부르는 함수] 편집기·시트 메뉴에서 직접 실행해도 됩니다. (5분을 기다리지 않고 바로 확인)
+ * @return {string} 결과 요약
  */
 function checkReplies() {
   const lock = LockService.getDocumentLock() || LockService.getScriptLock();
   if (!lock.tryLock(1000)) {
-    console.log('이전 확인이 아직 진행 중이라 이번 차례는 건너뜁니다.');
-    return;
+    const busy = '이전 확인이 아직 진행 중이라 이번 차례는 건너뜁니다.';
+    console.log(busy);
+    return busy;
   }
   try {
-    processReplies_();
+    return processReplies_();
   } catch (err) {
     console.error(`답장 확인 중 오류: ${err && err.detail ? err.detail : ''} ${err && err.stack ? err.stack : err}`);
     throw err; // 트리거 실패 알림 메일이 중계 계정으로 갑니다
@@ -56,7 +58,10 @@ function rememberProcessed_(props, state, messageId) {
   props.setProperty(PROPERTY_KEYS.REPLY_PROCESSED_IDS, JSON.stringify(state.processedIds));
 }
 
-/** 답장 확인 한 번 */
+/**
+ * 답장 확인 한 번
+ * @return {string} 결과 요약
+ */
 function processReplies_() {
   const startedAt = Date.now();
   const props = PropertiesService.getScriptProperties();
@@ -99,9 +104,10 @@ function processReplies_() {
   }
 
   if (canAdvance) props.setProperty(PROPERTY_KEYS.REPLY_LAST_CHECKED_AT, String(startedAt));
-  console.log(
-    `답장 확인 완료: 전달 ${counts.forwarded}, 무시 ${counts.ignored}, 확인필요 ${counts.review}, 다음에 재시도 ${counts.retry}`
-  );
+  const summary =
+    `답장 확인 완료: 전달 ${counts.forwarded}, 무시 ${counts.ignored}, 확인필요 ${counts.review}, 다음에 재시도 ${counts.retry}`;
+  console.log(summary);
+  return summary;
 }
 
 /**
