@@ -7,6 +7,7 @@
 |---|---|---|
 | v0.2 | 2026-11-08 | 첫 명세 |
 | v0.3 | 2026-11-10 | 멘토 ID 예시를 백엔드 형식(`mt-01`)으로 변경. `consent` → `privacyConsent`, `CONSENT_REQUIRED` → `PRIVACY_CONSENT_REQUIRED`로 이름 변경 (기존 코드의 멘토 참여 동의 `consent`와 헷갈리지 않게) |
+| v0.3.1 | 2026-11-10 | 형식 변화 없음. "호출할 때 주의할 점" 추가 (리다이렉트, HTTP 200, 잘못된 JSON·mentorId 처리) |
 
 ## 공통 규칙
 - 모든 요청은 `POST`, `Content-Type: text/plain`, 본문은 JSON 문자열입니다. 기능은 본문의 `action`으로 구분합니다.
@@ -15,6 +16,15 @@
 - 성공: `{"ok":true,"data":{...}}` / 실패: `{"ok":false,"error":{"code":"...","message":"..."}}`
 - `mentorId`는 형식을 정해 두지 않은 **문자열**입니다. 시트 "멘토" 탭의 값과 똑같은지만 비교합니다. 예시의 `mt-01`은 지금 백엔드 데모 데이터의 형식입니다.
 - 멘토 이메일은 어떤 응답에도 들어가지 않습니다.
+
+## 호출할 때 주의할 점
+- 웹앱은 응답 전에 한 번 리다이렉트(302)합니다. HTTP 클라이언트가 **리다이렉트를 따라가게** 설정해야 합니다. (curl은 `-L`, Python `requests`는 기본으로 따라감)
+- HTTP 상태 코드는 성공·실패와 상관없이 **항상 200**입니다. 성공 여부는 본문의 `ok`로 판단합니다.
+- 본문이 JSON 객체가 아니면 `INVALID_INPUT`입니다.
+- 처리 순서: JSON 확인 → `apiKey` 확인(`UNAUTHORIZED`) → `action` 확인(`INVALID_ACTION`) → 입력 검사.
+- `mentorId`가 문자열이 아니거나 비어 있으면 `INVALID_INPUT`, 문자열인데 시트에 없거나 비활성이면 `MENTOR_NOT_FOUND`입니다.
+- 이름·제목·내용은 앞뒤 공백을 지운 뒤 길이를 셉니다. 학생 이메일도 앞뒤 공백을 지웁니다.
+- `INTERNAL_ERROR`의 자세한 원인은 응답에 나가지 않고 Apps Script 실행 로그에만 남습니다.
 
 ## 1) getMentors — 활성 멘토 목록
 ```json
