@@ -1,0 +1,7 @@
+mentorId,이름,이메일,활성여부
+m001,테스트멘토1,mentor1@example.com,TRUE
+m002,테스트멘토2,mentor2@example.com,TRUE
+m003,테스트멘토3,mentor3@example.com,TRUE
+m004,테스트멘토4,mentor4@example.com,TRUE
+m005,테스트멘토5,mentor5@example.com,TRUE
+m006,테스트멘토6,mentor6@example.com,FALSE

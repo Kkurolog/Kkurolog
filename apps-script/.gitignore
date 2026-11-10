@@ -1,0 +1,10 @@
+# ===== 메일 자동화(apps-script) 전용 비밀 파일 — 절대 커밋 금지 =====
+# clasp 연결 정보 (스크립트 ID가 들어 있음). 예시는 .clasp.json.example 만 올린다
+.clasp.json
+# clasp 로그인 정보 (구글 계정 토큰)
+.clasprc.json
+# 실제 값이 들어간 로컬 메모·테스트 파일 (예: test.local.html, secrets.local.md)
+*.local.*
+# 실제 멘토·학생 데이터를 내려받은 파일 (예시 파일 *.example.csv 는 올린다)
+templates/*.csv
+!templates/*.example.csv
