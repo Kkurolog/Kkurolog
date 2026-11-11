@@ -1,0 +1,7 @@
+mentorId,이름,이메일,활성여부
+mt-01,새벽 (demo),mentor1@example.com,TRUE
+mt-02,도토리 (demo),mentor2@example.com,TRUE
+mt-03,바람 (demo),mentor3@example.com,TRUE
+mt-04,하람 (demo),mentor4@example.com,TRUE
+mt-05,모래 (demo),mentor5@example.com,TRUE
+mt-06,누리 (demo),mentor6@example.com,FALSE
