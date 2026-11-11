@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpIcon } from "./icons";
 
 type Props = {
   onSubmit: (question: string) => void; // 질문을 보낼 때 실행할 함수
@@ -34,21 +35,29 @@ export default function QuestionForm({ onSubmit, loading }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2">
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-end gap-2 rounded-[18px] border border-line-strong bg-white py-2 pr-2 pl-4 shadow-[0_4px_16px_rgba(29,74,56,0.06)] focus-within:border-brand"
+    >
+      <label htmlFor="question" className="sr-only">
+        질문
+      </label>
       <textarea
+        id="question"
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="예: 대학을 바로 가지 않고 취업한 선배들은 왜 그렇게 선택했어?"
         rows={2}
-        className="w-full resize-none rounded-lg border border-gray-300 bg-white p-3 text-base focus:border-indigo-500 focus:outline-none"
+        className="w-full resize-none bg-transparent py-2 text-base text-ink placeholder:text-muted focus:outline-none"
       />
       <button
         type="submit"
         disabled={loading || !question.trim()}
-        className="shrink-0 rounded-lg bg-indigo-600 px-5 py-3 font-medium text-white hover:bg-indigo-700 disabled:bg-gray-300"
+        aria-label={loading ? "답변을 찾는 중" : "보내기"}
+        className="inline-flex size-12 shrink-0 items-center justify-center rounded-[14px] bg-brand text-white hover:bg-brand-dark disabled:bg-line-strong"
       >
-        {loading ? "찾는 중..." : "보내기"}
+        <ArrowUpIcon className={loading ? "size-5 animate-pulse" : "size-5"} />
       </button>
     </form>
   );
