@@ -9,6 +9,7 @@
  * 2. 학생에게 보낼 본문 만들기
  *    - 원래 메일의 인용 부분 전체를 지웁니다. (학생 본인의 문의, 멘토 안내 문구, 문의번호 줄이 여기 있음)
  *    - 인용 지우기가 완벽하지 않을 때를 대비해, 문의번호 줄과 멘토 안내 문구(mentorFooter)를 따로 한 번 더 지웁니다.
+ *    - (Step 5-1) 리마인드 메일에 답장한 경우를 위해, 리마인드 문구(mentorReminderIntro)도 같은 방법으로 지웁니다.
  */
 
 /**
@@ -44,7 +45,7 @@ function findInquiryIdInMessage_(message, relayAddress) {
  * @param {string} introLine 멘토 메일 둘째 줄 (예: "꾸로록에서 학생 문의가 도착했어요.")
  * @return {boolean}
  */
-function isQuoteStart_(lines, i, introLine) {
+function isQuoteStart_(lines, i, introLine, reminderIntro) {
   const line = lines[i].trim();
   const next = (lines[i + 1] || '').trim();
   // Gmail 영어: "On Tue, Nov 10, 2026 at 1:45 PM 꾸로록 <...> wrote:" (두 줄로 나뉘기도 함)
@@ -60,6 +61,8 @@ function isQuoteStart_(lines, i, introLine) {
   // 인용 표시 없이 원래 메일이 그대로 붙은 경우: "안녕하세요, ○○님." + 멘토 메일 둘째 줄
   if (/^안녕하세요,/.test(line) && next === introLine) return true;
   if (line === introLine) return true;
+  // 인용 표시 없이 리마인드 메일이 그대로 붙은 경우: 맨 위 리마인드 문구
+  if (reminderIntro && line === reminderIntro) return true;
   return false;
 }
 
@@ -72,13 +75,15 @@ function isQuoteStart_(lines, i, introLine) {
 function extractReplyText_(plainBody, settings) {
   const footer = requireSetting_(settings, SETTING_KEYS.MENTOR_FOOTER);
   const introLine = buildMentorIntroLine_(requireSetting_(settings, SETTING_KEYS.SERVICE_NAME));
+  // 리마인드 문구는 없어도 됩니다 (설정 탭에 키가 아직 없는 시트 대비)
+  const reminderIntro = String(settings[SETTING_KEYS.MENTOR_REMINDER_INTRO] || '').trim();
 
   const lines = String(plainBody).replace(/\r\n?/g, '\n').split('\n');
 
   // 1) 인용이 시작되는 줄부터 끝까지 잘라냅니다.
   let end = lines.length;
   for (let i = 0; i < lines.length; i++) {
-    if (isQuoteStart_(lines, i, introLine)) {
+    if (isQuoteStart_(lines, i, introLine, reminderIntro)) {
       end = i;
       break;
     }
@@ -95,8 +100,9 @@ function extractReplyText_(plainBody, settings) {
     return true;
   });
 
-  // 4) 혹시 남은 멘토 안내 문구를 지웁니다.
+  // 4) 혹시 남은 멘토 안내 문구·리마인드 문구를 지웁니다.
   let text = kept.join('\n').split(footer).join('');
+  if (reminderIntro) text = text.split(reminderIntro).join('');
 
   // 5) 빈 줄 정리
   text = text.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();

@@ -164,6 +164,9 @@ function handleReplyMessage_(message, relay, settings, markProcessed) {
 
   // 5) 시트 기록 (첫 답장일 때만 답장일시를 씀)
   markInquiryReplied_(found.rowNumber, inquiryId, message.date);
+  // 전에 전달 실패로 '확인필요'가 붙었다면 떼고 '전달완료'만 남깁니다.
+  // (라벨은 메일 스레드 단위라서, 같은 스레드의 '확인필요'도 함께 떨어집니다. 멘토 답장이 전달됐으니 해결된 것으로 봅니다)
+  Receiver.removeLabel(message, GMAIL_LABELS.NEEDS_REVIEW);
   Receiver.addLabel(message, GMAIL_LABELS.FORWARDED);
   console.log(`전달 완료: ${inquiryId} → 학생`);
   return 'forwarded';

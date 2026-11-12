@@ -35,6 +35,7 @@ const INQUIRY_HEADERS = Object.freeze({
   BODY: '내용',
   REPLIED: '답장여부',
   REPLIED_AT: '답장일시',
+  REMINDED_AT: '리마인드일시', // Step 5-1: 멘토에게 리마인드를 보낸 시각 (안 보냈으면 빈칸)
 });
 
 /** "설정" 탭 헤더 */
@@ -52,7 +53,33 @@ const SETTING_KEYS = Object.freeze({
   STUDENT_SUBJECT_PREFIX: 'studentSubjectPrefix',
   STUDENT_FORWARD_INTRO: 'studentForwardIntro',
   STUDENT_FORWARD_FOOTER: 'studentForwardFooter',
+  // Step 5-1: 같은 학생 메일로 보내는 횟수 제한 (숫자. 0이면 제한 없음)
+  RATE_LIMIT_MINUTES: 'rateLimitMinutes', // 몇 분 동안 셀지
+  RATE_LIMIT_PER_WINDOW: 'rateLimitPerWindow', // 그 시간 안에 몇 건까지 보낼 수 있는지
+  RATE_LIMIT_PER_DAY: 'rateLimitPerDay', // 하루(한국 시간 자정 기준)에 몇 건까지 보낼 수 있는지
+  // Step 5-1: 학생에게 보내는 "보낸 문의 사본" 메일
+  STUDENT_COPY_SUBJECT_PREFIX: 'studentCopySubjectPrefix',
+  STUDENT_COPY_INTRO: 'studentCopyIntro',
+  STUDENT_COPY_FOOTER: 'studentCopyFooter',
+  // Step 5-1: 멘토 리마인드 (reminderDays: 숫자. 0이면 리마인드 안 보냄)
+  REMINDER_DAYS: 'reminderDays',
+  MENTOR_REMINDER_SUBJECT_PREFIX: 'mentorReminderSubjectPrefix',
+  MENTOR_REMINDER_INTRO: 'mentorReminderIntro',
 });
+
+/**
+ * 숫자 설정의 기본값. "설정" 탭 값이 비어 있거나 숫자가 아니면 이 값을 씁니다.
+ * (SETTING_KEYS를 쓰기 때문에 함수로 만들었습니다)
+ * @return {Object<string,number>}
+ */
+function numberSettingDefaults_() {
+  const defaults = {};
+  defaults[SETTING_KEYS.RATE_LIMIT_MINUTES] = 10; // 같은 학생 메일은 최근 10분 안에
+  defaults[SETTING_KEYS.RATE_LIMIT_PER_WINDOW] = 3; // 3건까지 (4번째부터 막힘)
+  defaults[SETTING_KEYS.RATE_LIMIT_PER_DAY] = 5; // 같은 학생 메일은 하루(한국 시간 자정 기준) 5건까지
+  defaults[SETTING_KEYS.REMINDER_DAYS] = 10; // 보낸 날짜 + 10일째에 리마인드
+  return defaults;
+}
 
 /** Script Properties(비밀 저장소)의 키 이름. 값은 코드가 아니라 프로젝트 설정 화면에 있습니다. */
 const PROPERTY_KEYS = Object.freeze({
@@ -91,6 +118,13 @@ const REPLY_CONFIG = Object.freeze({
   PROCESSED_IDS_MAX: 300, // 기억해 둘 처리 완료 메일 ID 개수
 });
 
+/** 멘토 리마인드 설정 (Step 5-1) */
+const REMINDER_CONFIG = Object.freeze({
+  TRIGGER_FUNCTION: 'sendReminders', // 하루 한 번 도는 트리거가 부르는 함수 이름
+  TRIGGER_HOUR: 10, // 매일 오전 10시~11시 사이에 실행 (구글이 1시간 안에서 시각을 정함)
+  MAX_MESSAGES_PER_RUN: 30, // 한 번 실행에 보낼 최대 리마인드 수 (실행 시간 6분 제한 대비)
+});
+
 /** 중계 Gmail 메일함에 붙이는 라벨 (사람이 메일함에서 상태를 보기 위한 것) */
 const GMAIL_LABELS = Object.freeze({
   FORWARDED: '메일자동화/전달완료', // 학생에게 전달함
@@ -112,7 +146,7 @@ function getSecret_(key) {
     throw new AppError(
       'INTERNAL_ERROR',
       null,
-      `Script Properties에 ${key} 값이 없습니다. 편집기에서 initSecrets()를 실행하세요.`
+      `Script Properties에 ${key} 값이 없습니다. 시트 메뉴에서 ① 설치·점검 (setup)을 실행하세요.`
     );
   }
   return value;
@@ -239,4 +273,40 @@ function toIsoKst_(date) {
  */
 function toDateKey_(date) {
   return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyyMMdd');
+}
+
+/**
+ * 날짜를 사람이 읽기 쉬운 한국 시간으로 바꿉니다. 예: 2026-11-08 14:03 (메일 본문용)
+ * @param {Date} date
+ * @return {string}
+ */
+function toDisplayKst_(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+}
+
+/**
+ * 시트에 적힌 ISO 시간 글자를 날짜로 바꿉니다. 예: "2026-11-08T14:03:00+09:00"
+ * @param {*} text
+ * @return {?Date} 읽지 못하면 null
+ */
+function parseIsoDate_(text) {
+  const value = String(text || '').trim();
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * 두 날짜가 한국 날짜(달력) 기준으로 며칠 차이인지 셉니다. 시각은 보지 않습니다.
+ * 예: 11월 1일 23:59 → 11월 11일 00:01 = 10일
+ * @param {Date} from
+ * @param {Date} to
+ * @return {number}
+ */
+function calendarDaysBetween_(from, to) {
+  const toUtcDay = function (date) {
+    const key = toDateKey_(date); // yyyyMMdd (한국 날짜)
+    return Date.UTC(Number(key.slice(0, 4)), Number(key.slice(4, 6)) - 1, Number(key.slice(6, 8)));
+  };
+  return Math.round((toUtcDay(to) - toUtcDay(from)) / (24 * 60 * 60 * 1000));
 }

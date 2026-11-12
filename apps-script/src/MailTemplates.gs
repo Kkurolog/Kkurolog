@@ -6,6 +6,9 @@
  * - 서비스 이름, 말머리, 맨 아래 안내 문구는 "설정" 탭 값을 씁니다.
  * - 학생의 메일 주소는 멘토에게 보여주지 않습니다. (멘토 답장은 중계 주소를 거쳐 학생에게 전달)
  * - 학생이 쓴 글은 HTML로 해석되지 않게 바꿔서(escape) 넣습니다.
+ * - (Step 5-1) 멘토 리마인드 메일: 원래 문의 메일과 같고, 제목 말머리와 맨 위 리마인드 문구만 다릅니다.
+ * - (Step 5-1) 학생 사본 메일: 학생이 보낸 문의를 학생 본인에게 보여 줍니다. 문의번호는 넣지 않습니다.
+ *   (학생이 사본에 답장해도 멘토 답장으로 잘못 처리되지 않게)
  * - 문의번호는 제목에 넣지 않고, 본문 맨 아래 작은 글씨 한 줄로만 넣습니다.
  *   답장 매칭은 Reply-To의 plus 주소(+문의번호)가 1순위이고,
  *   이 줄은 멘토 답장의 인용 부분에서 문의번호를 찾는 보조 단서입니다. (Step 4)
@@ -53,21 +56,26 @@ function nl2br_(html) {
 }
 
 /**
- * 멘토에게 보낼 문의 메일
+ * 멘토에게 보낼 문의 메일 (isReminder가 true면 리마인드 메일)
  * @param {Object<string,string>} settings "설정" 탭 값
  * @param {{name: string}} mentor
  * @param {{inquiryId: string, studentName: string, title: string, body: string}} inquiry
+ * @param {boolean=} isReminder true면 제목 말머리를 리마인드용으로 바꾸고, 맨 위에 리마인드 문구를 넣습니다
  * @return {{subject: string, textBody: string, htmlBody: string}}
  */
-function buildMentorInquiryMail_(settings, mentor, inquiry) {
+function buildMentorInquiryMail_(settings, mentor, inquiry, isReminder) {
   const serviceName = requireSetting_(settings, SETTING_KEYS.SERVICE_NAME);
-  const prefix = requireSetting_(settings, SETTING_KEYS.MENTOR_SUBJECT_PREFIX);
+  const prefix = isReminder
+    ? requireSetting_(settings, SETTING_KEYS.MENTOR_REMINDER_SUBJECT_PREFIX)
+    : requireSetting_(settings, SETTING_KEYS.MENTOR_SUBJECT_PREFIX);
   const footer = requireSetting_(settings, SETTING_KEYS.MENTOR_FOOTER);
+  const reminderIntro = isReminder ? requireSetting_(settings, SETTING_KEYS.MENTOR_REMINDER_INTRO) : '';
 
   const subject = `${prefix} ${inquiry.title}`;
   const idLine = buildInquiryIdLine_(inquiry.inquiryId);
 
-  const textBody = [
+  const textLines = isReminder ? [reminderIntro, ''] : [];
+  const textBody = textLines.concat([
     `안녕하세요, ${mentor.name}님.`,
     buildMentorIntroLine_(serviceName),
     '',
@@ -81,11 +89,14 @@ function buildMentorInquiryMail_(settings, mentor, inquiry) {
     footer,
     '',
     idLine,
-  ].join('\n');
+  ]).join('\n');
 
   const e = escapeHtml_;
   const htmlBody = [
     '<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#222">',
+    isReminder
+      ? `<p style="padding:8px 12px;background:#fff6e0;border-radius:4px;font-weight:bold">${nl2br_(e(reminderIntro))}</p>`
+      : '',
     `<p>안녕하세요, ${e(mentor.name)}님.<br>${e(buildMentorIntroLine_(serviceName))}</p>`,
     '<table style="border-collapse:collapse;margin:8px 0">',
     `<tr><td style="padding:2px 12px 2px 0;color:#666">학생 이름</td><td>${e(inquiry.studentName)}</td></tr>`,
@@ -139,6 +150,55 @@ function buildStudentForwardMail_(settings, inquiry, mentorName, replyText) {
     `<tr><td style="padding:2px 12px 2px 0;color:#666">내 문의 제목</td><td>${e(inquiry.title)}</td></tr>`,
     '</table>',
     `<div style="border-left:3px solid #ccc;padding:8px 12px;margin:12px 0;background:#fafafa">${nl2br_(e(replyText))}</div>`,
+    `<p style="margin-top:24px;font-size:12px;color:#666">${nl2br_(e(footer))}</p>`,
+    '</div>',
+  ].join('');
+
+  return { subject: subject, textBody: textBody, htmlBody: htmlBody };
+}
+
+/**
+ * 학생에게 보낼 "보낸 문의 사본" 메일
+ * - 멘토 이름, 제목, 내용, 보낸 일시를 보여 줍니다.
+ * - 멘토 이메일과 문의번호는 넣지 않습니다.
+ * @param {Object<string,string>} settings "설정" 탭 값
+ * @param {string} mentorName "멘토" 탭의 이름
+ * @param {{studentName: string, title: string, body: string, sentAt: Date}} inquiry
+ * @return {{subject: string, textBody: string, htmlBody: string}}
+ */
+function buildStudentCopyMail_(settings, mentorName, inquiry) {
+  const prefix = requireSetting_(settings, SETTING_KEYS.STUDENT_COPY_SUBJECT_PREFIX);
+  const intro = requireSetting_(settings, SETTING_KEYS.STUDENT_COPY_INTRO);
+  const footer = requireSetting_(settings, SETTING_KEYS.STUDENT_COPY_FOOTER);
+
+  const subject = `${prefix} ${inquiry.title}`;
+  const sentAt = toDisplayKst_(inquiry.sentAt);
+
+  const textBody = [
+    `안녕하세요, ${inquiry.studentName}님.`,
+    intro,
+    '',
+    `- 받는 멘토: ${mentorName}`,
+    `- 제목: ${inquiry.title}`,
+    `- 보낸 일시: ${sentAt}`,
+    '',
+    '──────────',
+    inquiry.body,
+    '──────────',
+    '',
+    footer,
+  ].join('\n');
+
+  const e = escapeHtml_;
+  const htmlBody = [
+    '<div style="font-family:sans-serif;font-size:14px;line-height:1.6;color:#222">',
+    `<p>안녕하세요, ${e(inquiry.studentName)}님.<br>${nl2br_(e(intro))}</p>`,
+    '<table style="border-collapse:collapse;margin:8px 0">',
+    `<tr><td style="padding:2px 12px 2px 0;color:#666">받는 멘토</td><td>${e(mentorName)}</td></tr>`,
+    `<tr><td style="padding:2px 12px 2px 0;color:#666">제목</td><td>${e(inquiry.title)}</td></tr>`,
+    `<tr><td style="padding:2px 12px 2px 0;color:#666">보낸 일시</td><td>${e(sentAt)}</td></tr>`,
+    '</table>',
+    `<div style="border-left:3px solid #ccc;padding:8px 12px;margin:12px 0;background:#fafafa">${nl2br_(e(inquiry.body))}</div>`,
     `<p style="margin-top:24px;font-size:12px;color:#666">${nl2br_(e(footer))}</p>`,
     '</div>',
   ].join('');

@@ -5,7 +5,7 @@
  * 1. 계정 확인: 시트 사본을 다른 계정(기관)이 만든 경우, 이전 계정의 apiKey·adminToken·답장 처리 기록을 지우고 새로 만듭니다.
  * 2. 탭·헤더 점검: "멘토/문의/설정" 탭과 1행 헤더, 설정 키가 빠져 있으면 그것만 만듭니다. 있는 데이터는 건드리지 않습니다.
  * 3. 비밀값: API_KEY, ADMIN_TOKEN이 없으면 만듭니다.
- * 4. 트리거: 5분마다 답장을 확인하는 트리거를 1개만 켭니다.
+ * 4. 트리거: 5분마다 답장 확인 + 매일 리마인드, 각각 1개만 켭니다.
  * 5. 점검: 활성 멘토 수, 예시 메일(example.com)이 남아 있는지, 오늘 남은 발송 수를 알려 줍니다.
  *
  * 반드시 중계 계정(메일을 보낼 계정)으로 실행합니다. 시트 메뉴 또는 편집기에서 실행할 수 있습니다.
@@ -31,6 +31,7 @@ function defaultHeaders_() {
     INQUIRY_HEADERS.BODY,
     INQUIRY_HEADERS.REPLIED,
     INQUIRY_HEADERS.REPLIED_AT,
+    INQUIRY_HEADERS.REMINDED_AT,
   ];
   headers[SHEET_NAMES.SETTINGS] = [SETTING_HEADERS.KEY, SETTING_HEADERS.VALUE, '설명'];
   return headers;
@@ -56,6 +57,27 @@ function defaultSettings_() {
       SETTING_KEYS.STUDENT_FORWARD_FOOTER,
       '이 메일은 꾸로록이 자동으로 전달한 메일이에요. 추가로 궁금한 점은 꾸로록에서 새 문의를 보내주세요.',
       '학생에게 전달되는 메일 맨 아래 안내 문구',
+    ],
+    [SETTING_KEYS.RATE_LIMIT_MINUTES, '10', '같은 학생 메일의 문의 수를 셀 시간(분). rateLimitPerWindow와 함께 씀. 0이면 이 제한 없음'],
+    [SETTING_KEYS.RATE_LIMIT_PER_WINDOW, '3', 'rateLimitMinutes분 안에 같은 학생 메일로 보낼 수 있는 문의 수. 0이면 이 제한 없음'],
+    [SETTING_KEYS.RATE_LIMIT_PER_DAY, '5', '같은 학생 메일로 하루(자정 기준)에 보낼 수 있는 문의 수. 0이면 제한 없음'],
+    [SETTING_KEYS.STUDENT_COPY_SUBJECT_PREFIX, '[꾸로록 보낸 문의]', '학생에게 가는 "보낸 문의 사본" 메일 제목 앞에 붙는 말'],
+    [
+      SETTING_KEYS.STUDENT_COPY_INTRO,
+      '멘토님께 아래 문의를 보냈어요. 답장이 오면 이 메일 주소로 전달해 드려요.',
+      '학생에게 가는 "보낸 문의 사본" 메일 맨 위 안내 문구',
+    ],
+    [
+      SETTING_KEYS.STUDENT_COPY_FOOTER,
+      '이 메일은 보낸 문의의 사본이에요. 이 메일에 답장해도 멘토에게 전달되지 않아요.',
+      '학생에게 가는 "보낸 문의 사본" 메일 맨 아래 안내 문구',
+    ],
+    [SETTING_KEYS.REMINDER_DAYS, '10', '답장이 없을 때 보낸 날짜로부터 며칠째에 멘토에게 한 번 더 보낼지. 0이면 보내지 않음'],
+    [SETTING_KEYS.MENTOR_REMINDER_SUBJECT_PREFIX, '[꾸로록 리마인드]', '멘토에게 가는 리마인드 메일 제목 앞에 붙는 말'],
+    [
+      SETTING_KEYS.MENTOR_REMINDER_INTRO,
+      "열흘 전 꾸로록에 들어온 문의가 멘토님을 기다리고 있어요. 해당 메일의 '답장' 버튼으로 회신해 주세요!",
+      '멘토에게 가는 리마인드 메일 맨 위 문구',
     ],
   ];
 }
@@ -97,7 +119,7 @@ function setup() {
   ensureSheets_(report);
   initSecrets();
   report.push('API_KEY·ADMIN_TOKEN: 준비됨 (값은 ⚙ 프로젝트 설정 → 스크립트 속성에서 확인)');
-  report.push(installReplyTrigger());
+  installAutoTriggers().forEach(function (line) { report.push(line); });
   checkMentors_(report);
   report.push(`오늘 남은 Gmail 발송 수: ${Mailer.remainingDailyQuota()}통`);
   report.push('웹앱을 아직 배포하지 않았다면: 편집기 → 배포 → 새 배포 (README/HANDOVER 참고)');
@@ -154,12 +176,12 @@ function ensureSheets_(report) {
   report.push('탭·헤더 점검 완료');
 }
 
-/** "문의" 탭의 문의번호·보낸일시·답장일시 열을 일반 텍스트로 둡니다. */
+/** "문의" 탭의 문의번호·보낸일시·답장일시·리마인드일시 열을 일반 텍스트로 둡니다. */
 function formatInquirySheet_() {
   const sheet = getSheet_(SHEET_NAMES.INQUIRIES);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
     .map(function (h) { return String(h).trim(); });
-  [INQUIRY_HEADERS.ID, INQUIRY_HEADERS.CREATED_AT, INQUIRY_HEADERS.REPLIED_AT].forEach(function (h) {
+  [INQUIRY_HEADERS.ID, INQUIRY_HEADERS.CREATED_AT, INQUIRY_HEADERS.REPLIED_AT, INQUIRY_HEADERS.REMINDED_AT].forEach(function (h) {
     const col = headers.indexOf(h) + 1;
     if (col > 0) sheet.getRange(2, col, sheet.getMaxRows() - 1, 1).setNumberFormat('@');
   });
@@ -201,7 +223,7 @@ function checkMentors_(report) {
 /**
  * [시트 메뉴에서만 실행] 기관에 넘길 템플릿 사본의 데이터를 비웁니다.
  * - 원본에서 실수로 실행하지 않도록: 파일 이름에 "템플릿"이 있어야 하고, 확인 창을 두 번 거칩니다.
- * - 문의 기록 전부 삭제, 멘토 탭은 예시 값으로 교체, Script Properties 전부 삭제, 답장 확인 트리거 끄기.
+ * - 문의 기록 전부 삭제, 멘토 탭은 예시 값으로 교체, Script Properties 전부 삭제, 자동 실행 트리거(답장 확인·리마인드) 끄기.
  * - 설정 탭 문구는 그대로 둡니다.
  */
 function clearForTemplate() {
@@ -257,7 +279,7 @@ function clearForTemplate() {
 
   // 비밀값·상태 전부 삭제, 트리거 끄기 (이 사본의 스크립트에만 해당. 원본에는 영향 없음)
   PropertiesService.getScriptProperties().deleteAllProperties();
-  removeReplyTrigger();
+  removeAutoTriggers();
   SpreadsheetApp.flush();
 
   ui.alert(
