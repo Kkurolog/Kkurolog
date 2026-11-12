@@ -42,9 +42,14 @@ def _bool_env(name: str, default: bool) -> bool:
 RATE_LIMIT_CLIENT_PER_MINUTE = _int_env("RATE_LIMIT_CLIENT_PER_MINUTE", 0)
 RATE_LIMIT_CLIENT_PER_DAY = _int_env("RATE_LIMIT_CLIENT_PER_DAY", 30)
 
-# IP 한 개당 (봇 방지용)
-RATE_LIMIT_IP_PER_MINUTE = _int_env("RATE_LIMIT_IP_PER_MINUTE", 60)
-RATE_LIMIT_IP_PER_DAY = _int_env("RATE_LIMIT_IP_PER_DAY", 1000)
+# IP 한 개당
+# 익명 ID 는 브라우저가 마음대로 바꿔 보낼 수 있어서, 한 사람이 서비스 전체 하루치를 다 써 버리는 걸
+# 실제로 막는 건 이 IP 기준이다. 그래서 두 조건을 같이 맞춘다:
+#   - 학교 와이파이(재학생 약 70명이 IP 하나)가 막히지 않을 만큼 넉넉하게
+#     (분당 120 = 70명이 1분 안에 한 번씩 물어도 통과)
+#   - 그래도 서비스 전체 상한보다는 작게 → IP 하나가 막혀도 다른 곳(집·모바일)의 학생은 쓸 수 있다
+RATE_LIMIT_IP_PER_MINUTE = _int_env("RATE_LIMIT_IP_PER_MINUTE", 120)
+RATE_LIMIT_IP_PER_DAY = _int_env("RATE_LIMIT_IP_PER_DAY", 1500)
 
 # 서비스 전체 하루 상한 (API 비용 안전장치)
 RATE_LIMIT_GLOBAL_PER_DAY = _int_env("RATE_LIMIT_GLOBAL_PER_DAY", 2000)
@@ -62,3 +67,8 @@ RAG_LOCAL_CHUNKS = os.getenv("RAG_LOCAL_CHUNKS") or None
 # true 면 X-Forwarded-For 헤더에서 학생 IP를 읽는다.
 # Render 같은 배포 환경은 프록시를 거치므로 true 로 둬야 한다. (로컬 개발은 false)
 TRUST_PROXY_HEADERS = _bool_env("TRUST_PROXY_HEADERS", False)
+
+# 우리 서버 앞에 있는 프록시 개수. X-Forwarded-For 는 프록시를 지날 때마다 '오른쪽 끝'에 IP가 붙는다.
+# 왼쪽 값은 요청한 사람이 마음대로 적어 보낼 수 있으므로, 오른쪽에서 이 개수만큼 센 자리의 값을 쓴다.
+# Render 는 1. (배포 후 로그로 실제 학생 IP가 찍히는지 한 번 확인한다)
+TRUSTED_PROXY_COUNT = max(1, _int_env("TRUSTED_PROXY_COUNT", 1))

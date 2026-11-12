@@ -21,11 +21,10 @@ logger = logging.getLogger("uvicorn.error")
 class ContextDoc:
     """Claude 에게 넘길 글 하나 (검색된 chunk + 앞뒤 chunk 를 순서대로 모은 것)."""
 
-    post_id: str
+    source_id: str
     title: str
     display_name: str
-    date: str | None
-    post_type: str
+    published_at: str | None
     chunks: list[Chunk] = field(default_factory=list)
 
 
@@ -83,8 +82,8 @@ def format_documents(docs: list[ContextDoc]) -> str:
     parts = ["<documents>"]
     for doc in docs:
         parts.append(
-            f'<document post_id="{_escape(doc.post_id)}" type="{doc.post_type}" '
-            f'name="{_escape(doc.display_name)}" date="{doc.date or "미상"}" title="{_escape(doc.title)}">'
+            f'<document source_id="{_escape(doc.source_id)}" '
+            f'name="{_escape(doc.display_name)}" date="{doc.published_at or "미상"}" title="{_escape(doc.title)}">'
         )
         for c in doc.chunks:
             q = f"<question>{_escape(c.question)}</question>\n" if c.question else ""

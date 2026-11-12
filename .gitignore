@@ -4,8 +4,8 @@
 !.env.example
 
 # ===== 인터뷰 원문·개인정보 데이터 (절대 커밋 금지) =====
-data/raw/
-data/private/
+# data/ 폴더 전체를 올리지 않는다 (졸업생 실명·인터뷰 전문 포함)
+data/
 
 # ===== Python =====
 __pycache__/

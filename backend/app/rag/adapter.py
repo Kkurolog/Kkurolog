@@ -15,16 +15,16 @@ from app.schemas import AskResponse, Source
 EXCERPT_SEPARATOR = "\n…\n"
 
 
-def _merge_post(post_id: str, group: list[RagSource]) -> Source:
+def _merge_source(source_id: str, group: list[RagSource]) -> Source:
     """같은 글에서 나온 출처들을 하나로 합친다."""
     first = group[0]
     excerpts = [s.excerpt for s in group if s.excerpt]
     return Source(
         alumni=first.alumni,
         excerpt=EXCERPT_SEPARATOR.join(excerpts) or None,
-        interview_id=post_id,
+        interview_id=source_id,
         visibility=first.visibility,
-        date=first.date,
+        date=first.published_at,
         url=first.url,
     )
 
@@ -32,10 +32,10 @@ def _merge_post(post_id: str, group: list[RagSource]) -> Source:
 def to_ask_response(result: RagAnswer) -> AskResponse:
     sources: list[Source] = []
     if result.answer_type == "answer":
-        by_post: dict[str, list[RagSource]] = {}
+        by_source: dict[str, list[RagSource]] = {}
         for s in result.sources:
-            by_post.setdefault(s.post_id, []).append(s)
-        sources = [_merge_post(pid, group) for pid, group in by_post.items()]
+            by_source.setdefault(s.source_id, []).append(s)
+        sources = [_merge_source(sid, group) for sid, group in by_source.items()]
 
     return AskResponse(
         answer=result.answer,

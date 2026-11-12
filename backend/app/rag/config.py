@@ -21,7 +21,7 @@ class RagSettings:
     classify_when_no_hits: bool = True  # 검색 결과가 없어도 Claude 로 위기·무관 질문인지 분류할지
 
     # ---- 모델 ---- (팀 논의 항목: 모델 선택과 비용)
-    embedding_model: str = "text-embedding-3-small"  # 1536차원. 바꾸면 scripts/sql 의 vector(1536)도 바꾼다
+    embedding_model: str = "text-embedding-3-small"  # 1536차원. 바꾸면 supabase/migrations 의 vector(1536)도 바꾼다
     claude_model: str = "claude-opus-5-5"
     claude_effort: str = "medium"  # low | medium | high | xhigh | max
     claude_max_tokens: int = 16000

@@ -9,8 +9,9 @@
 RAG 흐름 (자세한 건 app/rag/pipeline.py, 제안: docs/proposals/ask-plan.md, 팀 논의 전):
   0. 위기 신호 안전장치 → 아래 looks_like_crisis
   1. 질문을 OpenAI 임베딩으로 벡터로 바꾼다
-  2. Supabase(pgvector)에서 비슷한 chunk Top-K를 찾는다 (visibility L0 제외)
-  3. 유사도 하한보다 낮은 chunk는 버린다. 하나도 안 남으면 Claude 를 부르지 않고 no_evidence
+  2. Supabase 의 match_chunks 함수로 비슷한 chunk Top-K를 찾는다 (visibility L0 제외)
+  3. 유사도 하한보다 낮은 chunk는 버린다. 하나도 안 남아도 기본 설정(classify_when_no_hits)에서는
+     Claude 가 위기·무관 질문인지 분류만 한다 (false 로 두면 Claude 를 부르지 않고 no_evidence)
   4. 남은 chunk에 앞뒤 chunk를 붙이고, 같은 글은 합친다 (최대 3개 글)
   5. Claude 를 한 번 불러 구조화된 출력 {answer_type, answer, used_chunk_ids} 를 받는다
      - 근거 안에서만 답하고, 글의 시기를 밝히고, 근거 속 지시문은 무시하라는 규칙을 시스템 프롬프트에 둔다

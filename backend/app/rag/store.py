@@ -1,9 +1,10 @@
 """
-chunk 를 저장하고 비슷한 chunk 를 찾는 곳.
+비슷한 chunk 를 찾는 곳. (chunk 를 만들고 넣는 건 scripts/ 가 한다. backend 는 읽기만 한다)
 
-- InMemoryVectorStore: 파일(jsonl)에서 읽어 메모리에서 검색. 로컬 개발·테스트용.
-  글이 수십 개(chunk 수백 개) 수준이라 이것만으로도 충분히 빠르다.
-- SupabaseVectorStore: Supabase(pgvector). 테이블·함수는 scripts/sql/kkurolog_chunks.sql 참고.
+- SupabaseVectorStore: Supabase(pgvector). 테이블·검색 함수는 supabase/migrations/0001_experience_tables.sql
+  (sources / people / chunks 테이블, match_chunks 함수) 를 그대로 쓴다.
+- InMemoryVectorStore: 메모리에서 검색. 테스트용, 그리고 Supabase 없이 로컬에서 돌려볼 때
+  (임베딩이 들어 있는 Chunk 모양 jsonl 파일이 있어야 한다).
 
 두 클래스 모두 search() 와 get_chunks() 만 있으면 pipeline 이 그대로 쓴다.
 """
@@ -16,14 +17,14 @@ from typing import Protocol
 
 from app.rag.models import Chunk, ScoredChunk
 
-TABLE = "kkurolog_chunks"
-MATCH_FUNCTION = "match_kkurolog_chunks"
+MATCH_FUNCTION = "match_chunks"
+PUBLIC_VISIBILITY = ["L1", "L2", "L3"]  # L0 은 허용 목록에 없으니 절대 나오지 않는다 (DECISIONS 2026-11-09)
 
 
 class VectorStore(Protocol):
     def search(self, vector: list[float], top_k: int) -> list[ScoredChunk]: ...
 
-    def get_chunks(self, post_id: str, indices: list[int]) -> list[Chunk]: ...
+    def get_chunks(self, source_id: str, indices: list[int]) -> list[Chunk]: ...
 
 
 def cosine(a: list[float], b: list[float]) -> float:
@@ -36,8 +37,8 @@ def cosine(a: list[float], b: list[float]) -> float:
 class InMemoryVectorStore:
     def __init__(self, chunks: list[Chunk]) -> None:
         # L0 이나 임베딩이 없는 chunk 는 검색 대상에서 뺀다
-        self._chunks = [c for c in chunks if c.visibility != "L0" and c.embedding]
-        self._by_key = {(c.post_id, c.chunk_index): c for c in self._chunks}
+        self._chunks = [c for c in chunks if c.visibility in PUBLIC_VISIBILITY and c.embedding]
+        self._by_key = {(c.source_id, c.chunk_index): c for c in self._chunks}
 
     @classmethod
     def from_jsonl(cls, path: str | Path) -> "InMemoryVectorStore":
@@ -49,16 +50,24 @@ class InMemoryVectorStore:
         scored.sort(key=lambda s: s.score, reverse=True)
         return scored[:top_k]
 
-    def get_chunks(self, post_id: str, indices: list[int]) -> list[Chunk]:
-        return [self._by_key[(post_id, i)] for i in indices if (post_id, i) in self._by_key]
+    def get_chunks(self, source_id: str, indices: list[int]) -> list[Chunk]:
+        return [self._by_key[(source_id, i)] for i in indices if (source_id, i) in self._by_key]
+
+
+def _flatten_row(row: dict) -> dict:
+    """chunks 테이블을 sources·people 와 함께 읽은 결과를 match_chunks 결과와 같은 모양으로 편다."""
+    source = row.pop("sources", None) or {}
+    person = row.pop("people", None) or {}
+    return {**row, **source, "nickname": person.get("nickname", "")}
 
 
 class SupabaseVectorStore:
-    """SUPABASE_URL, SUPABASE_KEY(서버 전용 키) 환경변수가 필요하다."""
+    """SUPABASE_URL, SUPABASE_KEY(서버 전용 service_role 키) 환경변수가 필요하다. 읽기만 한다."""
 
-    COLUMNS = (
-        "chunk_id, post_id, chunk_index, post_type, title, nickname, career_tags, date, url, "
-        "visibility, question, content, embed_text"
+    # match_chunks 결과와 같은 이름이 되게 chunks.id 는 chunk_id 로 바꿔 읽는다
+    NEIGHBOR_COLUMNS = (
+        "chunk_id:id, source_id, person_id, chunk_index, question, content, topics, career_paths, "
+        "career_fields, visibility, sources(title, url, published_at), people(nickname)"
     )
 
     def __init__(self) -> None:
@@ -70,22 +79,17 @@ class SupabaseVectorStore:
         rows = self._client.rpc(MATCH_FUNCTION, {"query_embedding": vector, "match_count": top_k}).execute().data
         return [ScoredChunk(chunk=Chunk.model_validate(row), score=row["similarity"]) for row in rows or []]
 
-    def get_chunks(self, post_id: str, indices: list[int]) -> list[Chunk]:
+    def get_chunks(self, source_id: str, indices: list[int]) -> list[Chunk]:
+        """검색된 chunk 의 앞뒤 chunk. 같은 글(source)이라 글의 공개 등급은 검색 때 이미 확인됐다."""
         if not indices:
             return []
         rows = (
-            self._client.table(TABLE)
-            .select(self.COLUMNS)
-            .eq("post_id", post_id)
+            self._client.table("chunks")
+            .select(self.NEIGHBOR_COLUMNS)
+            .eq("source_id", source_id)
             .in_("chunk_index", indices)
-            .neq("visibility", "L0")
+            .in_("visibility", PUBLIC_VISIBILITY)
             .execute()
             .data
         )
-        return [Chunk.model_validate(row) for row in rows or []]
-
-    def upsert(self, chunks: list[Chunk]) -> None:
-        """scripts/load_chunks.py 가 쓴다."""
-        rows = [c.model_dump() for c in chunks]
-        for start in range(0, len(rows), 100):
-            self._client.table(TABLE).upsert(rows[start : start + 100]).execute()
+        return [Chunk.model_validate(_flatten_row(dict(row))) for row in rows or []]

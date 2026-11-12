@@ -8,6 +8,7 @@
 - 프로젝트 맥락: [docs/CONTEXT.md](docs/CONTEXT.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)
 - 데이터 구조 초안: [docs/DATA.md](docs/DATA.md)
+- 팀 작업 방법(브랜치·PR): [docs/WORKFLOW.md](docs/WORKFLOW.md)
 
 ## 지금 되는 것
 > 모든 답변·멘토는 **가짜(demo) 데이터**이며 실존 인물이 아니다.
@@ -51,11 +52,21 @@ Kkurolog/
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows는 아래 표 참고
 pip install -r requirements.txt
-cp .env.example .env             # Windows: copy .env.example .env
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
+
+**Windows 사용자:** 가상환경 켜는 명령이 터미널마다 다르다. 켜지면 줄 앞에 `(.venv)`가 붙는다.
+
+| 터미널 | 가상환경 켜기 |
+|---|---|
+| Git Bash (VS Code 기본 터미널이 `bash`/`MINGW64`일 때) | `source .venv/Scripts/activate` |
+| PowerShell | `.venv\Scripts\Activate.ps1` |
+
+- PowerShell에서 "스크립트를 실행할 수 없습니다" 오류가 나면 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`를 한 번 실행한다.
+- Python이 여러 버전 깔려 있으면 `py -3.12 -m venv .venv`처럼 버전을 지정해 만든다.
 - http://localhost:8000/health 에서 `{"status":"ok"}`가 나오면 성공
 - http://localhost:8000/docs 에서 API를 직접 눌러볼 수 있다
 - 테스트: `pytest` (backend 폴더, venv 켠 상태)
@@ -64,16 +75,19 @@ uvicorn app.main:app --reload
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local       # Windows: copy .env.example .env.local
+cp .env.example .env.local
 npm run dev
 ```
 - http://localhost:3000 에서 질문을 입력해 본다, http://localhost:3000/mentors 에서 멘토를 찾아본다
 
 두 번째부터는 설치 과정 없이 아래만 실행하면 된다.
-- backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`
+- backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload` (Windows는 activate 부분만 위 표대로)
 - frontend: `cd frontend && npm run dev`
 
+## 팀 작업 방법
+`main`은 보호되어 있어 직접 push할 수 없다. **브랜치 → PR → 다른 팀원 1명 승인 → Squash and merge** 순서로만 합친다.
+처음이라면 [docs/WORKFLOW.md](docs/WORKFLOW.md)를 위에서부터 따라 한다.
+
 ## 협업 규칙
-- `main`에서 바로 작업하지 않는다. 브랜치를 만들고 PR로 올린다.
-- API 키, 인터뷰 원문, 개인정보는 커밋하지 않는다 (`.env`, `data/raw/`는 자동으로 제외됨).
+- API 키, 인터뷰 원문, 개인정보는 커밋하지 않는다 (`.env`, `data/` 폴더 전체는 자동으로 제외됨).
 - 중요한 결정은 `docs/DECISIONS.md`에 한 줄씩 남긴다.

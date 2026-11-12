@@ -3,7 +3,7 @@ RAG 성능 측정. 설정(Top-K, 유사도 하한 등)을 바꿀 때마다 돌�
 
 질문 세트 형식: scripts/eval/questions.example.json 참고
   expected_type     : answer | no_evidence | off_topic | safety
-  expected_post_ids : 답의 근거가 되어야 하는 글 ID (answer 일 때)
+  expected_source_ids : 답의 근거가 되어야 하는 글번호 (sources.id, answer 일 때)
 
 모드
   --retrieval-only : 임베딩 + 검색만 (Claude 호출 없음, 비용 아주 적음)
@@ -12,7 +12,8 @@ RAG 성능 측정. 설정(Top-K, 유사도 하한 등)을 바꿀 때마다 돌�
                      → answer_type 정확도, 출처 적중률
 
 실행 (backend 폴더에서):
-  python ../scripts/eval_ask.py ../scripts/eval/questions.example.json --local ../data/raw/chunks_embedded.jsonl --retrieval-only
+  python ../scripts/eval_ask.py ../scripts/eval/questions.example.json --retrieval-only
+  (기본은 Supabase 의 match_chunks 로 검색한다. chunks.embedding 이 채워져 있어야 한다)
 """
 
 import argparse
@@ -32,7 +33,7 @@ from app.services.answer import looks_like_crisis  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("questions", help="질문 세트 JSON")
-    parser.add_argument("--local", help="임베딩 포함 chunk jsonl (없으면 Supabase 사용)")
+    parser.add_argument("--local", help="임베딩 포함 Chunk 모양 jsonl (없으면 Supabase 사용)")
     parser.add_argument("--retrieval-only", action="store_true", help="Claude 를 부르지 않고 검색만 측정")
     args = parser.parse_args()
 
@@ -49,9 +50,9 @@ def main() -> None:
     failed_total = 0  # API 오류로 '임시 안내'를 대신 낸 횟수 (근거 부족과 구분)
 
     for q in questions:
-        expected = set(q.get("expected_post_ids", []))
+        expected = set(q.get("expected_source_ids", []))
         hits = [] if looks_like_crisis(q["question"]) else pipeline.retrieve(q["question"])
-        found = {h.chunk.post_id for h in hits}
+        found = {h.chunk.source_id for h in hits}
         top = ", ".join(f"{h.chunk.chunk_id}({h.score:.2f})" for h in hits[:3]) or "-"
 
         if q["expected_type"] == "answer":
@@ -68,7 +69,7 @@ def main() -> None:
             type_correct += ok
             if q["expected_type"] == "answer":
                 source_total += 1
-                source_hit += bool(expected & {s.post_id for s in result.sources})
+                source_hit += bool(expected & {s.source_id for s in result.sources})
             line += f" | 결과: {result.answer_type} {'✓' if ok else '✗ (기대 ' + q['expected_type'] + ')'}"
             if result.failed:
                 failed_total += 1
