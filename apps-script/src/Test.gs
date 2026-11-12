@@ -83,8 +83,8 @@ function testValidationErrors() {
 
 /**
  * 3) 실제로 문의 1건 저장 + 첫 번째 활성 멘토에게 메일 발송 + 학생 사본 (메일 2통 사용)
- * - 같은 TEST_STUDENT_EMAIL로 10분 안에 다시 실행하면 TOO_MANY_REQUESTS가 나옵니다. (정상)
- *   여러 번 테스트할 때는 설정 탭 rateLimitMinutes를 잠시 0으로 바꾸고, 끝나면 10으로 되돌립니다.
+ * - 같은 TEST_STUDENT_EMAIL로 10분 안에 4번째 실행하면 TOO_MANY_REQUESTS가 나옵니다. (정상, 하루 5건 제한도 있음)
+ *   테스트 기간에는 설정 탭 rateLimitMinutes·rateLimitPerDay를 0으로 두고, 운영 전에 10·5로 되돌립니다.
  */
 function testSubmitInquiry() {
   const studentEmail = testProperty_(PROPERTY_KEYS.TEST_STUDENT_EMAIL);
@@ -182,26 +182,30 @@ function testRateLimit() {
   const now = new Date();
   const minutesAgo = function (m) { return toIsoKst_(new Date(now.getTime() - m * 60 * 1000)); };
   const email = 'student@example.com';
-  const limits = { minutes: 10, perDay: 5 };
+  const limits = { minutes: 10, perWindow: 3, perDay: 5 };
   const codeOf = function (entries, lim) {
     const err = findRateLimitError_(entries, email, now, lim || limits);
-    return err ? `${err.code}:${err.message.indexOf('하루') >= 0 ? '하루' : '간격'}` : 'OK';
+    return err ? `${err.code}:${err.message.indexOf('하루') >= 0 ? '하루' : '10분'}` : 'OK';
   };
   const same = function (n, createdAt, address) {
     const list = [];
     for (let i = 0; i < n; i++) list.push({ email: address || email, createdAt: createdAt });
     return list;
   };
+  const noDay = { minutes: 10, perWindow: 3, perDay: 0 };
   const cases = [
     ['처음 보냄', [], null, 'OK'],
-    ['5분 전에 보냄 → 막힘', same(1, minutesAgo(5)), null, 'TOO_MANY_REQUESTS:간격'],
-    ['11분 전에 보냄 → 통과', same(1, minutesAgo(11)), null, 'OK'],
-    ['대소문자·공백만 다른 주소 5분 전 → 막힘', same(1, minutesAgo(5), '  Student@Example.COM '), null, 'TOO_MANY_REQUESTS:간격'],
-    ['다른 주소 1분 전 → 통과', same(1, minutesAgo(1), 'other@example.com'), null, 'OK'],
-    ['오늘 4건 (간격 제한 0) → 통과', same(4, toIsoKst_(now)), { minutes: 0, perDay: 5 }, 'OK'],
-    ['오늘 5건 (간격 제한 0) → 막힘', same(5, toIsoKst_(now)), { minutes: 0, perDay: 5 }, 'TOO_MANY_REQUESTS:하루'],
+    ['10분 안에 2건 → 3번째 통과', same(2, minutesAgo(5)), null, 'OK'],
+    ['10분 안에 3건 → 4번째 막힘', same(3, minutesAgo(5)), null, 'TOO_MANY_REQUESTS:10분'],
+    ['3건이 모두 11분 전 → 통과', same(3, minutesAgo(11)), noDay, 'OK'],
+    ['11분 전 2건 + 5분 전 1건 → 통과', same(2, minutesAgo(11)).concat(same(1, minutesAgo(5))), noDay, 'OK'],
+    ['대소문자·공백만 다른 주소 3건 → 막힘', same(3, minutesAgo(5), '  Student@Example.COM '), null, 'TOO_MANY_REQUESTS:10분'],
+    ['다른 주소 3건 → 통과', same(3, minutesAgo(1), 'other@example.com'), null, 'OK'],
+    ['오늘 4건 (10분 제한 0) → 통과', same(4, toIsoKst_(now)), { minutes: 0, perWindow: 3, perDay: 5 }, 'OK'],
+    ['오늘 5건 (10분 제한 0) → 막힘', same(5, toIsoKst_(now)), { minutes: 0, perWindow: 3, perDay: 5 }, 'TOO_MANY_REQUESTS:하루'],
     ['어제 5건 → 통과', same(5, toIsoKst_(new Date(now.getTime() - 24 * 60 * 60 * 1000))), null, 'OK'],
-    ['제한 둘 다 0 → 통과', same(9, toIsoKst_(now)), { minutes: 0, perDay: 0 }, 'OK'],
+    ['제한 모두 0 → 통과', same(9, toIsoKst_(now)), { minutes: 0, perWindow: 0, perDay: 0 }, 'OK'],
+    ['rateLimitPerWindow만 0 → 10분 제한 없음', same(4, minutesAgo(1)), { minutes: 10, perWindow: 0, perDay: 0 }, 'OK'],
     ['보낸일시를 못 읽는 줄은 셈하지 않음', same(5, '날짜아님'), null, 'OK'],
   ];
   let failed = 0;
@@ -209,6 +213,12 @@ function testRateLimit() {
     const got = codeOf(c[1], c[2]);
     failed += testCheck_(`횟수 제한 - ${c[0]}`, got === c[3], `기대 ${c[3]} / 실제 ${got}`);
   });
+  const msgErr = findRateLimitError_(same(3, minutesAgo(1)), email, now, noDay);
+  failed += testCheck_(
+    '10분 제한 문구',
+    !!msgErr && msgErr.message === '현재 메일 발송량이 많아 전송이 잠시 제한되었어요. 10분 후 다시 시도해 주세요.',
+    msgErr && msgErr.message
+  );
   console.log(failed === 0 ? '모두 통과했습니다.' : `${failed}개 실패했습니다.`);
 }
 

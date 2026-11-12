@@ -54,8 +54,9 @@ const SETTING_KEYS = Object.freeze({
   STUDENT_FORWARD_INTRO: 'studentForwardIntro',
   STUDENT_FORWARD_FOOTER: 'studentForwardFooter',
   // Step 5-1: 같은 학생 메일로 보내는 횟수 제한 (숫자. 0이면 제한 없음)
-  RATE_LIMIT_MINUTES: 'rateLimitMinutes',
-  RATE_LIMIT_PER_DAY: 'rateLimitPerDay',
+  RATE_LIMIT_MINUTES: 'rateLimitMinutes', // 몇 분 동안 셀지
+  RATE_LIMIT_PER_WINDOW: 'rateLimitPerWindow', // 그 시간 안에 몇 건까지 보낼 수 있는지
+  RATE_LIMIT_PER_DAY: 'rateLimitPerDay', // 하루(한국 시간 자정 기준)에 몇 건까지 보낼 수 있는지
   // Step 5-1: 학생에게 보내는 "보낸 문의 사본" 메일
   STUDENT_COPY_SUBJECT_PREFIX: 'studentCopySubjectPrefix',
   STUDENT_COPY_INTRO: 'studentCopyIntro',
@@ -73,7 +74,8 @@ const SETTING_KEYS = Object.freeze({
  */
 function numberSettingDefaults_() {
   const defaults = {};
-  defaults[SETTING_KEYS.RATE_LIMIT_MINUTES] = 10; // 같은 학생 메일은 10분에 1건
+  defaults[SETTING_KEYS.RATE_LIMIT_MINUTES] = 10; // 같은 학생 메일은 최근 10분 안에
+  defaults[SETTING_KEYS.RATE_LIMIT_PER_WINDOW] = 3; // 3건까지 (4번째부터 막힘)
   defaults[SETTING_KEYS.RATE_LIMIT_PER_DAY] = 5; // 같은 학생 메일은 하루(한국 시간 자정 기준) 5건까지
   defaults[SETTING_KEYS.REMINDER_DAYS] = 10; // 보낸 날짜 + 10일째에 리마인드
   return defaults;

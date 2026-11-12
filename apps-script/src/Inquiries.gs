@@ -3,7 +3,7 @@
  *
  * 이 파일이 하는 일
  * 1. 입력값 검사 (이름·제목·내용 길이, 이메일 형식, 개인정보 동의, 활성 멘토)
- * 2. 같은 학생 메일로 너무 자주 보냈는지 확인 (Step 5-1. 기본: 10분에 1건, 하루 5건)
+ * 2. 같은 학생 메일로 너무 자주 보냈는지 확인 (Step 5-1. 기본: 최근 10분 안에 3건, 하루 5건)
  * 3. 문의번호 만들기 (날짜마다 0001부터: q20261108-0001)
  * 4. "문의" 탭에 한 줄 저장
  * 5. 멘토에게 메일 발송 (Reply-To = 중계계정+문의번호 plus 주소)
@@ -85,26 +85,27 @@ function nextInquiryId_(existingIds, now) {
 /**
  * 같은 학생 메일로 너무 자주 보냈는지 확인합니다. (시트를 읽지 않는 계산만 하는 함수: Test.gs에서 검사)
  * - 하루: 한국 시간 자정 기준. 오늘 이미 perDay건을 보냈으면 막습니다.
- * - 간격: 마지막으로 보낸 뒤 minutes분이 지나지 않았으면 막습니다.
+ * - 짧은 시간: 최근 minutes분 안에 이미 perWindow건을 보냈으면 막습니다. (기본: 10분 안에 3건까지)
  * - 메일 주소는 대소문자·앞뒤 공백을 무시하고 비교합니다.
- * - 0으로 설정한 제한은 쓰지 않습니다.
+ * - 0으로 설정한 제한은 쓰지 않습니다. (minutes나 perWindow가 0이면 짧은 시간 제한 없음)
  * @param {{email: string, createdAt: string}[]} entries "문의" 탭의 학생메일·보낸일시
  * @param {string} email 이번에 보낸 학생 메일
  * @param {Date} now
- * @param {{minutes: number, perDay: number}} limits
+ * @param {{minutes: number, perWindow: number, perDay: number}} limits
  * @return {?AppError} 막아야 하면 TOO_MANY_REQUESTS 에러, 괜찮으면 null
  */
 function findRateLimitError_(entries, email, now, limits) {
   const target = String(email).trim().toLowerCase();
   const todayKey = toDateKey_(now);
+  const windowMs = limits.minutes * 60 * 1000;
   let todayCount = 0;
-  let lastSentAt = null;
+  let windowCount = 0;
   entries.forEach(function (entry) {
     if (String(entry.email).trim().toLowerCase() !== target) return;
     const sentAt = parseIsoDate_(entry.createdAt);
     if (!sentAt) return;
     if (toDateKey_(sentAt) === todayKey) todayCount++;
-    if (!lastSentAt || sentAt > lastSentAt) lastSentAt = sentAt;
+    if (now - sentAt < windowMs) windowCount++;
   });
   if (limits.perDay > 0 && todayCount >= limits.perDay) {
     return new AppError(
@@ -113,11 +114,11 @@ function findRateLimitError_(entries, email, now, limits) {
       `하루 제한: 오늘 ${todayCount}건`
     );
   }
-  if (limits.minutes > 0 && lastSentAt && now - lastSentAt < limits.minutes * 60 * 1000) {
+  if (limits.minutes > 0 && limits.perWindow > 0 && windowCount >= limits.perWindow) {
     return new AppError(
       'TOO_MANY_REQUESTS',
-      `같은 메일 주소로는 ${limits.minutes}분에 한 번만 보낼 수 있어요. 잠시 후 다시 시도해 주세요.`,
-      `간격 제한: 마지막 문의 ${toIsoKst_(lastSentAt)}`
+      `현재 메일 발송량이 많아 전송이 잠시 제한되었어요. ${limits.minutes}분 후 다시 시도해 주세요.`,
+      `짧은 시간 제한: 최근 ${limits.minutes}분 안에 ${windowCount}건`
     );
   }
   return null;
@@ -171,6 +172,7 @@ function submitInquiryAction_(req) {
   }
   const limits = {
     minutes: getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_MINUTES),
+    perWindow: getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_PER_WINDOW),
     perDay: getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_PER_DAY),
   };
 

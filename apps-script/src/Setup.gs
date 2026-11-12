@@ -58,7 +58,8 @@ function defaultSettings_() {
       '이 메일은 꾸로록이 자동으로 전달한 메일이에요. 추가로 궁금한 점은 꾸로록에서 새 문의를 보내주세요.',
       '학생에게 전달되는 메일 맨 아래 안내 문구',
     ],
-    [SETTING_KEYS.RATE_LIMIT_MINUTES, '10', '같은 학생 메일로 다시 보내려면 기다려야 하는 시간(분). 0이면 제한 없음'],
+    [SETTING_KEYS.RATE_LIMIT_MINUTES, '10', '같은 학생 메일의 문의 수를 셀 시간(분). rateLimitPerWindow와 함께 씀. 0이면 이 제한 없음'],
+    [SETTING_KEYS.RATE_LIMIT_PER_WINDOW, '3', 'rateLimitMinutes분 안에 같은 학생 메일로 보낼 수 있는 문의 수. 0이면 이 제한 없음'],
     [SETTING_KEYS.RATE_LIMIT_PER_DAY, '5', '같은 학생 메일로 하루(자정 기준)에 보낼 수 있는 문의 수. 0이면 제한 없음'],
     [SETTING_KEYS.STUDENT_COPY_SUBJECT_PREFIX, '[꾸로록 보낸 문의]', '학생에게 가는 "보낸 문의 사본" 메일 제목 앞에 붙는 말'],
     [

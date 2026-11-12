@@ -96,7 +96,8 @@ function getStatusLines_() {
   lines.push(`리마인드 보낸 문의: ${reminded}건`);
   const settings = getSettings_();
   lines.push(
-    `같은 학생 메일 제한: ${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_MINUTES)}분에 1건, ` +
+    `같은 학생 메일 제한: ${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_MINUTES)}분에 ` +
+      `${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_PER_WINDOW)}건, ` +
       `하루 ${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_PER_DAY)}건 (0 = 제한 없음)`
   );
   lines.push(`리마인드: 보낸 날짜 + ${getNumberSetting_(settings, SETTING_KEYS.REMINDER_DAYS)}일째 (0 = 보내지 않음)`);
