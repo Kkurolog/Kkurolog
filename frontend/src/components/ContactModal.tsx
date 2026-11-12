@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { sendContactRequest, type Mentor } from "@/lib/api";
+import { CheckIcon, CloseIcon } from "./icons";
 
 type Props = {
   mentor: Mentor;
@@ -16,7 +17,7 @@ type Props = {
 type Status = "editing" | "sending" | "done" | "error";
 
 const inputClass =
-  "w-full rounded-lg border border-gray-300 p-2 text-base focus:border-indigo-500 focus:outline-none";
+  "w-full rounded-[10px] border border-line-strong bg-white px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-brand focus:outline-none";
 
 export default function ContactModal({ mentor, initialMessage = "", onClose }: Props) {
   const [senderName, setSenderName] = useState("");
@@ -56,47 +57,55 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
 
   return (
     // 바깥 어두운 배경. 배경을 누르면 닫힌다
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()} // 팝업 안쪽을 눌렀을 때는 닫히지 않게
       >
         <div className="flex items-start justify-between gap-4">
-          <h2 id="contact-title" className="text-lg font-bold text-gray-900">
+          <h2 id="contact-title" className="text-lg font-bold text-ink">
             {mentor.name} 선배에게 연락하기
           </h2>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-gray-400 hover:text-gray-700">
-            ✕
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="-mt-2 -mr-2 inline-flex size-11 items-center justify-center rounded-[10px] text-muted hover:bg-canvas hover:text-ink"
+          >
+            <CloseIcon className="size-5" />
           </button>
         </div>
 
         {status === "done" ? (
           <div className="mt-6 flex flex-col gap-4">
-            <p className="rounded-lg bg-green-50 p-4 text-green-800">
-              ✅ {resultText}
-              <br />
-              <span className="text-sm">선배가 답장하면 입력한 이메일로 바로 받을 수 있어요.</span>
-            </p>
-            <p className="text-xs text-gray-400">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겼어요)</p>
+            <div className="flex gap-3 rounded-xl bg-mint-soft p-4 text-brand">
+              <CheckIcon className="mt-0.5 size-5 shrink-0" />
+              <p>
+                {resultText}
+                <br />
+                <span className="text-sm">선배가 답장하면 입력한 이메일로 바로 받을 수 있어요.</span>
+              </p>
+            </div>
+            <p className="text-xs text-muted">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겼어요)</p>
             <button
               type="button"
               onClick={onClose}
-              className="self-end rounded-lg bg-indigo-600 px-5 py-2 font-medium text-white hover:bg-indigo-700"
+              className="min-h-11 self-end rounded-[10px] bg-brand px-5 font-semibold text-white hover:bg-brand-dark"
             >
               닫기
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-            <p className="rounded-lg bg-indigo-50 p-3 text-sm leading-relaxed text-indigo-900">
+            <p className="rounded-xl bg-mint-soft p-3 text-sm leading-relaxed text-brand">
               작성한 내용은 꾸로록을 통해 <b>{mentor.name}</b> 선배에게 이메일로 바로 전달돼요. 선배의 이메일
               주소는 공개되지 않으며, 이후 연락은 선배가 답장으로 이어가요.
             </p>
 
-            <label className="flex flex-col gap-1 text-sm text-gray-700">
+            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
               내 이름 (또는 별명)
               <input
                 required
@@ -106,7 +115,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                 className={inputClass}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-gray-700">
+            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
               답장 받을 이메일
               <input
                 required
@@ -118,7 +127,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                 className={inputClass}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-gray-700">
+            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
               메일 제목
               <input
                 required
@@ -129,8 +138,8 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                 className={inputClass}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-gray-700">
-              질문 내용 <span className="text-xs text-gray-400">(10자 이상, {message.length}/2000)</span>
+            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
+              질문 내용 <span className="text-xs font-normal text-muted">(10자 이상, {message.length}/2000)</span>
               <textarea
                 required
                 minLength={10}
@@ -142,20 +151,20 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
               />
             </label>
 
-            {status === "error" && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{resultText}</p>}
+            {status === "error" && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{resultText}</p>}
 
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg px-4 py-2 text-gray-600 hover:bg-gray-100"
+                className="min-h-11 rounded-[10px] px-4 text-body hover:bg-canvas"
               >
                 취소
               </button>
               <button
                 type="submit"
                 disabled={status === "sending"}
-                className="rounded-lg bg-indigo-600 px-5 py-2 font-medium text-white hover:bg-indigo-700 disabled:bg-gray-300"
+                className="min-h-11 rounded-[10px] bg-brand px-5 font-semibold text-white hover:bg-brand-dark disabled:bg-line-strong"
               >
                 {status === "sending" ? "보내는 중..." : "보내기"}
               </button>
