@@ -8,7 +8,7 @@ backend의 시작점. API 주소(라우트)를 정의한다.
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.schemas import (
@@ -20,7 +20,8 @@ from app.schemas import (
     RecommendRequest,
     RecommendResponse,
 )
-from app.services.answer import make_answer
+from app.rate_limit import limit_ask
+from app.services.answer import looks_like_crisis, make_answer, safety_answer
 from app.services.contact import deliver_contact_request
 from app.services.mentors import get_mentor, list_mentors, recommend_mentors
 
@@ -46,8 +47,17 @@ def health() -> dict[str, str]:
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(request: AskRequest) -> AskResponse:
-    """학생의 질문을 받아 답변과 출처를 돌려준다."""
+def ask(request: AskRequest, http_request: Request) -> AskResponse:
+    """
+    학생의 질문을 받아 답변과 출처를 돌려준다. 처리 순서가 중요하다:
+      1. 입력 검사: FastAPI 가 이 함수가 불리기 전에 한다. 형식이 틀리면 422 (횟수에 세지 않음)
+      2. 위기 신호 검사: 걸리면 횟수 제한과 상관없이 바로 상담 안내 (횟수에 세지 않음, API 비용 없음)
+      3. 호출 횟수 제한: 넘으면 429 (수치는 app/config.py, 이유는 app/rate_limit.py)
+      4. 답변 만들기
+    """
+    if looks_like_crisis(request.question):
+        return safety_answer()
+    limit_ask(http_request)
     return make_answer(request.question)
 
 
