@@ -11,7 +11,7 @@
 | # | 제안 | 상태 |
 |---|---|---|
 | 1 | 데이터는 gschool.kr 공개 글 (사용 허락받음) | 결정 대기 |
-| 2 | 글 종류별 chunking 규칙 | **구현함** (`app/rag/chunking.py`, `scripts/build_chunks.py`). 크롤러는 미구현 |
+| 2 | chunking 규칙 | main의 `scripts/chunk_gschool.py`와 DECISIONS.md(2026-11-09)를 따름. 이 브랜치의 별도 chunking 코드는 지움 |
 | 3 | 검색 → 유사도 하한 → Claude 판단, 출처는 실제로 쓴 chunk만 | **구현함** (`app/rag/pipeline.py`). 실제 API로는 아직 미검증 |
 | 4 | Claude에는 검색 chunk + 앞뒤 chunk만 넘김 (최대 3개 글) | **구현함** |
 | 5 | 응답에 `answer_type`, 출처에 `visibility/date/url` 추가 | **이 브랜치에서 구현함** |
@@ -31,18 +31,21 @@
 - 크롤링은 요청 사이에 간격을 두고, 결과는 `data/raw/`에 파일로만 저장합니다. 원문은 저작물이라 **git에 올리지 않습니다.**
 - 메뉴·푸터·댓글은 지웁니다. 공개 글이라도 본문에 다른 학생 실명이 섞여 있을 수 있어 개인정보 정제 단계는 둡니다.
 
-## 2. Chunking (글을 검색 단위로 자르는 규칙)
-- **졸업생 인터뷰** (에세이 게시판, 투게덥 시리즈): HTML 굵은 글씨(`<strong>`) 질문을 경계로 **질문-답변 쌍** 하나를 chunk 하나로 만듭니다.
-  답변이 길면 문단으로 나누고, 나눈 조각마다 질문을 앞에 붙입니다. 마무리 편집 노트는 별도 chunk로 둡니다.
-- **코-레터 뉴스레터·에세이**: 소제목이나 문단 2~4개(약 500~800자) 단위로 자릅니다. 문단 중간에서는 자르지 않습니다.
-- 모든 chunk 앞에 `[글 종류 | 닉네임 | 진로 | 날짜]` 머리말을 붙여 임베딩합니다.
-- metadata: `type, nickname, career_tags, date, url, visibility, post_id, chunk_index`
-  (`chunk_index`는 앞뒤 chunk를 찾을 때 씁니다)
+## 2. Chunking과 저장 구조 (main 기준으로 맞춤)
+- 조각 나누기·태깅·적재는 main의 데이터 파이프라인을 그대로 씁니다 (`scripts/README.md`):
+  `collect_gschool.py` → `chunk_gschool.py` → 태깅 → `build_dataset.py` → `check_tags.py` → `load_to_supabase.py`.
+  규칙과 `embed_text` 형식은 DECISIONS.md(2026-11-09)에 있습니다.
+- 테이블은 `supabase/migrations/0001_experience_tables.sql`의 `sources`(글) / `people`(인물) / `chunks`(조각)입니다.
+  backend는 **읽기만** 하고, 검색은 `match_chunks` 함수로만 합니다 (L0은 함수가 허용 목록 방식으로 막음).
+- 앞뒤 chunk는 같은 글(`source_id`)의 `chunk_index`(1부터)로 찾습니다.
+- **아직 남은 일**: `chunks.embedding`이 비어 있어서 지금은 검색 결과가 0개입니다.
+  DECISIONS.md대로 태그 검수가 끝난 뒤 임베딩을 채우는 스크립트를 따로 만듭니다 (`text-embedding-3-small`, 1536차원).
 
 ## 3. `/ask` 처리 흐름
 ```
-질문 → 호출 횟수 검사 → 위기 신호 검사 → 질문 임베딩 → Top-K 검색 (L0 제외)
-     → 유사도 하한보다 낮은 chunk 버림 → 하나도 없으면 Claude 안 부르고 "근거 부족"
+질문 → 위기 신호 검사 → 호출 횟수 검사 → 질문 임베딩 → Top-K 검색 (L0 제외)
+     → 유사도 하한보다 낮은 chunk 버림 → 하나도 없어도 Claude로 위기·무관 질문인지 분류만 함
+       (설정 classify_when_no_hits=false 면 Claude 안 부르고 "근거 부족")
      → 앞뒤 chunk 붙이기, 같은 글은 합치기 (최대 3개 글)
      → Claude 1회 호출 → {answer_type, answer, used_chunk_ids} 받기
      → used_chunk_ids에 해당하는 chunk만 출처로 돌려줌
@@ -104,39 +107,45 @@
 | 기준 | 분당 | 하루 | 이유 |
 |---|---|---|---|
 | 브라우저별 익명 ID (`X-Client-Id` 헤더) | 제한 없음 | 30 | 학생 한 명 기준. 학교 와이파이는 모두 같은 IP. 연달아 질문해도 막지 않고 하루 상한으로만 관리 |
-| IP | 60 | 1000 | 봇 방지용으로 느슨하게 |
+| IP | 120 | 1500 | 악용 방지의 실제 기준. 학교 와이파이(약 70명이 IP 하나)가 막히지 않게 넉넉하되, 전체 상한보다 작게 |
 | 서비스 전체 | - | 2000 | 비용 안전장치 |
 
 - 수치는 `backend/app/config.py`에 있고, `.env`로 바꿀 수 있습니다.
 - 익명 ID는 프론트가 만든 무작위 값(UUID)을 localStorage에 저장해 헤더로 보냅니다.
   쿠키를 안 쓰는 이유: 프론트(Vercel)와 백엔드(Render)의 도메인이 달라 브라우저가 쿠키를 막을 수 있습니다.
+- 익명 ID는 브라우저가 마음대로 바꿔 보낼 수 있어서, 평범한 학생용 기준일 뿐 악용은 못 막습니다.
+  그래서 IP 하루 상한을 전체 상한보다 작게 둡니다. IP 하나가 하루치를 다 써도 다른 곳의 학생은 쓸 수 있습니다.
+- IP는 `X-Forwarded-For` 헤더의 **오른쪽 끝**(우리 프록시가 직접 붙인 값)에서 읽습니다.
+  맨 앞 값은 요청한 사람이 꾸밀 수 있어서, 그 값을 쓰면 IP를 바꿔 가며 제한을 피할 수 있습니다.
+- IP 기준에 걸리면 "같은 와이파이에서 질문이 몰리고 있어요"라고 안내합니다. 그 학생이 횟수를 다 쓴 게 아니기 때문입니다.
 - 카운터는 서버 메모리에 둡니다. 서버가 재시작되면 0이 되지만 MVP에는 충분합니다.
 - 배포할 때 Render 환경변수에 `TRUST_PROXY_HEADERS=true`를 넣어야 IP별 제한이 제대로 동작합니다.
+  프록시 개수(`TRUSTED_PROXY_COUNT`, 기본 1)가 맞는지 배포 후 로그로 학생 IP가 찍히는지 한 번 확인합니다.
 - Anthropic·OpenAI 콘솔에서 월 사용 한도도 따로 설정합니다.
 
 ## 8. 대화 맥락
 MVP에서는 질문을 하나씩 따로 답합니다 (지금 동작과 같음). 이어지는 질문 지원은 나중에 `history` 필드를 추가해서 합니다.
 
 ## 9. 성능 측정
-- 설문 문항을 바탕으로 질문 20~30개를 만들고, 질문마다 "기대하는 글(post_id)"을 적어 둡니다.
+- 설문 문항을 바탕으로 질문 20~30개를 만들고, 질문마다 "기대하는 글번호(`expected_source_ids`)"를 적어 둡니다.
   "근거 부족이어야 하는 질문", "위기·무관 질문"도 섞습니다.
 - 스크립트로 검색 적중률, 근거 판단 정확도, `answer_type` 분류 정확도를 잽니다.
 - 유사도 하한, K 값, 앞뒤 chunk 개수는 이 결과를 보고 정합니다.
 
 ## 10. 구현 순서 (PR 단위 제안)
 1. 응답 형식 + 위기 안전장치 + 호출 제한 ← **이 브랜치**
-2. chunking 스크립트 ← **이 브랜치** (크롤링·개인정보 정제는 아직)
-3. 임베딩 + Supabase 적재, 검색 함수 ← **이 브랜치** (실제 키로 미검증)
-4. Claude 답변 생성 + 출처 구성 → `make_answer()`에 연결 ← **이 브랜치** (`RAG_ENABLED=true`로 켬)
-5. 실제 데이터로 성능 측정 → 유사도 하한·K 값 등 조정 ← 다음 단계
+2. 수집·chunking·태깅·적재 ← main에 이미 있음 (`scripts/`, `supabase/migrations/`)
+3. `match_chunks`로 검색 + Claude 답변 생성 + 출처 구성 → `make_answer()`에 연결 ← **이 브랜치** (`RAG_ENABLED=true`로 켬, 실제 키로 미검증)
+4. 태그 검수 후 `chunks.embedding` 채우기 ← 다음 단계 (스크립트 아직 없음)
+5. 실제 데이터로 성능 측정 → 유사도 하한·K 값 등 조정 ← 그다음
 
-### RAG 켜 보기 (로컬)
+### RAG 켜 보기 (임베딩을 채운 뒤)
 ```bash
 cd backend
-pip install -r requirements-rag.txt          # .env 에 OPENAI_API_KEY, ANTHROPIC_API_KEY
-python ../scripts/build_chunks.py ../scripts/examples/sample_posts.json ../data/raw/chunks.jsonl
-python ../scripts/load_chunks.py ../data/raw/chunks.jsonl --local ../data/raw/chunks_embedded.jsonl  # ⚠️ 임베딩 비용 발생
-# .env 에 RAG_ENABLED=true, RAG_LOCAL_CHUNKS=../data/raw/chunks_embedded.jsonl 넣고 서버 실행
+pip install -r requirements-rag.txt
+# .env 에 RAG_ENABLED=true, SUPABASE_URL, SUPABASE_KEY(service_role), OPENAI_API_KEY, ANTHROPIC_API_KEY
+uvicorn app.main:app --reload
+python ../scripts/eval_ask.py ../scripts/eval/questions.example.json --retrieval-only   # 검색만 측정 (Claude 비용 없음)
 ```
 
 ## 팀 논의가 필요한 것

@@ -26,7 +26,7 @@ from app.rag.messages import (
     looks_like_crisis,  # 위기 신호 판정은 app/services/answer.py 의 함수 하나만 쓴다
 )
 from app.rag.models import Chunk, RagAnswer, RagSource, ScoredChunk
-from app.rag.store import VectorStore
+from app.rag.store import PUBLIC_VISIBILITY, VectorStore
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -44,12 +44,12 @@ def to_source(chunk: Chunk) -> RagSource:
     """공개 등급에 맞춰 출처를 만든다. L1 은 원문 비공개, 글 주소와 제목은 L3 만."""
     return RagSource(
         chunk_id=chunk.chunk_id,
-        post_id=chunk.post_id,
+        source_id=chunk.source_id,
         alumni=chunk.display_name,
         title=public_title(chunk),
         excerpt=None if chunk.visibility == "L1" else chunk.content,
         visibility=chunk.visibility,
-        date=chunk.date,
+        published_at=chunk.published_at,
         url=chunk.url if chunk.visibility == "L3" else None,
     )
 
@@ -65,7 +65,7 @@ class RagPipeline:
     def retrieve(self, question: str) -> list[ScoredChunk]:
         vector = self.embedder.embed([question])[0]
         hits = self.store.search(vector, self.settings.top_k)
-        return [h for h in hits if h.score >= self.settings.similarity_floor and h.chunk.visibility != "L0"]
+        return [h for h in hits if h.score >= self.settings.similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY]
 
     # ---- 3. 앞뒤 chunk 붙이고 글 단위로 묶기 ----
     def build_context(self, hits: list[ScoredChunk]) -> list[ContextDoc]:
@@ -73,7 +73,7 @@ class RagPipeline:
         hit_indices: dict[str, set[int]] = {}
         first_chunk: dict[str, Chunk] = {}
         for h in hits:
-            pid = h.chunk.post_id
+            pid = h.chunk.source_id
             best_score[pid] = max(best_score.get(pid, 0.0), h.score)
             hit_indices.setdefault(pid, set()).add(h.chunk.chunk_index)
             first_chunk.setdefault(pid, h.chunk)
@@ -82,20 +82,19 @@ class RagPipeline:
         window = self.settings.neighbor_window
         docs = []
         for pid in top_posts:
-            wanted = sorted({i + d for i in hit_indices[pid] for d in range(-window, window + 1) if i + d >= 0})
+            wanted = sorted({i + d for i in hit_indices[pid] for d in range(-window, window + 1) if i + d >= 1})
             chunks = {c.chunk_index: c for c in self.store.get_chunks(pid, wanted)}
             for h in hits:  # 검색된 chunk 는 저장소 결과와 상관없이 꼭 넣는다
-                if h.chunk.post_id == pid:
+                if h.chunk.source_id == pid:
                     chunks.setdefault(h.chunk.chunk_index, h.chunk)
-            ordered = [chunks[i] for i in sorted(chunks) if chunks[i].visibility != "L0"]
+            ordered = [chunks[i] for i in sorted(chunks) if chunks[i].visibility in PUBLIC_VISIBILITY]
             head = first_chunk[pid]
             docs.append(
                 ContextDoc(
-                    post_id=pid,
+                    source_id=pid,
                     title=public_title(head),  # L1·L2 는 제목을 넘기지 않는다
                     display_name=head.display_name,
-                    date=head.date,
-                    post_type=head.post_type,
+                    published_at=head.published_at,
                     chunks=ordered,
                 )
             )

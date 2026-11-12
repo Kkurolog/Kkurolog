@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app import config
+from app import config, rate_limit
 from app.main import app
 from app.rag.models import RagAnswer, RagSource
 from app.rate_limit import RateLimiter
@@ -250,12 +250,59 @@ def test_daily_limit_resets_at_kst_midnight(monkeypatch):
     assert not blocked(limiter)
 
 
-def test_forwarded_ip_used_when_trusted(monkeypatch):
+def test_forwarded_ip_uses_value_added_by_our_proxy(monkeypatch):
+    """프록시가 붙인 오른쪽 끝 값으로 센다. 다른 IP 에서 온 요청은 따로 센다."""
     monkeypatch.setattr(config, "TRUST_PROXY_HEADERS", True)
     monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
-    assert ask("질문", {"X-Forwarded-For": "203.0.113.1, 10.0.0.1"}).status_code == 200
-    assert ask("질문", {"X-Forwarded-For": "203.0.113.1, 10.0.0.1"}).status_code == 429
-    assert ask("질문", {"X-Forwarded-For": "203.0.113.2, 10.0.0.1"}).status_code == 200
+    assert ask("질문", {"X-Forwarded-For": "203.0.113.1"}).status_code == 200
+    assert ask("질문", {"X-Forwarded-For": "203.0.113.1"}).status_code == 429
+    assert ask("질문", {"X-Forwarded-For": "203.0.113.2"}).status_code == 200
+
+
+def test_spoofed_forwarded_ip_cannot_bypass_limit(monkeypatch):
+    """요청한 사람이 왼쪽에 가짜 IP 를 바꿔 적어 보내도, 프록시가 붙인 진짜 IP 로 센다."""
+    monkeypatch.setattr(config, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
+    assert ask("질문", {"X-Forwarded-For": "1.1.1.1, 203.0.113.9"}).status_code == 200
+    assert ask("질문", {"X-Forwarded-For": "2.2.2.2, 203.0.113.9"}).status_code == 429
+    assert ask("질문", {"X-Forwarded-For": "3.3.3.3, 4.4.4.4, 203.0.113.9"}).status_code == 429
+
+
+def test_trusted_proxy_count_two(monkeypatch):
+    """프록시가 2개면 오른쪽에서 두 번째 값이 학생 IP 다."""
+    monkeypatch.setattr(config, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(config, "TRUSTED_PROXY_COUNT", 2)
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
+    assert ask("질문", {"X-Forwarded-For": "9.9.9.9, 203.0.113.5, 10.0.0.1"}).status_code == 200
+    assert ask("질문", {"X-Forwarded-For": "8.8.8.8, 203.0.113.5, 10.0.0.2"}).status_code == 429
+
+
+def test_forwarded_header_ignored_when_not_trusted(monkeypatch):
+    """로컬 개발(TRUST_PROXY_HEADERS=false)에서는 헤더를 믿지 않고 실제 접속 IP 로 센다."""
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
+    assert ask("질문", {"X-Forwarded-For": "1.1.1.1"}).status_code == 200
+    assert ask("질문", {"X-Forwarded-For": "2.2.2.2"}).status_code == 429
+
+
+def test_ip_limit_message_does_not_blame_the_student(monkeypatch):
+    """같은 와이파이의 다른 학생들 때문에 막힌 거라 '횟수를 다 썼어요'라고 하지 않는다."""
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_DAY", 1)
+    assert ask("질문", CLIENT_A).status_code == 200
+    res = ask("질문", CLIENT_B)  # B 는 처음 질문하지만 같은 IP
+    assert res.status_code == 429
+    assert res.json()["detail"] == rate_limit.IP_DAILY_LIMIT_MESSAGE
+
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_DAY", 100)
+    monkeypatch.setattr(config, "RATE_LIMIT_IP_PER_MINUTE", 1)
+    rate_limit.ask_limiter.reset()
+    assert ask("질문", CLIENT_A).status_code == 200
+    assert ask("질문", CLIENT_B).json()["detail"] == rate_limit.IP_LIMIT_MESSAGE
+
+
+def test_default_ip_limits_fit_school_wifi_and_global_cap():
+    """기본값: 재학생 70명이 같은 IP 로 1분 안에 한 번씩 물어도 통과하고, IP 하나가 전체 하루치를 못 쓴다."""
+    assert config.RATE_LIMIT_IP_PER_MINUTE >= 70
+    assert config.RATE_LIMIT_IP_PER_DAY < config.RATE_LIMIT_GLOBAL_PER_DAY
 
 
 # ---------------------------------------------------------------------------
@@ -281,8 +328,8 @@ def use_fake_pipeline(monkeypatch, result: RagAnswer) -> FakePipeline:
 
 
 def test_rag_answer_is_used_when_enabled(monkeypatch):
-    source = RagSource(chunk_id="p1#0", post_id="p1", alumni="새벽", excerpt="원문", visibility="L3",
-                       url="https://example.com/p1", date="2023-05-10")
+    source = RagSource(chunk_id="p1-01", source_id="p1", alumni="새벽", excerpt="원문", visibility="L3",
+                       url="https://example.com/p1", published_at="2023-05-10")
     fake = use_fake_pipeline(monkeypatch, RagAnswer(answer_type="answer", answer="RAG 답변", sources=[source]))
     data = ask("창업 이야기").json()
     assert fake.questions == ["창업 이야기"]
