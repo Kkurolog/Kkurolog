@@ -3,7 +3,7 @@
  *
  * 이 파일이 하는 일
  * - 시트를 열면 "○○ 메일 자동화" 메뉴를 만듭니다. (onOpen은 구글이 자동으로 부르는 함수)
- * - 기관 담당자가 Apps Script 편집기를 열지 않고도 설치·점검·트리거 켜기/끄기를 할 수 있습니다.
+ * - 기관 담당자가 Apps Script 편집기를 열지 않고도 설치·점검·자동 실행 켜기/끄기·리마인드를 할 수 있습니다.
  * - 메뉴를 처음 누르면 권한 승인 창이 뜹니다. 반드시 중계 계정으로 로그인한 상태에서 누르세요.
  *   (메뉴를 누른 사람의 계정으로 트리거가 만들어지고 메일이 나갑니다)
  */
@@ -23,8 +23,9 @@ function onOpen() {
     .addItem('상태 보기', 'menuShowStatus')
     .addSeparator()
     .addItem('답장 지금 확인', 'menuCheckReplies')
-    .addItem('답장 자동 확인 켜기 (5분마다)', 'menuInstallTrigger')
-    .addItem('답장 자동 확인 끄기', 'menuRemoveTrigger')
+    .addItem('리마인드 지금 보내기 (조건에 맞는 문의만)', 'menuSendReminders')
+    .addItem('자동 실행 켜기 (답장 확인 5분마다 · 리마인드 매일)', 'menuInstallTrigger')
+    .addItem('자동 실행 끄기', 'menuRemoveTrigger')
     .addSeparator()
     .addItem('템플릿용으로 데이터 비우기 (사본에서만)', 'clearForTemplate')
     .addToUi();
@@ -59,8 +60,9 @@ function runFromMenu_(title, fn) {
 
 function menuSetup() { runFromMenu_('설치·점검 결과', setup); }
 function menuCheckReplies() { runFromMenu_('답장 확인', checkReplies); }
-function menuInstallTrigger() { runFromMenu_('답장 자동 확인 켜기', installReplyTrigger); }
-function menuRemoveTrigger() { runFromMenu_('답장 자동 확인 끄기', removeReplyTrigger); }
+function menuSendReminders() { runFromMenu_('리마인드', sendReminders); }
+function menuInstallTrigger() { runFromMenu_('자동 실행 켜기', installAutoTriggers); }
+function menuRemoveTrigger() { runFromMenu_('자동 실행 끄기', removeAutoTriggers); }
 function menuShowStatus() { runFromMenu_('상태', getStatusLines_); }
 
 /**
@@ -75,7 +77,11 @@ function getStatusLines_() {
   lines.push(`API_KEY: ${props.getProperty(PROPERTY_KEYS.API_KEY) ? '있음' : '없음 → setup 실행'}`);
   lines.push(`ADMIN_TOKEN: ${props.getProperty(PROPERTY_KEYS.ADMIN_TOKEN) ? '있음' : '없음 → setup 실행'}`);
   const triggers = countReplyTriggers_();
-  lines.push(`답장 자동 확인 트리거: ${triggers}개${triggers === 1 ? '' : ' (1개여야 정상 → "켜기"를 누르세요)'}`);
+  lines.push(`답장 자동 확인 트리거: ${triggers}개${triggers === 1 ? '' : ' (1개여야 정상 → "자동 실행 켜기"를 누르세요)'}`);
+  const reminderTriggers = countReminderTriggers_();
+  lines.push(
+    `리마인드 트리거: ${reminderTriggers}개${reminderTriggers === 1 ? '' : ' (1개여야 정상 → "자동 실행 켜기"를 누르세요)'}`
+  );
   const lastChecked = Number(props.getProperty(PROPERTY_KEYS.REPLY_LAST_CHECKED_AT)) || 0;
   lines.push(`마지막 답장 확인: ${lastChecked ? toIsoKst_(new Date(lastChecked)) : '(아직 없음)'}`);
 
@@ -86,6 +92,14 @@ function getStatusLines_() {
   const total = table.values.filter(function (row, i) { return table.displayValues[i][col.ID]; }).length;
   const replied = table.values.filter(function (row) { return isTruthyCell_(row[col.REPLIED]); }).length;
   lines.push(`문의: 전체 ${total}건, 답장 받음 ${replied}건, 답장 전 ${total - replied}건`);
+  const reminded = table.displayValues.filter(function (row) { return String(row[col.REMINDED_AT]).trim(); }).length;
+  lines.push(`리마인드 보낸 문의: ${reminded}건`);
+  const settings = getSettings_();
+  lines.push(
+    `같은 학생 메일 제한: ${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_MINUTES)}분에 1건, ` +
+      `하루 ${getNumberSetting_(settings, SETTING_KEYS.RATE_LIMIT_PER_DAY)}건 (0 = 제한 없음)`
+  );
+  lines.push(`리마인드: 보낸 날짜 + ${getNumberSetting_(settings, SETTING_KEYS.REMINDER_DAYS)}일째 (0 = 보내지 않음)`);
   lines.push(`오늘 남은 Gmail 발송 수: ${Mailer.remainingDailyQuota()}통`);
   return lines;
 }

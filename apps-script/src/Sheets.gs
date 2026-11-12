@@ -103,3 +103,22 @@ function requireSetting_(settings, key) {
   }
   return value;
 }
+
+/**
+ * 숫자 설정값 하나를 꺼냅니다. (0 이상의 정수)
+ * - 비어 있으면 기본값(numberSettingDefaults_)을 씁니다.
+ * - 숫자가 아니거나 음수·소수면 기본값을 쓰고 로그에 경고를 남깁니다. (문의가 멈추지 않게)
+ * @param {Object<string,string>} settings getSettings_() 결과
+ * @param {string} key SETTING_KEYS 중 숫자 설정
+ * @return {number}
+ */
+function getNumberSetting_(settings, key) {
+  const fallback = numberSettingDefaults_()[key];
+  const raw = String(settings[key] === undefined ? '' : settings[key]).trim();
+  if (raw === '') return fallback;
+  if (!/^\d+$/.test(raw)) {
+    console.warn(`"설정" 탭의 ${key} 값 "${raw}"이 0 이상의 정수가 아니라서 기본값 ${fallback}을 씁니다.`);
+    return fallback;
+  }
+  return Number(raw);
+}

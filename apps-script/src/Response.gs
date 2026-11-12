@@ -17,6 +17,7 @@ const ERROR_MESSAGES = Object.freeze({
   MENTOR_NOT_FOUND: '선택한 멘토를 찾을 수 없습니다.',
   INQUIRY_NOT_FOUND: '문의를 찾을 수 없습니다.',
   SEND_FAILED: '메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.',
+  TOO_MANY_REQUESTS: '같은 메일 주소로 너무 자주 보냈어요. 잠시 후 다시 시도해 주세요.',
   INTERNAL_ERROR: '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
 });
 
