@@ -8,6 +8,7 @@ RAG 성능 측정. 설정(Top-K, 유사도 하한 등)을 바꿀 때마다 돌�
 모드
   --retrieval-only : 임베딩 + 검색만 (Claude 호출 없음, 비용 아주 적음)
                      → 검색 적중률: 기대 글이 유사도 하한을 넘겨 검색되었는가
+                     → OPENAI_API_KEY, SUPABASE_URL, SUPABASE_KEY 만 있으면 된다 (Claude 키 불필요)
   (기본)           : 전체 파이프라인 (⚠️ 질문마다 Claude 호출 → 비용 발생)
                      → answer_type 정확도, 출처 적중률
 
@@ -39,7 +40,17 @@ def main() -> None:
 
     load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
     settings = RagSettings.from_env()
-    pipeline = build_pipeline_from_env(settings, args.local)
+    if args.retrieval_only:
+        # 검색만 할 때는 Claude 를 만들지 않는다 → ANTHROPIC_API_KEY 없이도 돌아간다
+        from app.rag.embedding import OpenAIEmbedder
+        from app.rag.pipeline import RagPipeline
+        from app.rag.store import InMemoryVectorStore, SupabaseVectorStore
+
+        store = InMemoryVectorStore.from_jsonl(args.local) if args.local else SupabaseVectorStore()
+        embedder = OpenAIEmbedder(settings.embedding_model, timeout=settings.embedding_timeout_seconds)
+        pipeline = RagPipeline(embedder=embedder, store=store, generator=None, settings=settings)
+    else:
+        pipeline = build_pipeline_from_env(settings, args.local)
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     print(f"설정: top_k={settings.top_k}, similarity_floor={settings.similarity_floor}, "
           f"neighbor_window={settings.neighbor_window}, max_posts={settings.max_posts}\n")
