@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
 import ContactModal from "@/components/ContactModal";
 import GuidePage from "@/components/GuidePage";
+import { KkuroEyes, MiniKkuro } from "@/components/Kkuro";
 import QuestionForm from "@/components/QuestionForm";
 import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
@@ -36,9 +37,21 @@ const SUGGESTED_QUESTIONS = [
 
 const TYPING_SPEED_MS = 45; // 추천 질문을 한 글자씩 쓰는 간격
 
-// 대화 전 화면 아래쪽의 꾸로록 캐릭터: 노란 돔 + 큰 눈 두 개.
+// 대화 전 화면 아래쪽의 꾸로록 캐릭터("빼꼼 꾸로록"): 노란 돔 + 큰 눈 두 개.
+// - 기본: 정면을 보며 가끔 깜빡인다
+// - 듣는 중: 입력창에 초점이 있거나 글을 쓰는 동안 눈동자가 입력창의 글 끝을 따라간다
 // 누르면 추천 질문을 입력창에 써 준다. 마우스를 올리면 살짝 올라오고 안내 문구가 바뀐다.
-function KkuroCharacter({ onClick, typing }: { onClick: () => void; typing: boolean }) {
+function KkuroCharacter({
+  onClick,
+  typing,
+  listening,
+  lookX,
+}: {
+  onClick: () => void;
+  typing: boolean;
+  listening: boolean;
+  lookX: number;
+}) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[200px] overflow-hidden lg:h-[267px]">
       <button
@@ -47,21 +60,11 @@ function KkuroCharacter({ onClick, typing }: { onClick: () => void; typing: bool
         aria-label="꾸로록에게 추천 질문 받기 (입력창에 질문이 써져요)"
         className="group pointer-events-auto absolute top-2 left-1/2 size-[1100px] -translate-x-1/2 cursor-pointer rounded-full bg-accent transition-transform duration-300 ease-out hover:-translate-y-2 focus-visible:-translate-y-2 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand active:translate-y-0 lg:size-[1504px]"
       >
-        {/* 눈: 주기적으로 깜빡이고, 마우스를 올리거나 질문을 쓰는 중에는 눈동자가 위(입력창)를 본다 */}
-        <span aria-hidden="true" className="absolute top-8 left-1/2 flex -translate-x-1/2 gap-6 lg:top-12">
-          {[0, 1].map((i) => (
-            <span
-              key={i}
-              className="relative block h-[104px] w-[78px] rounded-[50%] border-4 border-brand bg-surface motion-safe:animate-blink lg:h-[140px] lg:w-[104px]"
-            >
-              <span
-                className={`absolute left-1/2 block size-9 -translate-x-1/2 rounded-full bg-brand transition-all duration-300 lg:size-11 ${
-                  typing ? "top-1" : "top-3 group-hover:top-1"
-                }`}
-              />
-            </span>
-          ))}
-        </span>
+        <KkuroEyes
+          mood={listening ? "listening" : "default"}
+          lookX={lookX}
+          className="absolute top-8 left-1/2 h-[104px] -translate-x-1/2 lg:top-12 lg:h-[140px]"
+        />
         <span className="absolute top-[150px] left-1/2 -translate-x-1/2 text-[15px] font-bold whitespace-nowrap text-brand lg:top-[218px]">
           <span className="group-hover:hidden group-focus-visible:hidden">
             {typing ? "꾸로록이 질문을 쓰고 있어요" : "꾸로록이 듣고 있어요"}
@@ -81,6 +84,7 @@ export default function Home() {
   const [contact, setContact] = useState<{ mentor: Mentor; question: string } | null>(null);
   const [draft, setDraft] = useState(""); // 입력창에 쓰고 있는 질문
   const [typing, setTyping] = useState(false); // 추천 질문을 자동으로 쓰는 중인지
+  const [inputFocused, setInputFocused] = useState(false); // 입력창에 초점이 있는지 (꾸로록이 '듣는 중' 표정)
   const suggestionIndex = useRef(0); // 다음에 써 줄 추천 질문 번호
   const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -180,13 +184,20 @@ export default function Home() {
               loading={loading}
               typing={typing}
               inputRef={inputRef}
+              onFocusChange={setInputFocused}
               placeholder="처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"
               autoFocus
             />
           </div>
         </section>
 
-        <KkuroCharacter onClick={fillSuggestion} typing={typing} />
+        <KkuroCharacter
+          onClick={fillSuggestion}
+          typing={typing}
+          listening={typing || inputFocused}
+          // 글이 길어질수록 눈동자가 왼쪽 → 오른쪽으로 따라간다 (40자쯤에서 오른쪽 끝)
+          lookX={-0.8 + 1.6 * Math.min(1, Array.from(draft).length / 40)}
+        />
         <GuidePage />
       </main>
     );
@@ -197,26 +208,29 @@ export default function Home() {
     <div className="flex min-w-0 flex-1">
       <main className="paper-lines flex min-w-0 flex-1 flex-col">
         <div className="mx-auto flex w-full max-w-[680px] flex-1 flex-col gap-8 px-5 pt-12 pb-6">
-          {messages.map((message) => (
+          {messages.map((message, i) => (
             <ChatMessageView
               key={message.id}
               message={message}
+              isLatest={i === messages.length - 1}
               onOpenSource={setOpenSource}
               onContact={(mentor, question) => setContact({ mentor, question })}
             />
           ))}
           {loading && (
-            <div className="flex items-center gap-3" role="status">
-              <span className="flex gap-1.5" aria-hidden="true">
+            // 생각 중: 꾸로록이 눈을 감고, 점 세 개가 통통 튄다
+            <div className="flex items-end gap-3 motion-safe:animate-rise-in" role="status">
+              <MiniKkuro mood="thinking" className="w-[72px]" />
+              <span className="flex gap-1.5 pb-1.5" aria-hidden="true">
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="block size-2 animate-dot rounded-full bg-brand"
+                    className="block size-2 rounded-full bg-brand motion-safe:animate-dot"
                     style={{ animationDelay: `${i * 0.15}s` }}
                   />
                 ))}
               </span>
-              <p className="text-[15px] text-muted">답변을 준비하고 있어요...</p>
+              <p className="pb-0.5 text-[15px] text-muted">답변을 준비하고 있어요...</p>
             </div>
           )}
           <div ref={bottomRef} />

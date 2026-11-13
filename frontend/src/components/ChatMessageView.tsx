@@ -4,12 +4,14 @@
 // - 근거가 부족하면(hasEnoughEvidence=false) 안내 문구와 함께 이 경험을 가진 선배(멘토)를 보여준다.
 import type { Mentor, Source } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
+import { MiniKkuro } from "./Kkuro";
 import MentorCard from "./MentorCard";
 
 type Props = {
   message: ChatMessage;
   onOpenSource: (source: Source) => void; // 출처 링크를 눌렀을 때
   onContact: (mentor: Mentor, question: string) => void; // 멘토의 메일 버튼을 눌렀을 때
+  isLatest?: boolean; // 가장 최근 메시지인지 (방금 도착한 답변에는 '찾았다!' 꾸로록이 빼꼼 나온다)
 };
 
 // 출처 링크 문구. 예: "출처 · 졸업생 A (demo) · demo-1"
@@ -17,7 +19,7 @@ export function sourceLabel(source: Source) {
   return `출처 · ${source.alumni} · ${source.interview_id}`;
 }
 
-export default function ChatMessageView({ message, onOpenSource, onContact }: Props) {
+export default function ChatMessageView({ message, onOpenSource, onContact, isLatest = false }: Props) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end motion-safe:animate-rise-in">
@@ -64,6 +66,11 @@ export default function ChatMessageView({ message, onOpenSource, onContact }: Pr
 
   return (
     <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
+      {/* 방금 도착한 답변: 꾸로록이 눈을 반짝이며 빼꼼 (지난 답변은 기본 표정) */}
+      <div className="flex items-end gap-2">
+        <MiniKkuro mood={isLatest ? "found" : "default"} className="w-[72px] motion-safe:animate-pop-in" />
+        <span className="pb-0.5 text-[13px] font-bold text-brand">꾸로록</span>
+      </div>
       {/* 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
       {message.content.split(/\n\s*\n/).map((paragraph, i) => (
         <p key={i} className="whitespace-pre-wrap">

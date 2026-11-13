@@ -17,6 +17,7 @@ type Props = {
   autoFocus?: boolean;
   typing?: boolean; // 추천 질문을 자동으로 쓰는 중인지 (그동안 보내기·직접 입력을 막는다)
   inputRef?: Ref<HTMLTextAreaElement>; // 부모가 입력창에 초점을 옮길 때 쓴다
+  onFocusChange?: (focused: boolean) => void; // 입력창에 초점이 들어오고 나갈 때 (꾸로록 표정용)
 };
 
 export default function QuestionForm({
@@ -28,6 +29,7 @@ export default function QuestionForm({
   autoFocus,
   typing = false,
   inputRef,
+  onFocusChange,
 }: Props) {
   function send() {
     const trimmed = value.trim();
@@ -64,6 +66,8 @@ export default function QuestionForm({
         // 추천 질문을 자동으로 쓰는 동안에는 직접 입력을 잠깐 막는다 (깜빡이는 커서는 그대로 보인다)
         onChange={(e) => !typing && onChange(e.target.value)}
         onKeyDown={handleKeyDown}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
         placeholder={placeholder}
         rows={1}
         autoFocus={autoFocus}
