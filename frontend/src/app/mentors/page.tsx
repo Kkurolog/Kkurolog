@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import ContactModal from "@/components/ContactModal";
+import { MiniKkuro } from "@/components/Kkuro";
 import MentorCard from "@/components/MentorCard";
 import { fetchMentors, type Mentor } from "@/lib/api";
 
@@ -27,14 +28,27 @@ export default function MentorsPage() {
       <div className="mx-auto flex w-full max-w-[1048px] flex-col gap-12">
         <h1 className="font-display text-[36px] leading-[48px] text-brand">멘토 찾아보기</h1>
 
-        {loading && <p className="text-sm text-muted">불러오는 중...</p>}
-        {error && (
-          <p role="alert" className="border-l-4 border-danger pl-4 text-[15px] text-ink">
-            {error}
-          </p>
-        )}
-        {!loading && !error && mentors.length === 0 && (
-          <p className="text-[15px] text-muted">아직 참여한 멘토가 없어요.</p>
+        {/* 불러오는 중·오류·빈 목록: 거꾸로 매달린 꾸로록 */}
+        {(loading || error || mentors.length === 0) && (
+          <div className="flex flex-col items-center gap-5 py-10 text-center" role={error ? "alert" : "status"}>
+            <MiniKkuro mood="upside" className="w-40 motion-safe:animate-float" />
+            {loading && (
+              <p className="flex items-center gap-2 text-[15px] text-muted">
+                멘토를 불러오고 있어요
+                <span className="flex gap-1" aria-hidden="true">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="block size-1.5 rounded-full bg-brand motion-safe:animate-dot"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </span>
+              </p>
+            )}
+            {error && <p className="border-l-4 border-danger pl-3 text-left text-[15px] text-ink">{error}</p>}
+            {!loading && !error && <p className="text-[15px] text-muted">아직 참여한 멘토가 없어요.</p>}
+          </div>
         )}
 
         {mentors.length > 0 && (

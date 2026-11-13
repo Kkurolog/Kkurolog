@@ -8,11 +8,13 @@ frontend/src/
 ├─ app/
 │  ├─ layout.tsx          # 모든 페이지 공통 틀 (왼쪽 사이드바 + 페이지 내용). ChatProvider로 대화 상태를 감싼다
 │  ├─ page.tsx            # "/": 대화 전 인사 화면(캐릭터·스티커) → 대화 중 채팅 화면 + 오른쪽 출처 패널
+│  ├─ not-found.tsx       # 없는 주소일 때 (거꾸로 매달린 꾸로록)
 │  ├─ mentors/page.tsx    # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
 │  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴). 새 채팅 확인 창
 │  ├─ Logo.tsx            # 꾸로록 로고 (노란 얼굴 + 눈)
+│  ├─ Kkuro.tsx           # 꾸로록 캐릭터 '빼꼼 꾸로록' 눈·작은 돔. 표정: 기본/듣는 중/생각 중/찾았다!/거꾸로
 │  ├─ QuestionForm.tsx    # 질문 입력창 + 보내기 (Enter 보내기, Shift+Enter 줄바꿈)
 │  ├─ ChatMessageView.tsx # 채팅 메시지 하나 (질문 말풍선 / 답변 글 + 출처 링크 / 근거 부족 시 추천 멘토)
 │  ├─ GuidePage.tsx       # 메인 화면 오른쪽 아래 접힌 귀퉁이 → 넘기면 나오는 사용 가이드
