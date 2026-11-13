@@ -17,7 +17,7 @@ function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// 온보딩: "자기소개 부탁해" 같은 질문에는 backend 를 부르지 않고 꾸로록 소개로 답한다 (와이어프레임 02-1)
+// 온보딩: "자기소개 부탁해" 같은 질문이나 "안녕" 같은 인사에는 backend 를 부르지 않고 꾸로록 소개로 답한다 (와이어프레임 02-1)
 const ONBOARDING_ANSWER = [
   "안녕! 나는 꾸로록이야.",
   "나는 거꾸로캠퍼스를 먼저 졸업한 선배들의 인터뷰를 바탕으로 너와 이야기를 나누는 챗봇이야.",
@@ -26,8 +26,18 @@ const ONBOARDING_ANSWER = [
   "선배들의 어떤 경험이 궁금해?",
 ].join("\n\n");
 
+// 메시지 '전체'가 인사일 때만 온보딩으로 보낸다. ("안녕! 창업한 선배 있어?" 처럼 질문이 같이 있으면 backend 로)
+// 끝에 붙는 문장부호·웃음(ㅎㅋ)·물결은 지우고 비교한다. 예: "안녕하세요!!", "하이 ㅎㅎ", "반가워~"
+const GREETING_ONLY =
+  /^(안녕(하세요|하십니까|하셔요)?|하이|헬로|hi|hello|hey|반가워(요)?|반갑습니다|처음\s*왔어(요)?|꾸로록(아|님)?|꾸로록(이|은)?\s*(뭐야|뭐예요|뭐에요|뭐니))$/i;
+
+function isGreetingOnly(question: string) {
+  const text = question.trim().replace(/[\s!?.~,ㅎㅋ^]+$/g, "").replace(/^[\s!?.~,]+/, "");
+  return GREETING_ONLY.test(text);
+}
+
 function isOnboardingQuestion(question: string) {
-  return /자기\s*소개|너는\s*누구|넌\s*누구|누구야/.test(question);
+  return /자기\s*소개|너는\s*누구|넌\s*누구|누구야/.test(question) || isGreetingOnly(question);
 }
 
 function useChatState() {
