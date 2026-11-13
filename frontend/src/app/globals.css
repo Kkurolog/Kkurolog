@@ -1,23 +1,58 @@
 /* 전체 공통 스타일. 대부분의 스타일은 각 컴포넌트의 className(Tailwind)에 쓴다. */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap");
 @import "tailwindcss";
 
 /*
-  꾸로록 디자인 토큰 (C안 "조용한 대화").
+  꾸로록 디자인 토큰 (A안 "종이 위 블루 라인").
+  거꾸로캠퍼스 캐릭터 색(블루 + 옐로 + 흰색)에서 뽑은 팔레트.
+  배색 비율: 크림 바탕 65% · 블루(선·글자·버튼) 18% · 옐로(큰 도형·하이라이트) 12% · 네이비(본문) 5%
+  - 옐로(accent)는 큰 도형 1개나 하이라이트에만 쓰고, 글자색으로는 쓰지 않는다.
+  - 토마토(danger)는 오류·경고 1곳에만 쓴다.
   여기서 정한 이름을 className에 그대로 쓴다. 예: bg-brand, text-muted, border-line
   색을 바꾸고 싶으면 이 블록만 고치면 화면 전체에 반영된다.
 */
 @theme {
-  --color-brand: #1d4a38; /* 메인 초록: 버튼, 내 질문 말풍선, 선택된 메뉴 글씨 */
-  --color-brand-dark: #123326; /* 버튼에 마우스를 올렸을 때 */
-  --color-mint: #dcefe5; /* 선택된 메뉴 배경, 프로필 동그라미 */
-  --color-mint-soft: #eef6f1; /* 추천 이유 같은 연한 강조 배경 */
-  --color-canvas: #f2f5f3; /* 페이지 바탕 */
-  --color-line: #dde5e0; /* 카드·구분선 테두리 */
-  --color-line-strong: #c9d6cf; /* 입력창 테두리 */
-  --color-ink: #18231e; /* 기본 글자 */
-  --color-body: #3d4d45; /* 본문 보조 글자 */
-  --color-muted: #5a6b62; /* 작은 안내 글자 */
+  --color-brand: #0056c7; /* 꾸로록 블루: 로고·제목·버튼·굵은 외곽선 */
+  --color-brand-dark: #00449e; /* 버튼에 마우스를 올렸을 때 */
+  --color-brand-soft: #4074b8; /* 소프트 블루: 보조 블루 */
+  --color-accent: #f7de5f; /* 꾸로록 옐로: 큰 도형(캐릭터 돔), 스티커, 하이라이트 */
+  --color-butter: #fff3b8; /* 버터: 키워드 pill, 형광펜 밑줄 */
+  --color-sky: #e3eefc; /* 스카이: hover·선택 상태, 질문 말풍선, 프로필 바탕 */
+  --color-canvas: #fffbea; /* 페이퍼 크림: 페이지 바탕 */
+  --color-surface: #ffffff; /* 화이트: 입력창 바탕 */
+  --color-line: #d6e3f5; /* 연한 구분선, 노트 줄 */
+  --color-ink: #0b2559; /* 잉크 네이비: 본문 글자 */
+  --color-body: #2f4470; /* 본문 보조 글자 */
+  --color-muted: #5b6b8c; /* 작은 안내 글자 */
+  --color-placeholder: #8c96ad; /* 입력창 안내 문구 */
+  --color-danger: #f0562e; /* 토마토: 오류 표시 1곳에만 */
 
-  --font-sans: "IBM Plex Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-sans: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-display: "Jua", "Noto Sans KR", sans-serif; /* 큰 제목용 둥근 글꼴 */
+
+  --animate-dot: dot-bounce 1.2s ease-in-out infinite;
+
+  @keyframes dot-bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    40% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+}
+
+/* 노트 줄무늬 바탕 (메인·채팅 화면). 32px 간격의 연한 블루 줄 */
+@utility paper-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    color-mix(in srgb, var(--color-line) 70%, transparent) 31px,
+    color-mix(in srgb, var(--color-line) 70%, transparent) 32px
+  );
 }
