@@ -1,4 +1,4 @@
-// 질문 입력창 + 보내기 버튼. (채팅 화면 아래에 붙는다)
+// 질문 입력창 + 보내기 버튼. (메인 화면 가운데, 대화가 시작되면 화면 아래에 붙는다)
 // 실제로 backend를 부르는 일은 부모가 하고, 여기서는 입력만 받는다.
 // Enter: 보내기 / Shift+Enter: 줄바꿈
 "use client";
@@ -9,9 +9,11 @@ import { ArrowUpIcon } from "./icons";
 type Props = {
   onSubmit: (question: string) => void; // 질문을 보낼 때 실행할 함수
   loading: boolean; // 답변을 기다리는 중인지
+  placeholder: string; // 비어 있을 때 보이는 안내 문구
+  autoFocus?: boolean;
 };
 
-export default function QuestionForm({ onSubmit, loading }: Props) {
+export default function QuestionForm({ onSubmit, loading, placeholder, autoFocus }: Props) {
   const [question, setQuestion] = useState("");
 
   function send() {
@@ -37,7 +39,7 @@ export default function QuestionForm({ onSubmit, loading }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-end gap-2 rounded-[18px] border border-line-strong bg-white py-2 pr-2 pl-4 shadow-[0_4px_16px_rgba(29,74,56,0.06)] focus-within:border-brand"
+      className="flex min-h-[72px] w-full items-center gap-3 rounded-[36px] border-2 border-brand bg-surface py-3 pr-3 pl-7 focus-within:shadow-[0_0_0_4px_var(--color-sky)]"
     >
       <label htmlFor="question" className="sr-only">
         질문
@@ -47,17 +49,18 @@ export default function QuestionForm({ onSubmit, loading }: Props) {
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="예: 대학을 바로 가지 않고 취업한 선배들은 왜 그렇게 선택했어?"
-        rows={2}
-        className="w-full resize-none bg-transparent py-2 text-base text-ink placeholder:text-muted focus:outline-none"
+        placeholder={placeholder}
+        rows={1}
+        autoFocus={autoFocus}
+        className="max-h-40 w-full resize-none bg-transparent py-1 text-base leading-6 text-ink [field-sizing:content] placeholder:text-placeholder focus:outline-none"
       />
       <button
         type="submit"
         disabled={loading || !question.trim()}
-        aria-label={loading ? "답변을 찾는 중" : "보내기"}
-        className="inline-flex size-12 shrink-0 items-center justify-center rounded-[14px] bg-brand text-white hover:bg-brand-dark disabled:bg-line-strong"
+        aria-label={loading ? "답변을 준비하는 중" : "보내기"}
+        className="inline-flex size-12 shrink-0 items-center justify-center self-end rounded-full bg-brand text-white hover:bg-brand-dark disabled:bg-brand/35"
       >
-        <ArrowUpIcon className={loading ? "size-5 animate-pulse" : "size-5"} />
+        <ArrowUpIcon className="size-6" />
       </button>
     </form>
   );

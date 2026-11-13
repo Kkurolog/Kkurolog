@@ -1,12 +1,16 @@
-// 멘토에게 연락하기 팝업(모달).
+// 멘토에게 메일 쓰기 창(모달). (와이어프레임 03-2 ~ 03-4)
 // 학생이 쓴 내용은 꾸로록 backend(/contact-requests)로 가고, 꾸로록이 선배에게 이메일로 전달한다.
 // (지금은 실제 메일을 보내지 않고 서버 로그에만 남긴다)
-// 상태: 입력 중 → 보내는 중 → 완료 / 오류
+// 상태: 작성 중(editing) → 전송 중(sending) → 완료(done)  /  실패하면 작성 중으로 돌아와 오류 문구를 보여준다
+// - 이름·메일 주소·제목·내용 중 하나라도 비어 있으면 '보내기'가 흐리고 누를 수 없다. (03-2-2, 03-2-3)
+// - 작성 중인 내용이 있을 때 X·바깥 배경·Esc 를 누르면 확인 창을 먼저 띄운다. (03-2-1)
 "use client";
 
 import { useEffect, useState } from "react";
 import { sendContactRequest, type Mentor } from "@/lib/api";
-import { CheckIcon, CloseIcon } from "./icons";
+import ConfirmDialog from "./ConfirmDialog";
+import { MentorPhoto } from "./MentorCard";
+import { CloseIcon, PlaneIcon, SpinnerIcon } from "./icons";
 
 type Props = {
   mentor: Mentor;
@@ -14,10 +18,10 @@ type Props = {
   onClose: () => void;
 };
 
-type Status = "editing" | "sending" | "done" | "error";
+type Status = "editing" | "sending" | "done";
 
-const inputClass =
-  "w-full rounded-[10px] border border-line-strong bg-white px-3 py-2.5 text-base text-ink placeholder:text-muted focus:border-brand focus:outline-none";
+const fieldClass =
+  "w-full bg-transparent px-8 py-5 text-base text-ink placeholder:text-placeholder focus:bg-sky/40 focus:outline-none";
 
 export default function ContactModal({ mentor, initialMessage = "", onClose }: Props) {
   const [senderName, setSenderName] = useState("");
@@ -25,153 +29,175 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState(initialMessage);
   const [status, setStatus] = useState<Status>("editing");
-  const [resultText, setResultText] = useState(""); // 완료/오류 때 보여줄 문구
+  const [error, setError] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
 
-  // Esc 키로 닫기
+  const filled = [senderName, replyEmail, subject, message].every((v) => v.trim() !== "");
+  const dirty = senderName !== "" || replyEmail !== "" || subject !== "" || message !== initialMessage;
+
+  // 닫기 요청: 작성 중인 내용이 있으면 확인 창, 없으면 바로 닫기. 전송 중에는 닫지 않는다.
+  function requestClose() {
+    if (status === "sending") return;
+    if (status === "editing" && dirty) setConfirmClose(true);
+    else onClose();
+  }
+
+  // Esc 키로 닫기 (확인 창이 떠 있으면 확인 창이 먼저 처리한다)
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !confirmClose) requestClose();
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!filled) return;
     setStatus("sending");
+    setError(null);
     try {
-      const res = await sendContactRequest({
+      await sendContactRequest({
         mentor_id: mentor.id,
-        sender_name: senderName,
-        reply_email: replyEmail,
-        subject,
-        message,
+        sender_name: senderName.trim(),
+        reply_email: replyEmail.trim(),
+        subject: subject.trim(),
+        message: message.trim(),
       });
-      setResultText(res.message);
       setStatus("done");
     } catch (err) {
-      setResultText(err instanceof Error ? err.message : "보내지 못했어요. 잠시 후 다시 시도해 주세요.");
-      setStatus("error");
+      setError(err instanceof Error ? err.message : "보내지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setStatus("editing");
     }
   }
 
+  const closeButton = (
+    <button
+      type="button"
+      onClick={requestClose}
+      aria-label="닫기"
+      className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-brand hover:bg-sky"
+    >
+      <CloseIcon className="size-6" />
+    </button>
+  );
+
   return (
-    // 바깥 어두운 배경. 배경을 누르면 닫힌다
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
+    // 바깥 어두운 배경. 누르면 닫기 요청
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={requestClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()} // 팝업 안쪽을 눌렀을 때는 닫히지 않게
+        className="relative flex h-[720px] max-h-[calc(100vh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border-2 border-brand bg-canvas"
+        onClick={(e) => e.stopPropagation()} // 창 안쪽을 눌렀을 때는 닫히지 않게
       >
-        <div className="flex items-start justify-between gap-4">
-          <h2 id="contact-title" className="text-lg font-bold text-ink">
-            {mentor.name} 선배에게 연락하기
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="닫기"
-            className="-mt-2 -mr-2 inline-flex size-11 items-center justify-center rounded-[10px] text-muted hover:bg-canvas hover:text-ink"
-          >
-            <CloseIcon className="size-5" />
-          </button>
-        </div>
-
-        {status === "done" ? (
-          <div className="mt-6 flex flex-col gap-4">
-            <div className="flex gap-3 rounded-xl bg-mint-soft p-4 text-brand">
-              <CheckIcon className="mt-0.5 size-5 shrink-0" />
-              <p>
-                {resultText}
-                <br />
-                <span className="text-sm">선배가 답장하면 입력한 이메일로 바로 받을 수 있어요.</span>
-              </p>
-            </div>
-            <p className="text-xs text-muted">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겼어요)</p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-11 self-end rounded-[10px] bg-brand px-5 font-semibold text-white hover:bg-brand-dark"
-            >
-              닫기
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-            <p className="rounded-xl bg-mint-soft p-3 text-sm leading-relaxed text-brand">
-              작성한 내용은 꾸로록을 통해 <b>{mentor.name}</b> 선배에게 이메일로 바로 전달돼요. 선배의 이메일
-              주소는 공개되지 않으며, 이후 연락은 선배가 답장으로 이어가요.
+        {status === "sending" && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8" role="status">
+            <SpinnerIcon className="size-14 text-brand" />
+            <p id="contact-title" className="text-2xl font-bold text-ink">
+              메일을 보내는 중이에요...
             </p>
+          </div>
+        )}
 
-            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-              내 이름 (또는 별명)
+        {status === "done" && (
+          <>
+            <div className="absolute top-10 right-7">{closeButton}</div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center" role="status">
+              <span className="mb-6 inline-flex size-24 items-center justify-center rounded-full bg-accent">
+                <PlaneIcon className="size-14 text-brand" />
+              </span>
+              <p id="contact-title" className="text-2xl font-bold text-ink">
+                메일 전송이 완료되었어요!
+              </p>
+              <p className="text-base text-muted">작성하신 메일은 메일함에 보내드렸어요.</p>
+              <p className="pt-2 text-xs text-muted">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겨요)</p>
+            </div>
+          </>
+        )}
+
+        {status === "editing" && (
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-center justify-between gap-4 px-8 pt-7 pb-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <MentorPhoto name={mentor.name} size="md" />
+                <h2 id="contact-title" className="shrink-0 text-xl font-bold text-ink">
+                  {mentor.name}
+                </h2>
+                <p className="truncate text-[15px] text-muted">{mentor.path_summary}</p>
+              </div>
+              {closeButton}
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col divide-y divide-brand/15 border-t border-brand/15">
               <input
-                required
-                maxLength={30}
-                value={senderName}
-                onChange={(e) => setSenderName(e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-              답장 받을 이메일
+                  aria-label="이름"
+                  maxLength={30}
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="이름"
+                  autoComplete="name"
+                  className={fieldClass}
+                />
               <input
-                required
-                type="email"
-                maxLength={254}
-                value={replyEmail}
-                onChange={(e) => setReplyEmail(e.target.value)}
-                placeholder="me@example.com"
-                className={inputClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-              메일 제목
+                  aria-label="본인 메일 주소"
+                  type="email"
+                  maxLength={254}
+                  value={replyEmail}
+                  onChange={(e) => setReplyEmail(e.target.value)}
+                  placeholder="본인 메일 주소"
+                  autoComplete="email"
+                  className={fieldClass}
+                />
               <input
-                required
-                maxLength={100}
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="예: 창업 먼저 하신 이유가 궁금해요"
-                className={inputClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-              질문 내용 <span className="text-xs font-normal text-muted">(10자 이상, {message.length}/2000)</span>
+                  aria-label="메일 제목"
+                  maxLength={100}
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="메일 제목"
+                  className={fieldClass}
+                />
               <textarea
-                required
-                minLength={10}
-                maxLength={2000}
-                rows={6}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className={`${inputClass} resize-none`}
-              />
-            </label>
+                  aria-label="메일 내용"
+                  maxLength={2000}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="멘토에게 궁금한 것을 질문해 보세요"
+                  className={`${fieldClass} min-h-24 flex-1 resize-none leading-relaxed`}
+                />
+            </div>
 
-            {status === "error" && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{resultText}</p>}
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="min-h-11 rounded-[10px] px-4 text-body hover:bg-canvas"
-              >
-                취소
-              </button>
+            <div className="flex items-center justify-end gap-4 px-8 pt-4 pb-7">
+              {error && (
+                <p role="alert" className="mr-auto border-l-4 border-danger pl-3 text-sm text-ink">
+                  {error}
+                </p>
+              )}
               <button
                 type="submit"
-                disabled={status === "sending"}
-                className="min-h-11 rounded-[10px] bg-brand px-5 font-semibold text-white hover:bg-brand-dark disabled:bg-line-strong"
+                disabled={!filled}
+                className="min-h-[45px] shrink-0 rounded-[22px] bg-brand px-7 text-[15px] font-bold text-white hover:bg-brand-dark disabled:border-[1.5px] disabled:border-brand disabled:bg-transparent disabled:text-brand disabled:opacity-30"
               >
-                {status === "sending" ? "보내는 중..." : "보내기"}
+                보내기
               </button>
             </div>
           </form>
         )}
       </div>
+
+      {confirmClose && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmDialog
+            title="작성을 그만둘까요?"
+            body="작성 중인 내용이 사라져요."
+            cancelLabel="계속 작성"
+            confirmLabel="나가기"
+            onCancel={() => setConfirmClose(false)}
+            onConfirm={onClose}
+          />
+        </div>
+      )}
     </div>
   );
 }
