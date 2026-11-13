@@ -30,8 +30,112 @@
   --font-sans: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-display: "Jua", "Noto Sans KR", sans-serif; /* 큰 제목용 둥근 글꼴 */
 
-  --animate-dot: dot-bounce 1.2s ease-in-out infinite;
+  /*
+    움직임(애니메이션). className 에 motion-safe:animate-이름 으로 쓴다.
+    motion-safe: 기기에서 '동작 줄이기'를 켠 사람에게는 움직이지 않는다.
+  */
+  --animate-dot: dot-bounce 1.2s ease-in-out infinite; /* 답변 대기 점 3개 */
+  --animate-fade-in: fade-in 0.2s ease-out both; /* 어두운 배경이 서서히 */
+  --animate-pop-in: pop-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.25) both; /* 창이 톡 튀어나오기 */
+  --animate-rise-in: rise-in 0.35s ease-out both; /* 새 메시지가 아래에서 살짝 올라오기 */
+  --animate-slide-left: slide-left 0.25s ease-out both; /* 왼쪽 사이드바 열기 */
+  --animate-slide-right: slide-right 0.25s ease-out both; /* 오른쪽 출처 패널 열기 */
+  --animate-float: float 4s ease-in-out infinite; /* 스티커가 둥실둥실 */
+  --animate-twinkle: twinkle 2.4s ease-in-out infinite; /* 반짝이 */
+  --animate-blink: blink 4.5s ease-in-out infinite; /* 꾸로록 눈 깜빡임 */
+  --animate-fly: fly 1.4s ease-in-out infinite; /* 메일 보내는 중: 종이비행기 날기 */
+  --animate-fly-away: fly-away 0.7s ease-in 0.15s both; /* 전송 완료: 비행기가 날아갔다 돌아오기 */
 
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.94);
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  @keyframes slide-left {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+  }
+  @keyframes slide-right {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -8px;
+    }
+  }
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 1;
+      scale: 1;
+    }
+    50% {
+      opacity: 0.4;
+      scale: 0.7;
+    }
+  }
+  @keyframes blink {
+    0%,
+    92%,
+    100% {
+      transform: scaleY(1);
+    }
+    95% {
+      transform: scaleY(0.08);
+    }
+  }
+  @keyframes fly {
+    0% {
+      transform: translate(-14px, 10px) rotate(-6deg);
+      opacity: 0;
+    }
+    25%,
+    70% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(18px, -14px) rotate(4deg);
+      opacity: 0;
+    }
+  }
+  @keyframes fly-away {
+    0% {
+      transform: translate(0, 0) scale(1);
+    }
+    45% {
+      transform: translate(40px, -40px) scale(0.6);
+      opacity: 0;
+    }
+    46% {
+      transform: translate(-30px, 30px) scale(0.6);
+      opacity: 0;
+    }
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+  }
   @keyframes dot-bounce {
     0%,
     80%,

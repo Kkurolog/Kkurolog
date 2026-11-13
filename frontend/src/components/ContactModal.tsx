@@ -84,19 +84,34 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
 
   return (
     // 바깥 어두운 배경. 누르면 닫기 요청
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" onClick={requestClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 motion-safe:animate-fade-in" onClick={requestClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-title"
-        className="relative flex h-[720px] max-h-[calc(100vh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border-2 border-brand bg-canvas"
+        className="relative flex h-[720px] max-h-[calc(100vh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border-2 border-brand bg-canvas motion-safe:animate-pop-in"
         onClick={(e) => e.stopPropagation()} // 창 안쪽을 눌렀을 때는 닫히지 않게
       >
         {status === "sending" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8" role="status">
-            <SpinnerIcon className="size-14 text-brand" />
+            {/* 노란 동그라미 안에서 종이비행기가 계속 날아가고, 바깥 고리가 돈다 */}
+            <span className="relative inline-flex size-28 items-center justify-center">
+              <SpinnerIcon className="absolute inset-0 size-28 text-brand" />
+              <span className="inline-flex size-[88px] items-center justify-center overflow-hidden rounded-full bg-accent">
+                <PlaneIcon className="size-12 text-brand motion-safe:animate-fly" />
+              </span>
+            </span>
             <p id="contact-title" className="text-2xl font-bold text-ink">
-              메일을 보내는 중이에요...
+              메일을 보내는 중이에요
+              <span aria-hidden="true" className="inline-flex w-8 justify-start gap-1 pl-1">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="inline-block size-1.5 rounded-full bg-ink motion-safe:animate-dot"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </span>
             </p>
           </div>
         )}
@@ -105,13 +120,13 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
           <>
             <div className="absolute top-10 right-7">{closeButton}</div>
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center" role="status">
-              <span className="mb-6 inline-flex size-24 items-center justify-center rounded-full bg-accent">
-                <PlaneIcon className="size-14 text-brand" />
+              <span className="mb-6 inline-flex size-24 items-center justify-center overflow-hidden rounded-full bg-accent motion-safe:animate-pop-in">
+                <PlaneIcon className="size-14 text-brand motion-safe:animate-fly-away" />
               </span>
-              <p id="contact-title" className="text-2xl font-bold text-ink">
+              <p id="contact-title" className="text-2xl font-bold text-ink motion-safe:animate-rise-in">
                 메일 전송이 완료되었어요!
               </p>
-              <p className="text-base text-muted">작성하신 메일은 메일함에 보내드렸어요.</p>
+              <p className="text-base text-muted">작성하신 메일 사본을 적어주신 메일로도 보내드렸어요.</p>
               <p className="pt-2 text-xs text-muted">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겨요)</p>
             </div>
           </>
