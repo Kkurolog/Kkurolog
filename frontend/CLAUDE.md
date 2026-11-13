@@ -32,6 +32,7 @@ frontend/src/
   `sky`(hover·선택·질문 말풍선), `canvas`(크림 바탕), `surface`(흰색 입력창), `line`, `ink`/`body`/`muted`/`placeholder`(글자),
   `danger`(토마토: 오류 1곳에만). `gray-500`, `indigo-600` 같은 Tailwind 기본 색을 직접 쓰지 않는다. 색을 바꿀 땐 `@theme`만 고친다.
 - 큰 제목은 `font-display`(Jua), 나머지는 기본 `font-sans`(Noto Sans KR).
+- 움직임은 `globals.css`의 `--animate-*`에 정해 두고 `motion-safe:animate-이름`으로 쓴다 (예: `motion-safe:animate-pop-in`). `motion-safe:`를 붙이면 '동작 줄이기'를 켠 사람에게는 움직이지 않는다.
 - 넓은 화면 기준은 `lg`(1024px). 그보다 좁으면 열린 사이드바·출처 패널이 화면 위에 겹쳐 뜨고, 메인 화면의 스티커는 숨겨진다.
 
 ## 실행

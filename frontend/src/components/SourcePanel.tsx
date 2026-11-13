@@ -22,7 +22,7 @@ export default function SourcePanel({ source, onClose }: { source: Source; onClo
   return (
     <aside
       aria-label="출처"
-      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[400px] flex-col gap-5 overflow-y-auto border-l-2 border-brand bg-canvas px-7 py-6 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:shrink-0"
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[400px] flex-col gap-5 overflow-y-auto border-l-2 border-brand bg-canvas px-7 py-6 lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:shrink-0 motion-safe:animate-slide-right"
     >
       <div className="flex items-start justify-between gap-4">
         <div>

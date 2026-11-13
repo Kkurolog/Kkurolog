@@ -30,13 +30,13 @@ export default function ConfirmDialog({ title, body, cancelLabel, confirmLabel, 
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50 p-4 motion-safe:animate-fade-in" onClick={onCancel}>
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-body"
-        className="flex w-full max-w-[440px] flex-col gap-3 rounded-3xl border-2 border-brand bg-canvas px-8 pt-8 pb-7"
+        className="flex w-full max-w-[440px] flex-col gap-3 rounded-3xl border-2 border-brand bg-canvas px-8 pt-8 pb-7 motion-safe:animate-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-title" className="text-xl font-bold text-ink">

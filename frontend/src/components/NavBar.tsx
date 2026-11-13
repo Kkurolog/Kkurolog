@@ -20,7 +20,7 @@ function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "b
   return (
     <span
       role="tooltip"
-      className={`pointer-events-none absolute z-30 hidden rounded-md bg-ink px-2.5 py-1.5 text-[13px] whitespace-nowrap text-white group-hover:block group-focus-visible:block ${position}`}
+      className={`pointer-events-none absolute z-30 hidden rounded-md bg-ink px-2.5 py-1.5 text-[13px] whitespace-nowrap text-white group-hover:block group-focus-visible:block motion-safe:animate-fade-in ${position}`}
     >
       {label}
     </span>
@@ -100,10 +100,10 @@ export default function NavBar() {
       {/* 열린 사이드바. 넓은 화면에서는 레일 자리를 넓혀 본문을 밀고, 좁은 화면에서는 위에 겹친다 */}
       {open && (
         <>
-          <div className="fixed inset-0 z-30 bg-ink/30 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="fixed inset-0 z-30 bg-ink/30 lg:hidden motion-safe:animate-fade-in" onClick={() => setOpen(false)} aria-hidden="true" />
           <aside
             aria-label="사이드바"
-            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r-2 border-brand bg-canvas lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0"
+            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r-2 border-brand bg-canvas lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
           >
             <div className="flex items-center justify-between px-[18px] pt-5">
               <Link href="/" aria-label="꾸로록 메인으로" className="flex items-center gap-2.5">

@@ -20,7 +20,7 @@ export function sourceLabel(source: Source) {
 export default function ChatMessageView({ message, onOpenSource, onContact }: Props) {
   if (message.role === "user") {
     return (
-      <div className="flex justify-end">
+      <div className="flex justify-end motion-safe:animate-rise-in">
         <p className="max-w-[85%] rounded-[20px] bg-sky px-5 py-3 text-[15px] leading-[26px] whitespace-pre-wrap text-ink">
           {message.content}
         </p>
@@ -30,7 +30,7 @@ export default function ChatMessageView({ message, onOpenSource, onContact }: Pr
 
   if (message.isError) {
     return (
-      <p role="alert" className="border-l-4 border-danger py-1 pl-4 text-[15px] leading-[26px] text-ink">
+      <p role="alert" className="motion-safe:animate-rise-in border-l-4 border-danger py-1 pl-4 text-[15px] leading-[26px] text-ink">
         {message.content}
       </p>
     );
@@ -39,7 +39,7 @@ export default function ChatMessageView({ message, onOpenSource, onContact }: Pr
   // 근거 부족: 지어내지 않고, 선배에게 직접 묻도록 안내한다
   if (!message.hasEnoughEvidence) {
     return (
-      <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink">
+      <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
         <p>
           <span className="bg-[linear-gradient(transparent_55%,var(--color-butter)_55%)] font-bold">
             지금 자료만으로는 답하기 어려워요.
@@ -63,7 +63,7 @@ export default function ChatMessageView({ message, onOpenSource, onContact }: Pr
   }
 
   return (
-    <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink">
+    <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
       {/* 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
       {message.content.split(/\n\s*\n/).map((paragraph, i) => (
         <p key={i} className="whitespace-pre-wrap">
