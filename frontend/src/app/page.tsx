@@ -1,6 +1,7 @@
 // 메인 화면 (주소 "/"): 꾸로록과 대화하는 채팅 화면.
 // - 대화 전(와이어프레임 01): 가운데에 인사 문구 + 입력창. 아래에 꾸로록 캐릭터(노란 돔 + 눈)와 해시태그 스티커.
 //   캐릭터를 누르면 추천 질문이 입력창에 한 글자씩 써진다.
+//   오른쪽 아래 접힌 귀퉁이를 넘기면 꾸로록 사용 가이드가 나온다 (GuidePage).
 // - 대화 중(02-0 ~ 02-2): 680px 폭으로 메시지가 위에서 아래로 쌓이고, 입력창은 화면 아래에 붙는다.
 // - 답변의 '출처 · …'를 누르면 오른쪽에 출처 패널(SourcePanel)이 열린다.
 // 대화 상태는 lib/useChat.ts 에서 관리한다.
@@ -9,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
 import ContactModal from "@/components/ContactModal";
+import GuidePage from "@/components/GuidePage";
 import QuestionForm from "@/components/QuestionForm";
 import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
@@ -185,6 +187,7 @@ export default function Home() {
         </section>
 
         <KkuroCharacter onClick={fillSuggestion} typing={typing} />
+        <GuidePage />
       </main>
     );
   }

@@ -15,6 +15,7 @@ frontend/src/
 │  ├─ Logo.tsx            # 꾸로록 로고 (노란 얼굴 + 눈)
 │  ├─ QuestionForm.tsx    # 질문 입력창 + 보내기 (Enter 보내기, Shift+Enter 줄바꿈)
 │  ├─ ChatMessageView.tsx # 채팅 메시지 하나 (질문 말풍선 / 답변 글 + 출처 링크 / 근거 부족 시 추천 멘토)
+│  ├─ GuidePage.tsx       # 메인 화면 오른쪽 아래 접힌 귀퉁이 → 넘기면 나오는 사용 가이드
 │  ├─ SourcePanel.tsx     # 출처 링크를 누르면 오른쪽에 열리는 인터뷰 출처 패널
 │  ├─ MentorCard.tsx      # 멘토 카드 하나 (사진 자리·이름·메일 버튼·소개·키워드)
 │  ├─ ContactModal.tsx    # 멘토에게 메일 쓰기 창 (작성 → 전송 중 → 완료, 닫기 확인)
