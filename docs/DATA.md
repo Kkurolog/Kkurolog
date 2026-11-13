@@ -49,7 +49,7 @@ sources (글) 1 ──< chunks (조각) >── 1 people (인물)
 | `topics` / `topic_detail` | 주제 태그 1~2개 / 기타일 때 상세 |
 | `career_paths`, `career_fields` | 인물 태그를 복사 (필터 검색용) |
 | `speaker_type`, `visibility`, `char_count` | |
-| `embedding` | `vector(1536)`, 지금은 null (다음 단계에서 채움) |
+| `embedding` | `vector(1536)`, `embed_chunks.py`로 채움 |
 | `embedding_model` | 예: `text-embedding-3-small` |
 
 ### 검색 함수 `match_chunks`
@@ -107,4 +107,4 @@ sources (글) 1 ──< chunks (조각) >── 1 people (인물)
 | 5. 태그 검사 | `check_tags.py` | 문제 목록, 승격 후보 |
 | 6. 테이블 만들기 | `run_sql.py` + `supabase/migrations/*.sql` | Supabase 테이블·함수 |
 | 7. 적재 | `load_to_supabase.py` (id 기준 upsert) | Supabase 데이터 |
-| 8. 임베딩 (다음) | 예정 | `chunks.embedding` |
+| 8. 임베딩 | `embed_chunks.py` (OpenAI `text-embedding-3-small`, 비어 있는 조각만) | `chunks.embedding`, `chunks.embedding_model` |

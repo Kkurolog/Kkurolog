@@ -136,7 +136,7 @@ MVP에서는 질문을 하나씩 따로 답합니다 (지금 동작과 같음). 
 1. 응답 형식 + 위기 안전장치 + 호출 제한 ← **이 브랜치**
 2. 수집·chunking·태깅·적재 ← main에 이미 있음 (`scripts/`, `supabase/migrations/`)
 3. `match_chunks`로 검색 + Claude 답변 생성 + 출처 구성 → `make_answer()`에 연결 ← **이 브랜치** (`RAG_ENABLED=true`로 켬, 실제 키로 미검증)
-4. 태그 검수 후 `chunks.embedding` 채우기 ← 다음 단계 (스크립트 아직 없음)
+4. 태그 검수 후 `chunks.embedding` 채우기 ← `scripts/embed_chunks.py` (OpenAI 키 받으면 실행)
 5. 실제 데이터로 성능 측정 → 유사도 하한·K 값 등 조정 ← 그다음
 
 ### RAG 켜 보기 (임베딩을 채운 뒤)

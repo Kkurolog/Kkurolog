@@ -27,7 +27,8 @@ Supabase를 쓰는 스크립트(`run_sql.py`, `load_to_supabase.py`)는 접속 �
 |---|---|---|
 | `SUPABASE_URL` | 대시보드 → Project Settings → API | load_to_supabase.py |
 | `SUPABASE_SECRET_KEY` | 대시보드 → Project Settings → API Keys → Secret key (service_role 권한) | load_to_supabase.py |
-| `SUPABASE_DB_URL` | 대시보드 → Connect → **Session pooler** 주소 (`postgresql://...pooler.supabase.com:5432/postgres`) | run_sql.py |
+| `SUPABASE_DB_URL` | 대시보드 → Connect → **Session pooler** 주소 (`postgresql://...pooler.supabase.com:5432/postgres`) | run_sql.py, embed_chunks.py |
+| `OPENAI_API_KEY` | platform.openai.com → API keys (콘솔에서 월 사용 한도도 설정) | embed_chunks.py |
 
 ## 전체 순서 한눈에 보기
 
@@ -39,6 +40,7 @@ python build_dataset.py        # 4. 합치기·검수 CSV → data/processed/
 python check_tags.py           # 5. 태그 검사 (문제 없음 ✅ 이어야 다음으로)
 python run_sql.py ../supabase/migrations/0001_experience_tables.sql   # 6. 테이블 만들기 (처음 한 번)
 python load_to_supabase.py     # 7. 적재 (여러 번 돌려도 중복 없음)
+python embed_chunks.py         # 8. 임베딩 채우기 (비어 있는 조각만, OPENAI_API_KEY 필요)
 ```
 
 ## collect_gschool.py — "Exit 오깔" 졸업생 인터뷰 수집
@@ -92,4 +94,20 @@ python run_sql.py --query "select count(*) from public.chunks"       # 쿼리 �
 
 - `.env`의 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`로 Supabase API를 통해 넣는다.
 - 순서: sources → people → chunks. 모두 `id` 기준 upsert라 다시 돌려도 중복이 생기지 않는다.
-- `embedding`은 보내지 않는다 (다음 단계에서 채움). 끝나면 테이블별 개수와 조각 샘플 2개를 DB에서 다시 읽어 보여준다.
+- `embedding`은 보내지 않는다 (`embed_chunks.py`가 채움). 끝나면 테이블별 개수와 조각 샘플 2개를 DB에서 다시 읽어 보여준다.
+
+## embed_chunks.py — 임베딩 채우기
+
+조각의 `embed_text`를 OpenAI `text-embedding-3-small`로 벡터(숫자 1536개)로 바꿔 `chunks.embedding`에 저장한다.
+
+```bash
+python embed_chunks.py --dry-run   # OpenAI 호출 없이 대상 개수·예상 비용만 (274개 ≈ $0.003)
+python embed_chunks.py             # embedding이 비어 있거나 다른 모델로 만든 조각만 채움
+python embed_chunks.py --all       # 전부 다시 만들기
+```
+
+- `SUPABASE_DB_URL`, `OPENAI_API_KEY`를 쓴다. 벡터를 다 받은 뒤 **한 트랜잭션**으로 저장해서, 중간에 실패하면 DB는 그대로다.
+- 끝나면 개수를 다시 세고, 조각 하나의 벡터로 `match_chunks`를 불러 자기 자신이 1등(유사도 ≈ 1.0)으로 나오는지 확인한다.
+- 모델은 `backend/app/rag/config.py`의 `embedding_model`과 **같아야 한다** (질문도 같은 모델로 벡터로 바꿔야 비교가 된다).
+- ⚠️ `load_to_supabase.py`로 `embed_text`가 바뀐 조각을 다시 올려도 예전 벡터는 남는다.
+  진로 요약·기관·질문·답변을 고쳤다면 `--all`로 다시 만든다. 태그만 고쳤다면 필요 없다 (태그는 `embed_text`에 들어가지 않음).
