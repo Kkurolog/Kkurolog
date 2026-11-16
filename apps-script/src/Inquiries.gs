@@ -2,7 +2,8 @@
  * Inquiries.gs — 문의 제출 (submitInquiry)
  *
  * 이 파일이 하는 일
- * 1. 입력값 검사 (이름·제목·내용 길이, 이메일 형식, 개인정보 동의, 활성 멘토)
+ * 1. 입력값 검사 (이름·제목·내용 길이, 이메일 형식, 활성 멘토)
+ *    (v0.5: 개인정보 동의 privacyConsent 검사는 뺐습니다. 보내도 무시합니다)
  * 2. 같은 학생 메일로 너무 자주 보냈는지 확인 (Step 5-1. 기본: 최근 10분 안에 3건, 하루 5건)
  * 3. 문의번호 만들기 (날짜마다 0001부터: q20261108-0001)
  * 4. "문의" 탭에 한 줄 저장
@@ -52,9 +53,6 @@ function validateInquiryRequest_(req) {
   const studentEmail = typeof req.studentEmail === 'string' ? req.studentEmail.trim() : '';
   if (studentEmail.length > LIMITS.EMAIL_MAX || !EMAIL_PATTERN.test(studentEmail)) {
     throw new AppError('INVALID_EMAIL');
-  }
-  if (req.privacyConsent !== true) {
-    throw new AppError('PRIVACY_CONSENT_REQUIRED');
   }
   return {
     mentorId: mentorId,

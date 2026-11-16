@@ -10,7 +10,7 @@
 ```
 
 > 이 문서는 **꾸로록 팀(개발·운영)** 용입니다. 개발자가 아니어도 따라 할 수 있게 쓰였습니다.
-> 지금은 **Step 6(인수인계 패키지)** 와 **Step 5-1(학생 사본·멘토 리마인드·횟수 제한)** 까지의 내용이 있습니다.
+> 지금은 **Step 6(인수인계 패키지)**, **Step 5-1(학생 사본·멘토 리마인드·횟수 제한)**, **Step 7(백엔드 연결 안내)** 까지의 내용이 있습니다.
 > 관리자 API(Step 5-2)는 팀이 관리자 페이지를 만들 때 추가합니다.
 >
 > **기관(거꾸로캠퍼스) 담당자는 [docs/HANDOVER.md](./docs/HANDOVER.md)만 보면 됩니다.**
@@ -57,6 +57,7 @@ apps-script/
 │   └── Test.gs            ← 편집기에서 실행하는 테스트
 ├── docs/
 │   ├── API.md             ← 팀 백엔드가 호출하는 API 명세
+│   ├── BACKEND_INTEGRATION.md ← 백엔드·프론트 담당자용 연결 안내 (예시 코드)
 │   └── HANDOVER.md        ← 기관 담당자용 인수인계·운영 안내
 └── templates/             ← 시트 탭 3개의 틀 (CSV). 테스트용 가짜 값만 들어 있음
     ├── mentors.example.csv    → "멘토" 탭
@@ -204,7 +205,7 @@ apps-script/
 | 함수 | 확인하는 것 | 메일 발송 |
 |---|---|---|
 | `testGetMentors` | 활성 멘토만 나오는지, 응답에 이메일이 없는지 | 없음 |
-| `testValidationErrors` | 잘못된 입력 10가지가 맞는 에러 코드를 내는지 (모두 ✅) | 없음 |
+| `testValidationErrors` | 잘못된 입력 8가지가 맞는 에러 코드를 내는지 + 동의 없이도 통과하는지 (v0.5) (모두 ✅) | 없음 |
 | `testSubmitInquiry` | "문의" 탭에 한 줄이 생기고, 첫 번째 활성 멘토에게 메일이 가는지 | 1통 |
 
 `testSubmitInquiry` 뒤에 멘토 메일함에서 확인할 것:
@@ -240,7 +241,7 @@ apps-script/
    ```json
    { "apiKey": "YOUR_API_KEY", "action": "submitInquiry", "mentorId": "mt-01",
      "studentName": "테스트학생", "studentEmail": "YOUR_TEST_EMAIL",
-     "title": "Postman 테스트", "body": "테스트 내용입니다.", "privacyConsent": true }
+     "title": "Postman 테스트", "body": "테스트 내용입니다." }
    ```
 
 > 웹앱은 응답 전에 다른 주소로 한 번 넘겨줍니다(리다이렉트). Postman은 자동으로 따라가지만,
@@ -385,7 +386,7 @@ apps-script/
 ### 9-3. 테스트
 | 함수 | 확인하는 것 | 메일 발송 |
 |---|---|---|
-| `testValidationErrors` | 기존 검사 10가지 (모두 ✅) | 없음 |
+| `testValidationErrors` | 기존 검사 (모두 ✅) | 없음 |
 | `testReplyParser` | 기존 + 리마인드 메일에 답장한 경우 2가지 (모두 ✅) | 없음 |
 | `testRateLimit` | 10분 3건·하루 5건 계산과 안내 문구 14가지 (모두 ✅). 설정 탭 값과 상관없이 검사 | 없음 |
 | `testReminderSchedule` | 10일째 계산 7가지 (모두 ✅) | 없음 |
@@ -406,7 +407,23 @@ apps-script/
 
 ---
 
-## 10. 알아 둘 한계 (MVP)
+## 10. 백엔드 연결 (Step 7)
+
+백엔드·프론트에 붙일 예시 코드와 순서는 **[docs/BACKEND_INTEGRATION.md](./docs/BACKEND_INTEGRATION.md)** 에 있습니다.
+메일 담당은 `/apps-script` 밖의 파일을 고치지 않고, 백엔드·프론트 담당자가 이 문서를 보고 반영합니다.
+
+### 10-1. 웹앱 v0.5 적용 (개인정보 동의 검사 빼기, 메일 담당이 원본 시트에서)
+사이트는 동의 체크박스 대신 "이대로 보내시겠습니까?" 확인 창을 쓰기로 해서, 웹앱이 `privacyConsent`를 요구하지 않게 바꿨습니다.
+1. 원본 시트 → 확장 프로그램 → Apps Script → `Inquiries`, `Response`, `Test` 3개 파일 내용을 전부 지우고 새로 붙여넣고 저장합니다.
+2. `testValidationErrors` 실행 → 모두 ✅ 이고 마지막 줄 `privacyConsent 없이도 입력 검사 통과`가 ✅ 인지 봅니다.
+3. **배포 → 배포 관리 → ✏ → 새 버전**으로 다시 배포합니다. (setup은 필요 없습니다)
+
+> 순서 주의: 웹앱 v0.5를 먼저 배포해야 합니다. 백엔드 예시 코드는 `privacyConsent`를 보내지 않아서,
+> 옛 웹앱(v0.4)에 연결하면 모든 문의가 거절됩니다.
+
+---
+
+## 11. 알아 둘 한계 (MVP)
 
 - Gmail 중계는 스팸함에 들어갈 수 있고 하루 발송 한도(약 100통)가 있습니다. 정식 운영 시에는 기관 도메인 + 메일 발송 전문 서비스로 바꾸는 것을 권장합니다.
 - 멘토가 **'답장' 버튼**으로 보내야 학생에게 전달됩니다. 새 메일로 보내면 전달되지 않습니다.

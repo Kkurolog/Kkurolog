@@ -13,7 +13,6 @@ const ERROR_MESSAGES = Object.freeze({
   INVALID_ACTION: '지원하지 않는 action입니다.',
   INVALID_EMAIL: '이메일 형식이 올바르지 않습니다.',
   INVALID_INPUT: '입력값이 올바르지 않습니다.',
-  PRIVACY_CONSENT_REQUIRED: '개인정보 수집·전달에 동의해야 문의를 보낼 수 있습니다.',
   MENTOR_NOT_FOUND: '선택한 멘토를 찾을 수 없습니다.',
   INQUIRY_NOT_FOUND: '문의를 찾을 수 없습니다.',
   SEND_FAILED: '메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.',

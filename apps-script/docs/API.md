@@ -1,4 +1,4 @@
-# 메일 자동화 API 명세 (v0.4)
+# 메일 자동화 API 명세 (v0.5)
 
 팀 백엔드 서버가 Apps Script 웹앱을 호출할 때 쓰는 형식입니다. 학생 화면(프론트)에서 직접 호출하지 않습니다.
 
@@ -10,6 +10,7 @@
 | v0.3.1 | 2026-11-10 | 형식 변화 없음. "호출할 때 주의할 점" 추가 (리다이렉트, HTTP 200, 잘못된 JSON·mentorId 처리) |
 | v0.3.2 | 2026-11-10 | 형식 변화 없음. 답장 자동 전달 규칙(문의번호 찾기 순서, 보낸 사람 확인, repliedAt = 첫 답장 시각) 정리 |
 | v0.4 | 2026-11-12 | 에러 코드 `TOO_MANY_REQUESTS` 추가 (같은 학생 메일 10분 3건·하루 5건 제한). `submitInquiry`가 학생에게 "보낸 문의 사본"도 보냄 (요청·응답 형식은 그대로). 답장 없는 문의 10일째 멘토 리마인드 추가 (API 아님). 관리자 API 응답에 `remindedAt` 추가 예정 (Step 5-2) |
+| v0.5 | 2026-11-16 | 개인정보 동의 `privacyConsent` 검사와 `PRIVACY_CONSENT_REQUIRED` 에러 삭제 (보내도 무시). 사이트는 동의 체크박스 대신 "이대로 보내시겠습니까?" 확인 창을 씀. 백엔드 연결 안내 [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) 추가 |
 
 ## 공통 규칙
 - 모든 요청은 `POST`, `Content-Type: text/plain`, 본문은 JSON 문자열입니다. 기능은 본문의 `action`으로 구분합니다.
@@ -41,13 +42,13 @@
 ```json
 { "apiKey": "YOUR_API_KEY", "action": "submitInquiry", "mentorId": "mt-01",
   "studentName": "테스트학생", "studentEmail": "student@example.com",
-  "title": "진로 고민이 있어요", "body": "문의 내용", "privacyConsent": true }
+  "title": "진로 고민이 있어요", "body": "문의 내용" }
 ```
 ```json
 { "ok": true, "data": { "inquiryId": "q20261108-0001", "createdAt": "2026-11-08T14:03:00+09:00" } }
 ```
-- `privacyConsent`: 학생이 개인정보(이름·메일) 수집과 멘토 전달에 동의했는지. 반드시 `true`여야 합니다.
-- 검증: 학생 이름 1~30자, 이메일 형식, 제목 1~100자, 내용 1~2000자, `privacyConsent`는 `true`, 활성 멘토만.
+- 검증: 학생 이름 1~30자, 이메일 형식, 제목 1~100자, 내용 1~2000자, 활성 멘토만.
+- (v0.5) `privacyConsent`는 더 이상 필요 없습니다. 보내도 무시합니다.
 - **횟수 제한** (v0.4): 같은 학생 메일(대소문자·앞뒤 공백 무시)로
   - 최근 **10분** 안에 이미 **3건**을 보냈으면 (4번째부터) `TOO_MANY_REQUESTS` (message: "현재 메일 발송량이 많아 전송이 잠시 제한되었어요. 10분 후 다시 시도해 주세요.")
   - 오늘(한국 시간 자정 기준) 이미 **5건**을 보냈으면 `TOO_MANY_REQUESTS` (message: "…하루에 5건까지 보낼 수 있어요. 내일 다시 시도해 주세요.")
@@ -101,7 +102,6 @@
 | INVALID_ACTION | 없는 action |
 | INVALID_EMAIL | 학생 이메일 형식 오류 |
 | INVALID_INPUT | 이름·제목·내용 길이 오류 등 |
-| PRIVACY_CONSENT_REQUIRED | `privacyConsent`가 `true`가 아님 |
 | MENTOR_NOT_FOUND | 없는 멘토이거나 비활성 멘토 |
 | INQUIRY_NOT_FOUND | 없는 문의번호 |
 | SEND_FAILED | 메일 발송 실패 (오늘 Gmail 발송 한도 부족 포함) |

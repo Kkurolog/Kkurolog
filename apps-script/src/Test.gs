@@ -56,7 +56,6 @@ function testValidationErrors() {
     studentEmail: 'student@example.com',
     title: '테스트 제목',
     body: '테스트 내용',
-    privacyConsent: true,
   };
   const cases = [
     ['apiKey 틀림', Object.assign({}, valid, { apiKey: 'WRONG_KEY' }), 'UNAUTHORIZED'],
@@ -66,8 +65,6 @@ function testValidationErrors() {
     ['이름 31자', Object.assign({}, valid, { studentName: '가'.repeat(31) }), 'INVALID_INPUT'],
     ['제목 101자', Object.assign({}, valid, { title: '가'.repeat(101) }), 'INVALID_INPUT'],
     ['내용 2001자', Object.assign({}, valid, { body: '가'.repeat(2001) }), 'INVALID_INPUT'],
-    ['동의 false', Object.assign({}, valid, { privacyConsent: false }), 'PRIVACY_CONSENT_REQUIRED'],
-    ['동의 "true"(글자)', Object.assign({}, valid, { privacyConsent: 'true' }), 'PRIVACY_CONSENT_REQUIRED'],
     ['없는 멘토', Object.assign({}, valid, { mentorId: 'no-such-mentor' }), 'MENTOR_NOT_FOUND'],
   ];
   let failed = 0;
@@ -78,6 +75,15 @@ function testValidationErrors() {
     if (!pass) failed++;
     console.log(`${pass ? '✅' : '❌'} ${c[0]}: 기대 ${c[2]} / 실제 ${code}`);
   });
+  // (v0.5) 개인정보 동의 privacyConsent 없이도 입력 검사를 통과하는지 (검사만 하고 저장·발송은 안 함)
+  let noConsentOk = true;
+  try {
+    validateInquiryRequest_(valid);
+  } catch (err) {
+    noConsentOk = false;
+  }
+  if (!noConsentOk) failed++;
+  console.log(`${noConsentOk ? '✅' : '❌'} privacyConsent 없이도 입력 검사 통과`);
   console.log(failed === 0 ? '모두 통과했습니다.' : `${failed}개 실패했습니다.`);
 }
 
@@ -99,7 +105,6 @@ function testSubmitInquiry() {
       studentEmail: studentEmail,
       title: '테스트 문의입니다',
       body: '꾸로록 메일 자동화 테스트 메일입니다.\n답장 버튼으로 회신해 주세요.',
-      privacyConsent: true,
     })
   );
   console.log(JSON.stringify(res, null, 2));
