@@ -98,7 +98,7 @@ export function SparkleIcon({ className }: IconProps) {
 // 도는 로딩 표시 (메일 전송 중)
 export function SpinnerIcon({ className }: IconProps) {
   return (
-    <svg viewBox="0 0 56 56" fill="none" aria-hidden="true" className={`animate-spin ${className ?? ""}`}>
+    <svg viewBox="0 0 56 56" fill="none" aria-hidden="true" className={`motion-safe:animate-spin ${className ?? ""}`}>
       <circle cx="28" cy="28" r="24" stroke="currentColor" strokeOpacity="0.15" strokeWidth="5" />
       <path d="M28 4a24 24 0 0 1 24 24" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
     </svg>
