@@ -10,8 +10,7 @@
 ```
 
 > 이 문서는 **꾸로록 팀(개발·운영)** 용입니다. 개발자가 아니어도 따라 할 수 있게 쓰였습니다.
-> 지금은 **Step 6(인수인계 패키지)**, **Step 5-1(학생 사본·멘토 리마인드·횟수 제한)**, **Step 7(백엔드 연결 안내)** 까지의 내용이 있습니다.
-> 관리자 API(Step 5-2)는 팀이 관리자 페이지를 만들 때 추가합니다.
+> 지금은 **Step 6(인수인계 패키지)**, **Step 5-1(학생 사본·멘토 리마인드·횟수 제한)**, **Step 7(백엔드 연결 안내)**, **Step 5-2(관리자 API)** 까지의 내용이 있습니다.
 >
 > **기관(거꾸로캠퍼스) 담당자는 [docs/HANDOVER.md](./docs/HANDOVER.md)만 보면 됩니다.**
 
@@ -44,6 +43,7 @@ apps-script/
 │   ├── Response.gs        ← 공통 응답 형식과 에러 코드
 │   ├── Sheets.gs          ← 시트 읽기 도구, "설정" 탭 읽기
 │   ├── Mentors.gs         ← getMentors (활성 멘토 목록, 이메일 제외)
+│   ├── Admin.gs           ← 관리자 API: getInquiries, getInquiry (adminToken 필요)
 │   ├── Inquiries.gs       ← submitInquiry (검사 → 저장 → 발송)
 │   ├── MailTemplates.gs   ← 멘토에게 갈 메일 내용 만들기
 │   ├── Mailer.gs          ← 실제 발송 (나중에 발송 전문 서비스로 바꿀 때 이 파일만 교체)
@@ -423,7 +423,41 @@ apps-script/
 
 ---
 
-## 11. 알아 둘 한계 (MVP)
+## 11. 관리자 API (Step 5-2)
+
+관리자 페이지가 문의 기록(8개 항목 + 리마인드 시각)을 볼 수 있게 하는 API입니다. 관리자 페이지가 없어도 Postman으로 쓸 수 있습니다.
+형식은 [docs/API.md](./docs/API.md) 3)·4), 백엔드 호출 예시는 [docs/BACKEND_INTEGRATION.md](./docs/BACKEND_INTEGRATION.md) 11장.
+
+| action | 하는 일 |
+|---|---|
+| `getInquiries` | 문의 목록 (최신순, `filter.replied`로 답장 전/후만, 20건씩 페이지) |
+| `getInquiry` | 문의번호로 한 건 |
+
+- 두 action 모두 `apiKey`와 **`adminToken`** 이 필요합니다. 틀리거나 없으면 `UNAUTHORIZED`.
+- `ADMIN_TOKEN` 값은 ⚙ 프로젝트 설정 → 스크립트 속성에 있습니다 (setup이 만들어 둠). 관리자 페이지를 만드는 백엔드 담당자에게만 안전한 방법으로 전달합니다.
+- 응답에는 학생 이름·메일이 들어 있습니다. 시트를 보는 것과 같은 개인정보라 공유에 주의합니다.
+
+### 11-1. 코드 붙여넣기 (원본 시트, 중계 계정으로)
+1. 새 파일 `Admin`을 만들고 붙여넣습니다.
+2. 바뀐 파일 `Main`, `Test`는 내용을 전부 지우고 새로 붙여넣습니다. 저장합니다.
+3. `testAdminApi` 실행 → 모두 ✅ 인지 봅니다. (메일 안 보냄. 학생 개인정보는 로그에 찍지 않고 건수만 찍습니다)
+4. **배포 관리 → 새 버전**으로 다시 배포합니다. (setup은 필요 없습니다)
+
+### 11-2. Postman으로 확인
+Body → raw → Text, `YOUR_...`만 실제 값으로:
+```json
+{ "apiKey": "YOUR_API_KEY", "action": "getInquiries", "adminToken": "YOUR_ADMIN_TOKEN",
+  "filter": { "replied": false }, "page": 1, "pageSize": 20 }
+```
+→ `{"ok":true,"data":{"total":…,"items":[…]}}` (답장 전 문의만, 최신순)
+```json
+{ "apiKey": "YOUR_API_KEY", "action": "getInquiry", "adminToken": "YOUR_ADMIN_TOKEN", "inquiryId": "q20261116-0001" }
+```
+→ `{"ok":true,"data":{"item":{…}}}`
+
+---
+
+## 12. 알아 둘 한계 (MVP)
 
 - Gmail 중계는 스팸함에 들어갈 수 있고 하루 발송 한도(약 100통)가 있습니다. 정식 운영 시에는 기관 도메인 + 메일 발송 전문 서비스로 바꾸는 것을 권장합니다.
 - 멘토가 **'답장' 버튼**으로 보내야 학생에게 전달됩니다. 새 메일로 보내면 전달되지 않습니다.

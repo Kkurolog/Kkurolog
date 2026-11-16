@@ -8,7 +8,7 @@
  * - (Step 5-1) 새 설정 키를 쓰는 테스트는 코드를 붙여넣은 뒤 시트 메뉴 ① 설치·점검 (setup)을 한 번 실행한 다음 돌립니다.
  *
  * 메일을 보내지 않는 테스트: testGetMentors, testValidationErrors, testReplyParser,
- *                          testRateLimit, testReminderSchedule, testMailTemplates
+ *                          testRateLimit, testReminderSchedule, testMailTemplates, testAdminApi
  * 메일을 보내는 테스트:     testSubmitInquiry (2통: 멘토 + 학생 사본), testSendReminder (1통)
  */
 
@@ -300,4 +300,104 @@ function testSendReminder() {
     `✅ ${target.inquiryId} 리마인드를 ${target.mentorId} 멘토에게 보냈습니다. ` +
       '멘토 메일함에서 제목·맨 위 문구를 확인하고, "답장"하면 학생에게 전달되는지 확인하세요.'
   );
+}
+
+/**
+ * 9) (Step 5-2) 관리자 API 확인 (메일 안 보냄. 시트를 읽기만 함)
+ * - 앞부분: 가짜 문의 목록으로 필터·최신순·페이지·입력 검사를 확인합니다.
+ * - 뒷부분: 실제 "문의" 탭으로 adminToken 검사와 응답 모양을 확인합니다.
+ *   학생 이름·메일 같은 개인정보는 로그에 찍지 않고, 건수와 항목 이름만 찍습니다.
+ */
+function testAdminApi() {
+  let failed = 0;
+
+  // --- 1. 입력 검사 (validateListRequest_) ---
+  const codeOf = function (req) {
+    try {
+      validateListRequest_(req);
+      return 'OK';
+    } catch (err) {
+      return err.code || 'ERROR';
+    }
+  };
+  const defaults = validateListRequest_({});
+  failed += testCheck_('생략하면 page 1, pageSize 20, 전체', defaults.page === 1 && defaults.pageSize === 20 && defaults.replied === null);
+  [
+    ['filter.replied false', { filter: { replied: false } }, 'OK'],
+    ['pageSize 100', { pageSize: 100 }, 'OK'],
+    ['page 0', { page: 0 }, 'INVALID_INPUT'],
+    ['page -1', { page: -1 }, 'INVALID_INPUT'],
+    ['page 1.5', { page: 1.5 }, 'INVALID_INPUT'],
+    ['page "2"(글자)', { page: '2' }, 'INVALID_INPUT'],
+    ['pageSize 101', { pageSize: 101 }, 'INVALID_INPUT'],
+    ['filter.replied "yes"', { filter: { replied: 'yes' } }, 'INVALID_INPUT'],
+    ['filter가 배열', { filter: [] }, 'INVALID_INPUT'],
+  ].forEach(function (c) {
+    const got = codeOf(c[1]);
+    failed += testCheck_(`입력 검사 - ${c[0]}`, got === c[2], `기대 ${c[2]} / 실제 ${got}`);
+  });
+
+  // --- 2. 필터·최신순·페이지 (buildInquiryPage_) ---
+  const fake = [
+    { inquiryId: 'q20261101-0001', createdAt: '2026-11-01T09:00:00+09:00', replied: true },
+    { inquiryId: 'q20261102-0001', createdAt: '2026-11-02T09:00:00+09:00', replied: false },
+    { inquiryId: 'q20261102-0002', createdAt: '2026-11-02T09:00:00+09:00', replied: false },
+    { inquiryId: 'q20261103-0001', createdAt: '2026-11-03T09:00:00+09:00', replied: true },
+    { inquiryId: 'q20261104-0001', createdAt: '2026-11-04T09:00:00+09:00', replied: false },
+  ];
+  const ids = function (page) { return page.items.map(function (i) { return i.inquiryId; }).join(','); };
+  const all = buildInquiryPage_(fake.slice(), { replied: null, page: 1, pageSize: 20 });
+  failed += testCheck_('전체 = 5건, 최신순 (같은 시각이면 번호 큰 것 먼저)',
+    all.total === 5 && ids(all) === 'q20261104-0001,q20261103-0001,q20261102-0002,q20261102-0001,q20261101-0001', ids(all));
+  const notReplied = buildInquiryPage_(fake.slice(), { replied: false, page: 1, pageSize: 20 });
+  failed += testCheck_('답장 전만 = 3건', notReplied.total === 3 && ids(notReplied) === 'q20261104-0001,q20261102-0002,q20261102-0001', ids(notReplied));
+  const page2 = buildInquiryPage_(fake.slice(), { replied: null, page: 2, pageSize: 2 });
+  failed += testCheck_('2페이지(2건씩) = 3·4번째, total은 그대로 5', page2.total === 5 && ids(page2) === 'q20261102-0002,q20261102-0001', ids(page2));
+  const tooFar = buildInquiryPage_(fake.slice(), { replied: null, page: 9, pageSize: 20 });
+  failed += testCheck_('마지막 페이지를 넘으면 빈 목록', tooFar.total === 5 && tooFar.items.length === 0);
+
+  // --- 3. 실제 시트로 adminToken·응답 모양 확인 ---
+  const apiKey = testProperty_(PROPERTY_KEYS.API_KEY);
+  const adminToken = testProperty_(PROPERTY_KEYS.ADMIN_TOKEN);
+  const call = function (body) {
+    return handleRequest_(JSON.stringify(Object.assign({ apiKey: apiKey }, body)));
+  };
+  const codeOfCall = function (res) { return res.ok ? 'OK' : res.error.code; };
+  [
+    ['adminToken 없음', { action: 'getInquiries' }, 'UNAUTHORIZED'],
+    ['adminToken 틀림', { action: 'getInquiries', adminToken: 'WRONG' }, 'UNAUTHORIZED'],
+    ['getInquiry adminToken 틀림', { action: 'getInquiry', adminToken: 'WRONG', inquiryId: 'q20261101-0001' }, 'UNAUTHORIZED'],
+    ['apiKey 대신 adminToken만 맞음', { action: 'getInquiries', adminToken: adminToken, apiKey: 'WRONG' }, 'UNAUTHORIZED'],
+    ['pageSize 101', { action: 'getInquiries', adminToken: adminToken, pageSize: 101 }, 'INVALID_INPUT'],
+    ['getInquiry 형식 틀림', { action: 'getInquiry', adminToken: adminToken, inquiryId: 'abc' }, 'INVALID_INPUT'],
+    ['getInquiry 없는 번호', { action: 'getInquiry', adminToken: adminToken, inquiryId: 'q20000101-9999' }, 'INQUIRY_NOT_FOUND'],
+  ].forEach(function (c) {
+    const got = codeOfCall(call(c[1]));
+    failed += testCheck_(`관리자 API - ${c[0]}`, got === c[2], `기대 ${c[2]} / 실제 ${got}`);
+  });
+
+  const list = call({ action: 'getInquiries', adminToken: adminToken, pageSize: 100 });
+  failed += testCheck_('관리자 API - 목록 성공', list.ok === true, JSON.stringify(list.error));
+  if (list.ok) {
+    console.log(`  문의 전체 ${list.data.total}건 (이번 페이지 ${list.data.items.length}건)`);
+    const expectedKeys = ['inquiryId', 'createdAt', 'mentorId', 'mentorName', 'studentName', 'studentEmail',
+      'title', 'body', 'replied', 'repliedAt', 'remindedAt'];
+    if (list.data.items.length > 0) {
+      const first = list.data.items[0];
+      const keys = Object.keys(first);
+      failed += testCheck_('항목 11개 (관리자 화면 8개 + inquiryId·mentorId·remindedAt)',
+        expectedKeys.every(function (k) { return keys.indexOf(k) >= 0; }) && keys.length === expectedKeys.length, keys.join(','));
+      failed += testCheck_('replied는 true/false', typeof first.replied === 'boolean');
+      failed += testCheck_('답장 전이면 repliedAt은 null',
+        list.data.items.every(function (it) { return it.replied || it.repliedAt === null; }));
+      const mentorEmails = readAllMentors_().map(function (m) { return m.email.toLowerCase(); });
+      const text = JSON.stringify(list.data).toLowerCase();
+      failed += testCheck_('응답에 멘토 이메일 없음', mentorEmails.every(function (e) { return text.indexOf(e) < 0; }));
+      const one = call({ action: 'getInquiry', adminToken: adminToken, inquiryId: first.inquiryId.toUpperCase() });
+      failed += testCheck_('getInquiry - 대문자 번호로도 같은 건', one.ok && one.data.item.inquiryId === first.inquiryId);
+    } else {
+      console.log('  ⚠ 문의가 0건이라 응답 모양 검사는 건너뜁니다. testSubmitInquiry로 1건 만든 뒤 다시 실행하세요.');
+    }
+  }
+  console.log(failed === 0 ? '모두 통과했습니다.' : `${failed}개 실패했습니다.`);
 }

@@ -3,9 +3,9 @@
 멘토 문의 메일 자동화(Apps Script 웹앱)를 꾸로록 백엔드 `/contact-requests`에 연결하는 방법입니다.
 메일 담당은 `/apps-script` 밖의 파일을 직접 고치지 않습니다. **아래 예시 코드를 보고 백엔드·프론트 담당자가 반영해 주세요.**
 
-- 웹앱 API 명세: [API.md](./API.md) (v0.5)
+- 웹앱 API 명세: [API.md](./API.md) (v0.6)
 - 이 문서의 예시 코드는 2026-11-16 main 기준으로 작성했고, 복사본에서 실제로 돌려 확인했습니다.
-  - backend: `pytest` 107개 통과 (기존 92 + 새 15)
+  - backend: `pytest` 116개 통과 (기존 92 + 문의 연결 15 + 관리자 조회 9)
   - frontend: `npm run lint && npm run build` 통과
 
 ```
@@ -89,6 +89,8 @@ def test_contact_unavailable_mentor():
 # 값은 메일 담당에게 직접 받는다. GitHub·채팅·문서에 쓰지 않는다
 # APPS_SCRIPT_URL=YOUR_WEB_APP_URL
 # APPS_SCRIPT_API_KEY=YOUR_API_KEY
+# 관리자 페이지에서 문의 기록을 볼 때만 필요 (11장)
+# APPS_SCRIPT_ADMIN_TOKEN=YOUR_ADMIN_TOKEN
 ```
 
 | 이름 | 값 | 어디에 |
@@ -96,7 +98,7 @@ def test_contact_unavailable_mentor():
 | `APPS_SCRIPT_URL` | 웹앱 주소 (`https://script.google.com/macros/s/.../exec` 모양) | 내 `.env`, Render → Environment |
 | `APPS_SCRIPT_API_KEY` | 웹앱 키 (64자) | 내 `.env`, Render → Environment |
 
-- 관리자 API(Step 5-2)를 만들 때 `APPS_SCRIPT_ADMIN_TOKEN`이 추가됩니다. 지금은 필요 없습니다.
+- `APPS_SCRIPT_ADMIN_TOKEN`은 관리자 페이지를 만들 때만 필요합니다 (11장). 학생 문의 보내기에는 쓰지 않습니다.
 - 기관에 넘긴 뒤에는 기관이 새로 만든 웹앱 주소·키로 **값만 바꾸면** 됩니다. 코드는 그대로입니다.
 - 웹앱 주소는 메일 담당이 "새 배포"를 하면 바뀝니다. 평소에는 "배포 관리 → 새 버전"으로 주소를 유지합니다.
 
@@ -297,7 +299,7 @@ def deliver_contact_request(request: ContactRequest, mentor: Mentor) -> None:
 
 ### 5-2. `backend/tests/conftest.py` (파일 전체)
 
-내 `.env`에 실제 웹앱 주소·키가 있어도, **`pytest`가 진짜 메일을 보내지 않게** 막는 설정(`no_real_mail`)을 추가합니다. 꼭 같이 넣어 주세요.
+내 `.env`에 실제 웹앱 주소·키가 있어도, **`pytest`가 진짜 웹앱을 부르지 않게** 막는 설정(`no_real_mail`)을 추가합니다. 꼭 같이 넣어 주세요.
 
 ```python
 """모든 테스트에 공통으로 적용되는 설정."""
@@ -324,6 +326,7 @@ def no_real_mail(monkeypatch):
     """
     monkeypatch.delenv("APPS_SCRIPT_URL", raising=False)
     monkeypatch.delenv("APPS_SCRIPT_API_KEY", raising=False)
+    monkeypatch.delenv("APPS_SCRIPT_ADMIN_TOKEN", raising=False)
 ```
 
 ### 5-3. `backend/tests/test_contact_web_app.py` (새 파일)
@@ -605,3 +608,209 @@ Gmail 하루 약 100통 한도를 문의(1건 = 2통)·답장 전달·리마인�
 | "찾을 수 없는 멘토예요." (404) | 백엔드 `mentors_demo.json`의 id와 시트 멘토 탭 `mentorId`가 글자 하나까지 같은지, 시트 활성여부가 켜져 있는지 |
 | "메일을 보내지 못했어요" (503) | 중계 Gmail 하루 발송 한도. 메일 담당이 시트 메뉴 → 상태 보기에서 남은 발송 수 확인 |
 | `pytest`가 진짜 메일을 보냄 | `tests/conftest.py`에 `no_real_mail`이 빠졌는지 확인 (5-2) |
+| 관리자 조회가 "메일 자동화 설정이 아직 없어요" (503) | `APPS_SCRIPT_ADMIN_TOKEN`이 비어 있음 (11장) |
+| 관리자 조회가 "문의 기록을 불러오지 못했어요" (502) | 서버 로그의 `code=`가 `UNAUTHORIZED`면 `APPS_SCRIPT_API_KEY`나 `APPS_SCRIPT_ADMIN_TOKEN`이 웹앱 값과 다름 |
+
+---
+
+## 11. 관리자 API (관리자 페이지를 만들 때)
+
+관리자 페이지에서 문의 기록을 보려면 웹앱의 `getInquiries`(목록), `getInquiry`(한 건)를 부릅니다. ([API.md](./API.md) 3)·4))
+아래는 **백엔드에서 웹앱을 부르는 부분만** 만든 예시입니다. 관리자 로그인과 관리자용 API 주소(라우트)는 관리자 페이지를 설계할 때 정합니다.
+
+**꼭 지킬 것**
+- **관리자 로그인에 성공한 요청에서만** 이 함수를 부릅니다. 응답에 학생 이름·메일(개인정보)이 들어 있습니다.
+- `APPS_SCRIPT_ADMIN_TOKEN`은 서버 환경변수에만 둡니다. 프론트로 보내지 않습니다.
+- 학생 화면용 API(`/mentors`, `/contact-requests` 등) 응답에는 절대 넣지 않습니다.
+
+화면 항목 ↔ 응답 필드: 학생 이름=`studentName`, 학생 메일=`studentEmail`, 멘토 이름=`mentorName`, 메일 제목=`title`, 메일 내용=`body`,
+보낸 일시=`createdAt`, 멘토 답변 여부=`replied`, 멘토 답변 일시=`repliedAt`(없으면 null), (추가) 리마인드 보낸 시각=`remindedAt`(없으면 null)
+
+### 11-1. `backend/app/services/mail_admin.py` (새 파일, 예시)
+
+```python
+"""
+관리자 페이지용: 메일 자동화(Apps Script 웹앱)의 문의 기록 조회. (웹앱 API 명세 v0.6의 getInquiries, getInquiry)
+
+- 관리자 로그인에 성공한 요청에서만 이 함수들을 부른다. (로그인 방식은 관리자 페이지를 만들 때 정한다)
+- 응답에는 학생 이름·메일(개인정보)이 들어 있다. 학생 화면 API에는 절대 쓰지 않는다.
+- 환경변수: APPS_SCRIPT_URL, APPS_SCRIPT_API_KEY (contact.py와 같음) + APPS_SCRIPT_ADMIN_TOKEN
+- 웹앱 호출 방법(리다이렉트 따라가기 등)은 contact.py의 _call_web_app 을 그대로 쓴다.
+"""
+
+import logging
+import os
+
+import httpx
+from fastapi import HTTPException
+
+from app.services.contact import _call_web_app
+
+logger = logging.getLogger("uvicorn.error")
+
+UNAVAILABLE_MESSAGE = "문의 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+
+# 웹앱 에러 코드 → HTTP 상태 (그 밖의 코드는 502)
+ADMIN_ERROR_STATUS = {
+    "INVALID_INPUT": 422,
+    "INQUIRY_NOT_FOUND": 404,
+}
+
+
+def _admin_settings() -> tuple[str, str, str]:
+    url = os.getenv("APPS_SCRIPT_URL", "").strip()
+    api_key = os.getenv("APPS_SCRIPT_API_KEY", "").strip()
+    admin_token = os.getenv("APPS_SCRIPT_ADMIN_TOKEN", "").strip()
+    if not url or not api_key or not admin_token:
+        # 관리자 기능은 demo 모드가 없다. 설정이 빠졌으면 바로 알린다.
+        logger.error("관리자 조회: APPS_SCRIPT_URL / APPS_SCRIPT_API_KEY / APPS_SCRIPT_ADMIN_TOKEN 중 빠진 값이 있음")
+        raise HTTPException(status_code=503, detail="메일 자동화 설정이 아직 없어요.")
+    return url, api_key, admin_token
+
+
+def _admin_call(body: dict) -> dict:
+    """관리자 action 을 부르고 data 를 돌려준다. 실패하면 HTTPException."""
+    url, api_key, admin_token = _admin_settings()
+    payload = {"apiKey": api_key, "adminToken": admin_token, **body}
+    try:
+        result = _call_web_app(url, payload)
+    except (httpx.HTTPError, ValueError) as err:
+        logger.error("관리자 조회 실패: %s action=%s", type(err).__name__, body.get("action"))
+        raise HTTPException(status_code=502, detail=UNAVAILABLE_MESSAGE) from None
+
+    if isinstance(result, dict) and result.get("ok") is True:
+        return result.get("data") or {}
+
+    error = (result.get("error") if isinstance(result, dict) else None) or {}
+    code = error.get("code")
+    status_code = ADMIN_ERROR_STATUS.get(code, 502)
+    # UNAUTHORIZED 는 APPS_SCRIPT_API_KEY 또는 APPS_SCRIPT_ADMIN_TOKEN 이 웹앱 값과 다르다는 뜻
+    logger.warning("관리자 조회 웹앱 에러 code=%s action=%s", code, body.get("action"))
+    detail = error.get("message") if status_code != 502 else UNAVAILABLE_MESSAGE
+    raise HTTPException(status_code=status_code, detail=detail or UNAVAILABLE_MESSAGE)
+
+
+def list_inquiries(replied: bool | None = None, page: int = 1, page_size: int = 20) -> dict:
+    """
+    문의 목록 (최신순). replied: None=전체, True=답장 받음, False=답장 전.
+    돌려주는 값: {"total": 전체 건수, "items": [문의, ...]}
+    문의 한 건: inquiryId, createdAt, mentorId, mentorName, studentName, studentEmail,
+               title, body, replied, repliedAt, remindedAt
+    """
+    body: dict = {"action": "getInquiries", "page": page, "pageSize": page_size}
+    if replied is not None:
+        body["filter"] = {"replied": replied}
+    return _admin_call(body)
+
+
+def get_inquiry(inquiry_id: str) -> dict:
+    """문의 한 건. 돌려주는 값은 list_inquiries 의 items 한 건과 같은 모양."""
+    return _admin_call({"action": "getInquiry", "inquiryId": inquiry_id})["item"]
+```
+
+### 11-2. `backend/tests/test_mail_admin.py` (새 파일)
+
+```python
+"""관리자 페이지용 문의 조회(mail_admin) 테스트. 진짜 웹앱은 부르지 않는다."""
+
+import httpx
+import pytest
+from fastapi import HTTPException
+
+from app.services import mail_admin
+
+ITEM = {
+    "inquiryId": "q20261116-0001", "createdAt": "2026-11-16T10:00:00+09:00",
+    "mentorId": "mt-01", "mentorName": "새벽 (demo)", "studentName": "하늘",
+    "studentEmail": "student@example.org", "title": "제목", "body": "내용",
+    "replied": False, "repliedAt": None, "remindedAt": None,
+}
+
+
+@pytest.fixture
+def web_app(monkeypatch):
+    monkeypatch.setenv("APPS_SCRIPT_URL", "https://web-app.example.invalid/exec")
+    monkeypatch.setenv("APPS_SCRIPT_API_KEY", "TEST_API_KEY")
+    monkeypatch.setenv("APPS_SCRIPT_ADMIN_TOKEN", "TEST_ADMIN_TOKEN")
+    state = {"calls": [], "reply": {"ok": True, "data": {"total": 1, "items": [ITEM]}}}
+
+    def fake_call(url, payload):
+        state["calls"].append(payload)
+        if isinstance(state["reply"], Exception):
+            raise state["reply"]
+        return state["reply"]
+
+    monkeypatch.setattr(mail_admin, "_call_web_app", fake_call)
+    return state
+
+
+def test_list_sends_admin_token_and_filter(web_app):
+    data = mail_admin.list_inquiries(replied=False, page=2, page_size=10)
+    assert data["total"] == 1 and data["items"][0]["inquiryId"] == "q20261116-0001"
+    assert web_app["calls"][0] == {
+        "apiKey": "TEST_API_KEY", "adminToken": "TEST_ADMIN_TOKEN",
+        "action": "getInquiries", "page": 2, "pageSize": 10, "filter": {"replied": False},
+    }
+
+
+def test_list_without_filter(web_app):
+    mail_admin.list_inquiries()
+    assert "filter" not in web_app["calls"][0]
+
+
+def test_get_inquiry(web_app):
+    web_app["reply"] = {"ok": True, "data": {"item": ITEM}}
+    assert mail_admin.get_inquiry("q20261116-0001") == ITEM
+    assert web_app["calls"][0]["inquiryId"] == "q20261116-0001"
+
+
+@pytest.mark.parametrize(
+    "code, status",
+    [("INQUIRY_NOT_FOUND", 404), ("INVALID_INPUT", 422), ("UNAUTHORIZED", 502), ("INTERNAL_ERROR", 502)],
+)
+def test_errors(web_app, code, status):
+    web_app["reply"] = {"ok": False, "error": {"code": code, "message": "웹앱 문구"}}
+    with pytest.raises(HTTPException) as info:
+        mail_admin.list_inquiries()
+    assert info.value.status_code == status
+
+
+def test_unreachable(web_app):
+    web_app["reply"] = httpx.ConnectError("연결 실패")
+    with pytest.raises(HTTPException) as info:
+        mail_admin.list_inquiries()
+    assert info.value.status_code == 502
+
+
+def test_missing_admin_token_env(web_app, monkeypatch):
+    monkeypatch.delenv("APPS_SCRIPT_ADMIN_TOKEN")
+    with pytest.raises(HTTPException) as info:
+        mail_admin.list_inquiries()
+    assert info.value.status_code == 503
+    assert web_app["calls"] == []
+```
+
+### 11-3. 라우트에 붙이는 모양 (참고)
+관리자 로그인 방식이 정해지면 `main.py`에 이런 식으로 붙입니다. `require_admin`은 로그인 확인 함수의 **자리표시자**입니다.
+```python
+from fastapi import Depends
+
+from app.services.mail_admin import get_inquiry, list_inquiries
+
+
+@app.get("/admin/inquiries")
+def admin_inquiries(replied: bool | None = None, page: int = 1, page_size: int = 20, _=Depends(require_admin)):
+    return list_inquiries(replied=replied, page=page, page_size=page_size)
+
+
+@app.get("/admin/inquiries/{inquiry_id}")
+def admin_inquiry(inquiry_id: str, _=Depends(require_admin)):
+    return get_inquiry(inquiry_id)
+```
+
+| 웹앱 에러 | HTTP |
+|---|---|
+| INQUIRY_NOT_FOUND | 404 |
+| INVALID_INPUT (page·pageSize·filter·문의번호 형식) | 422 |
+| UNAUTHORIZED, INTERNAL_ERROR, 연결 실패 | 502 "문의 기록을 불러오지 못했어요…" |
+| 환경변수 3개 중 하나라도 없음 | 503 "메일 자동화 설정이 아직 없어요." |

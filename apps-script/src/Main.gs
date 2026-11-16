@@ -4,6 +4,8 @@
  * 이 파일이 하는 일
  * - 팀 백엔드 서버가 웹앱 URL로 POST를 보내면 doPost가 받습니다.
  * - 본문(JSON)을 읽고 → apiKey를 확인하고 → action에 맞는 함수로 보냅니다.
+ * - 관리자 action(getInquiries, getInquiry)은 adminToken도 확인합니다. (Step 5-2)
+ *   순서: JSON → apiKey → action → adminToken → 입력 검사
  * - 어떤 오류가 나도 항상 {"ok":false,"error":{...}} 형식으로 답합니다.
  *   (Apps Script 웹앱은 HTTP 상태 코드를 바꿀 수 없어서 항상 200입니다. 성공 여부는 ok 값으로 봅니다)
  */
@@ -29,7 +31,9 @@ function getActionHandler_(action) {
   const handlers = {
     getMentors: getMentorsAction_,
     submitInquiry: submitInquiryAction_,
-    // Step 5에서 추가: getInquiries, getInquiry
+    // 관리자 API (Step 5-2, Admin.gs). adminToken이 필요합니다 → isAdminAction_
+    getInquiries: getInquiriesAction_,
+    getInquiry: getInquiryAction_,
   };
   if (typeof action !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, action)) {
     throw new AppError('INVALID_ACTION');
@@ -55,6 +59,22 @@ function parseRequestBody_(raw) {
   return req;
 }
 
+/**
+ * adminToken이 필요한 관리자 action인지
+ * @param {string} action
+ * @return {boolean}
+ */
+function isAdminAction_(action) {
+  return action === 'getInquiries' || action === 'getInquiry';
+}
+
+/** adminToken 확인. 틀리거나 없으면 UNAUTHORIZED */
+function verifyAdminToken_(adminToken) {
+  if (!safeEqual_(adminToken, getSecret_(PROPERTY_KEYS.ADMIN_TOKEN))) {
+    throw new AppError('UNAUTHORIZED');
+  }
+}
+
 /** apiKey 확인. 틀리면 UNAUTHORIZED */
 function verifyApiKey_(apiKey) {
   if (!safeEqual_(apiKey, getSecret_(PROPERTY_KEYS.API_KEY))) {
@@ -74,6 +94,7 @@ function handleRequest_(raw) {
     action = String(req.action);
     verifyApiKey_(req.apiKey);
     const handler = getActionHandler_(req.action);
+    if (isAdminAction_(req.action)) verifyAdminToken_(req.adminToken);
     return okResponse_(handler(req));
   } catch (err) {
     if (err instanceof AppError) {

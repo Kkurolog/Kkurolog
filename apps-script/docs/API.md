@@ -1,4 +1,4 @@
-# 메일 자동화 API 명세 (v0.5)
+# 메일 자동화 API 명세 (v0.6)
 
 팀 백엔드 서버가 Apps Script 웹앱을 호출할 때 쓰는 형식입니다. 학생 화면(프론트)에서 직접 호출하지 않습니다.
 
@@ -11,6 +11,7 @@
 | v0.3.2 | 2026-11-10 | 형식 변화 없음. 답장 자동 전달 규칙(문의번호 찾기 순서, 보낸 사람 확인, repliedAt = 첫 답장 시각) 정리 |
 | v0.4 | 2026-11-12 | 에러 코드 `TOO_MANY_REQUESTS` 추가 (같은 학생 메일 10분 3건·하루 5건 제한). `submitInquiry`가 학생에게 "보낸 문의 사본"도 보냄 (요청·응답 형식은 그대로). 답장 없는 문의 10일째 멘토 리마인드 추가 (API 아님). 관리자 API 응답에 `remindedAt` 추가 예정 (Step 5-2) |
 | v0.5 | 2026-11-16 | 개인정보 동의 `privacyConsent` 검사와 `PRIVACY_CONSENT_REQUIRED` 에러 삭제 (보내도 무시). 사이트는 동의 체크박스 대신 "이대로 보내시겠습니까?" 확인 창을 씀. 백엔드 연결 안내 [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) 추가 |
+| v0.6 | 2026-11-16 | 관리자 API `getInquiries`, `getInquiry` 구현 (Step 5-2). 멘토 탭에서 지워진 멘토의 문의는 `mentorName: null` |
 
 ## 공통 규칙
 - 모든 요청은 `POST`, `Content-Type: text/plain`, 본문은 JSON 문자열입니다. 기능은 본문의 `action`으로 구분합니다.
@@ -57,7 +58,7 @@
   - 사본 발송이 실패해도 응답은 성공(`ok: true`)입니다. 실패는 실행 로그에만 남습니다.
   - 그래서 문의 1건에 Gmail 발송 2통을 씁니다. 오늘 남은 발송 수가 2통보다 적으면 `SEND_FAILED`입니다.
 
-## 3) getInquiries — 문의 목록 (관리자, Step 5-2에서 구현 예정)
+## 3) getInquiries — 문의 목록 (관리자, v0.6)
 ```json
 { "apiKey": "YOUR_API_KEY", "action": "getInquiries", "adminToken": "YOUR_ADMIN_TOKEN",
   "filter": { "replied": false }, "page": 1, "pageSize": 20 }
@@ -74,6 +75,9 @@
 - `remindedAt`: 멘토에게 리마인드를 보낸 시각. 안 보냈으면 `null`. (관리자 화면 8개 항목에는 없는 추가 정보)
 - 페이지: `page` 생략 시 1, `pageSize` 생략 시 20, `pageSize` 최대 100. 0·음수·소수·글자이거나 `pageSize`가 100보다 크면 `INVALID_INPUT`. 마지막 페이지를 넘는 `page`는 빈 목록(`items: []`). `total`은 필터를 적용한 전체 건수.
 - `filter.replied`가 true/false가 아닌 값이면 `INVALID_INPUT`, `filter`를 생략하면 전체.
+- 최신순 = 보낸 일시(`createdAt`)가 늦은 것부터. 같은 시각이면 문의번호가 큰 것부터.
+- `mentorName`은 시트 "멘토" 탭에서 `mentorId`로 찾은 이름입니다. 멘토 줄이 지워졌으면 `null`. 멘토 이메일은 들어가지 않습니다.
+- 응답에 학생 이름·메일(개인정보)이 들어 있습니다. 백엔드는 관리자 로그인에 성공한 경우에만 호출하고, 학생 화면에 보내지 않습니다.
 
 | 관리자 화면 항목 | 응답 필드 |
 |---|---|
@@ -86,7 +90,7 @@
 | 멘토 답변 여부 | replied |
 | 멘토 답변 일시 | repliedAt |
 
-## 4) getInquiry — 한 건 조회 (관리자, Step 5-2에서 구현 예정)
+## 4) getInquiry — 한 건 조회 (관리자, v0.6)
 ```json
 { "apiKey": "YOUR_API_KEY", "action": "getInquiry", "adminToken": "YOUR_ADMIN_TOKEN",
   "inquiryId": "q20261108-0001" }
@@ -112,7 +116,7 @@
 5분마다 도는 시간 트리거(`checkReplies`)가 처리합니다. 백엔드가 호출할 것은 없습니다.
 - 문의번호 찾기: ① 받는 주소의 `+문의번호` → ② 인용 부분의 `문의번호: q...` 줄 → ③ 없으면 무시
 - 보낸 사람이 그 문의의 멘토(시트 등록 메일)일 때만 학생에게 전달합니다.
-- 전달되면 `getInquiries`(Step 5-2)에서 `replied: true`, `repliedAt` = **첫 답장 시각**으로 보입니다. 여러 번 답장해도 `repliedAt`은 바뀌지 않습니다.
+- 전달되면 `getInquiries`에서 `replied: true`, `repliedAt` = **첫 답장 시각**으로 보입니다. 여러 번 답장해도 `repliedAt`은 바뀌지 않습니다.
 - 멘토가 **'답장' 버튼**이 아니라 새 메일로 보내면 문의번호가 없어 매칭되지 않습니다.
 
 ## 멘토 리마인드 (API 아님, v0.4)
@@ -121,4 +125,4 @@
 - 멘토가 지금 비활성이면 보내지 않습니다.
 - 원래 문의 메일과 같은 내용에, 제목 말머리 `[꾸로록 리마인드]`와 맨 위 리마인드 문구가 붙습니다. 한 문의에 **한 번만** 보냅니다.
 - 답장 주소는 원래와 같은 `중계계정+문의번호`라서, 멘토가 리마인드 메일에 '답장'해도 학생에게 자동 전달됩니다.
-- 보낸 시각은 시트 "문의" 탭 `리마인드일시`에 남고, Step 5-2의 관리자 API에서 `remindedAt`으로 보입니다.
+- 보낸 시각은 시트 "문의" 탭 `리마인드일시`에 남고, 관리자 API에서 `remindedAt`으로 보입니다.
