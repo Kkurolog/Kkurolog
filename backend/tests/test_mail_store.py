@@ -18,15 +18,16 @@ KEY = "TEST_SERVICE_ROLE_KEY"
 
 
 def make_store(responses):
-    """responses: 요청 순서대로 돌려줄 (상태 코드, 본문). 받은 요청은 calls 에 쌓인다."""
+    """responses: 요청 순서대로 돌려줄 (상태 코드, 본문[, 추가 헤더]). 받은 요청은 calls 에 쌓인다."""
     calls = []
     queue = list(responses)
 
     def handler(request: httpx.Request):
         calls.append(request)
-        status, body = queue.pop(0)
+        status, body, *extra = queue.pop(0)
         content = b"" if body is None else json.dumps(body).encode()
-        return httpx.Response(status, content=content, headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json", **(extra[0] if extra else {})}
+        return httpx.Response(status, content=content, headers=headers)
 
     store = SupabaseMailStore(URL, KEY, client=httpx.Client(transport=httpx.MockTransport(handler)))
     return store, calls
@@ -132,3 +133,53 @@ def test_connection_error_becomes_store_error():
     store = SupabaseMailStore(URL, KEY, client=httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(StoreError):
         store.list_mentors()
+
+
+# ---------------------------------------------------------------- 관리자 (B-5)
+def test_list_inquiries_paging_filter_and_total():
+    store, calls = make_store([(200, [{"id": "q1", "mentors": {"name": "새벽"}}], {"Content-Range": "20-39/57"})])
+    rows, total = store.list_inquiries(False, 20, 20)
+    assert total == 57 and rows[0]["mentors"]["name"] == "새벽"
+    q = query(calls[0])
+    for item in [("select", "*,mentors(name)"), ("order", "created_at.desc,id.desc"), ("offset", "20"),
+                 ("limit", "20"), ("replied", "is.false")]:
+        assert item in q
+    assert calls[0].headers["Prefer"] == "count=exact"
+
+
+def test_list_inquiries_without_filter_and_empty_range():
+    store, calls = make_store([(200, [], {"Content-Range": "*/0"})])
+    rows, total = store.list_inquiries(None, 0, 20)
+    assert rows == [] and total == 0
+    assert not any(k == "replied" for k, _ in query(calls[0]))
+
+
+def test_list_review_replies_filters_status():
+    store, calls = make_store([(200, [], {"Content-Range": "*/0"})])
+    store.list_review_replies(0, 20)
+    assert ("status", "in.(needs_review,failed)") in query(calls[0])
+    assert ("select", "*,inquiries(title,student_name,mentor_id)") in query(calls[0])
+
+
+def test_update_mentor_returns_row_or_none():
+    store, calls = make_store([(200, [{"id": "mt-01", "name": "새 이름"}]), (200, [])])
+    assert store.update_mentor("mt-01", {"name": "새 이름"})["name"] == "새 이름"
+    assert calls[0].method == "PATCH" and calls[0].headers["Prefer"] == "return=representation"
+    assert store.update_mentor("mt-99", {"name": "x"}) is None
+
+
+def test_store_error_keeps_postgres_code():
+    store, _ = make_store([(400, {"code": "23514", "message": "violates check"})])
+    with pytest.raises(StoreError) as info:
+        store.update_mentor("mt-01", {"available": True})
+    assert info.value.code == "23514"
+
+
+def test_upsert_settings_only_touches_values():
+    store, calls = make_store([(201, None)])
+    store.upsert_settings({"senderName": "꾸로록"})
+    req = calls[0]
+    assert ("on_conflict", "key") in query(req) and ("columns", "key,value") in query(req)
+    assert "resolution=merge-duplicates" in req.headers["Prefer"]
+    assert json.loads(req.content) == [{"key": "senderName", "value": "꾸로록"}]
+

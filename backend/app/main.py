@@ -20,6 +20,7 @@ from app.schemas import (
     RecommendRequest,
     RecommendResponse,
 )
+from app.admin.router import router as admin_router
 from app.mail.router import router as mail_router
 from app.rate_limit import limit_ask
 from app.services.answer import looks_like_crisis, make_answer, safety_answer
@@ -36,12 +37,14 @@ frontend_origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in frontend_origins if origin.strip()],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],  # PATCH: 관리자 페이지의 멘토·설정 수정
     allow_headers=["*"],
 )
 
 # Apps Script(메일 웹앱) → 백엔드 내부 API: /internal/mail/inbound, /internal/mail/reminders (app/mail/router.py)
 app.include_router(mail_router)
+# 관리자 페이지용 API: /admin/* (app/admin/router.py, 공용 비밀번호 ADMIN_PASSWORD 로그인)
+app.include_router(admin_router)
 
 
 @app.get("/health")

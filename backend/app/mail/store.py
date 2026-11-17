@@ -23,7 +23,14 @@ TIMEOUT_SECONDS = 15
 
 
 class StoreError(Exception):
-    """Supabase 요청 실패 (연결 실패, 4xx·5xx). 메시지에 키·개인정보를 넣지 않는다."""
+    """Supabase 요청 실패 (연결 실패, 4xx·5xx). 메시지에 키·개인정보를 넣지 않는다.
+
+    code: Postgres 오류 코드 (예: 23514 = 규칙(check) 위반, 23505 = 같은 id 가 이미 있음). 없으면 "".
+    """
+
+    def __init__(self, message: str, code: str = ""):
+        super().__init__(message)
+        self.code = code
 
 
 class SupabaseMailStore:
@@ -41,6 +48,7 @@ class SupabaseMailStore:
         params: dict[str, str] | list[tuple[str, str]] | None = None,
         json: Any = None,
         prefer: str | None = None,
+        with_count: bool = False,
     ) -> Any:
         headers = dict(self._headers)
         if prefer:
@@ -56,10 +64,13 @@ class SupabaseMailStore:
                 code = str(response.json().get("code", ""))
             except ValueError:
                 pass
-            raise StoreError(f"Supabase 오류 {response.status_code} {code} ({method} {path})")
-        if not response.content:
-            return None
-        return response.json()
+            raise StoreError(f"Supabase 오류 {response.status_code} {code} ({method} {path})", code)
+        data = response.json() if response.content else None
+        if with_count:
+            # Prefer: count=exact 일 때 Content-Range: 0-19/57 → 전체 57건
+            total = response.headers.get("Content-Range", "*/0").rsplit("/", 1)[-1]
+            return data or [], int(total) if total.isdigit() else len(data or [])
+        return data
 
     # ------------------------------------------------------------------ 멘토
     def list_mentors(self) -> list[dict]:
@@ -154,6 +165,75 @@ class SupabaseMailStore:
             prefer="resolution=ignore-duplicates,return=minimal",
         )
 
+
+    # ------------------------------------------------------------------ 관리자 (B-5)
+    def list_inquiries(self, replied: bool | None, offset: int, limit: int) -> tuple[list[dict], int]:
+        """문의 목록 (최신순) + 필터에 맞는 전체 건수. 멘토 이름을 함께 가져온다."""
+        params = [
+            ("select", "*,mentors(name)"),
+            ("order", "created_at.desc,id.desc"),
+            ("offset", str(offset)),
+            ("limit", str(limit)),
+        ]
+        if replied is not None:
+            params.append(("replied", f"is.{str(replied).lower()}"))
+        return self._request("GET", "inquiries", params=params, prefer="count=exact", with_count=True)
+
+    def get_inquiry_with_mentor(self, inquiry_id: str) -> dict | None:
+        rows = self._request(
+            "GET", "inquiries", params={"select": "*,mentors(name)", "id": f"eq.{inquiry_id}"}
+        ) or []
+        return rows[0] if rows else None
+
+    def list_replies(self, inquiry_id: str) -> list[dict]:
+        return self._request(
+            "GET",
+            "mail_replies",
+            params={"select": "*", "inquiry_id": f"eq.{inquiry_id}", "order": "received_at"},
+        ) or []
+
+    def list_review_replies(self, offset: int, limit: int) -> tuple[list[dict], int]:
+        """학생에게 전달하지 못해 사람이 봐야 하는 답장 (최신순) + 전체 건수."""
+        return self._request(
+            "GET",
+            "mail_replies",
+            params=[
+                ("select", "*,inquiries(title,student_name,mentor_id)"),
+                ("status", "in.(needs_review,failed)"),
+                ("order", "received_at.desc"),
+                ("offset", str(offset)),
+                ("limit", str(limit)),
+            ],
+            prefer="count=exact",
+            with_count=True,
+        )
+
+    def get_mentor(self, mentor_id: str) -> dict | None:
+        rows = self._request("GET", "mentors", params={"select": "*", "id": f"eq.{mentor_id}"}) or []
+        return rows[0] if rows else None
+
+    def insert_mentor(self, row: dict) -> dict:
+        result = self._request("POST", "mentors", json=row, prefer="return=representation")
+        return result[0]
+
+    def update_mentor(self, mentor_id: str, values: dict) -> dict | None:
+        result = self._request(
+            "PATCH", "mentors", params={"id": f"eq.{mentor_id}"}, json=values, prefer="return=representation"
+        ) or []
+        return result[0] if result else None
+
+    def list_settings(self) -> list[dict]:
+        return self._request("GET", "mail_settings", params={"select": "key,value,description", "order": "key"}) or []
+
+    def upsert_settings(self, values: dict[str, str]) -> None:
+        """설정 값만 바꾼다 (없는 키는 새로 만든다). description 은 건드리지 않는다."""
+        self._request(
+            "POST",
+            "mail_settings",
+            params={"on_conflict": "key", "columns": "key,value"},
+            json=[{"key": key, "value": value} for key, value in values.items()],
+            prefer="resolution=merge-duplicates,return=minimal",
+        )
 
 def get_store() -> SupabaseMailStore:
     """설정(환경변수)으로 store 를 만든다. 테스트는 이 함수를 가짜로 바꿔 끼운다."""

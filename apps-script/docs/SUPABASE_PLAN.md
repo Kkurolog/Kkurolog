@@ -1,6 +1,6 @@
 # 메일 자동화 Supabase 이전 계획 (B 방식)
 
-> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드 / B-3 완료: 백엔드 코드, `MAIL_ENABLED=false`로 꺼 둔 상태). 운영 적용은 B-4(데이터 옮기기) 뒤. 이 문서는 단계마다 갱신합니다.
+> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드 / B-3 완료: 백엔드 코드, `MAIL_ENABLED=false`로 꺼 둔 상태 / B-4 완료: 팀 Supabase에 멘토 10명, mt-01~06 메일·연락 가능 / B-5 완료: 관리자 API). 다음: PR → 배포 → 실제 왕복 테스트. 이 문서는 단계마다 갱신합니다.
 > 지금 운영 중인 구조(구글 시트 + Apps Script)는 B-3까지 끝나고 실제 왕복 테스트를 통과할 때까지 그대로 둡니다.
 
 ## 1. 왜 바꾸나
@@ -104,7 +104,7 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | **B-2** | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | ✅ 코드 완료 (운영 시트 적용은 B-3 뒤) |
 | **B-3** | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | ✅ 코드 완료 (`backend/app/mail/`, pytest 158개 통과). `MAIL_ENABLED=true`로 켜기 전까지는 예전과 같이 동작 |
 | **B-4** | 데이터 옮기기: 멘토 프로필은 `scripts/load_mentors.py`로, 실제 메일·연락 가능은 Table Editor에서 직접. 기존 시트 문의(팀 테스트)는 옮기지 않고 새로 시작 | ✅ 스크립트 완료 (팀 Supabase 적용은 직접) |
-| B-5 | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | |
+| **B-5** | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | ✅ 코드 완료 (`backend/app/admin/`, 명세 [ADMIN_API.md](./ADMIN_API.md), pytest 179개) |
 | 마무리 | 실제 왕복 테스트, 문서(README·HANDOVER·BACKEND_INTEGRATION) 정리, PR | |
 
 ## 6. 바뀌거나 없어지는 것
@@ -144,3 +144,19 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | 기존 시트 문의 | 팀 테스트 문의라 옮기지 않고 새로 시작. 전환 뒤 예전 테스트 메일에 온 답장은 "없는 문의"로 무시됨 |
 
 **확인한 것**: 로컬 PostgreSQL(0001+0002)에서 `--dry-run`은 DB를 바꾸지 않음, 실제 실행 시 10명, 메일 없이 available=true는 DB가 막음, 이름을 바꾼 뒤 다시 실행해도 이름·email·available 유지(빠진 멘토만 새로 넣음), `--update-profiles`는 프로필만 덮어쓰고 email·available 유지.
+
+## 9. 관리자 API (B-5)
+
+명세: [ADMIN_API.md](./ADMIN_API.md). 구현: `backend/app/admin/`.
+
+| 정한 것 (2026-11-18) | 내용 |
+|---|---|
+| 로그인 | **공용 비밀번호 하나** (`ADMIN_PASSWORD`, 12자 이상). 관리자를 구분하지 않음. 맞으면 12시간 로그인 표(서명한 글자, DB에 저장 안 함). 비밀번호를 바꾸면 기존 표는 모두 무효 |
+| 시도 제한 | 같은 IP에서 10분에 10번 (서버 메모리) |
+| 범위 | 문의 목록(최신순·답장 필터·20건씩)·상세(+답장 내역), 확인필요 목록, 멘토 목록(메일 포함)·추가·수정, 설정 보기·수정 |
+| 변경 기록 | 남기지 않음 |
+| 멘토 삭제 | 없음. 쉬게 할 때는 `available: false` (문의 기록이 멘토를 참조) |
+| 형식 위치 | `backend/app/admin/models.py` (학생용 `schemas.py`와 분리). 프론트 타입은 관리자 페이지를 만들 때 추가 |
+| CORS | `PATCH` 허용 추가. 관리자 페이지 주소가 다르면 `FRONTEND_ORIGINS`에 추가 |
+
+**확인한 것 (pytest 179개 통과)**: 기존 158 + 관리자 15(로그인·시도 제한·표 만료·위조·비밀번호 변경, 목록 페이지·필터, 상세·답장 내역·확인필요, 멘토 추가·중복·규칙 위반·수정·메일 지우기, 설정 수정·검증·다음 메일 반영) + 요청 모양 6.
