@@ -160,3 +160,25 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | CORS | `PATCH` 허용 추가. 관리자 페이지 주소가 다르면 `FRONTEND_ORIGINS`에 추가 |
 
 **확인한 것 (pytest 179개 통과)**: 기존 158 + 관리자 15(로그인·시도 제한·표 만료·위조·비밀번호 변경, 목록 페이지·필터, 상세·답장 내역·확인필요, 멘토 추가·중복·규칙 위반·수정·메일 지우기, 설정 수정·검증·다음 메일 반영) + 요청 모양 6.
+
+## 10. merge 전 실제 Supabase 연결 확인 (2026-11-18)
+
+메일 담당 컴퓨터(Windows)에서 백엔드를 `MAIL_ENABLED=true`로 켜고 팀 Supabase에 연결해 확인했다. 메일 웹앱 주소는 일부러 가짜로 넣어 메일은 보내지 않았다.
+
+| 확인 | 결과 |
+|---|---|
+| `GET /mentors` | Supabase `mentors`의 이름(대시보드에서 바꾼 이름)이 나옴, mt-10 숨김, 연락 가능 mt-01~06, 메일 주소 없음 |
+| 관리자 로그인·멘토 목록(메일 포함)·설정 16개·문의 0건·확인필요 0건 | 200 |
+| 메일 없는 멘토를 연락 가능으로 | 422 (DB 규칙) |
+| 없는 문의번호 | 404 |
+| 설정 수정(같은 값) | 200 |
+| 출입증 없이 관리자 API | 401 |
+| 문의 보내기 (메일 웹앱 연결 실패) | 502, 문의 저장 안 됨 (0건 그대로) |
+
+**이때 찾아서 고친 것**
+- `SUPABASE_URL`에 대시보드의 REST 주소(`…/rest/v1`)를 넣으면 404 PGRST125 → 끝의 `/rest/v1`을 떼고 쓰도록 수정. `.env.example`에 "프로젝트 주소까지만" 안내.
+- `/docs`에서 관리자 API를 시험하면 출입증이 전달되지 않아 401 → 관리자 인증을 HTTP Bearer 방식으로 선언해 `/docs`에 Authorize 버튼이 생기게 수정 (관리자 페이지가 보내는 형식은 같음).
+- Windows의 애플리케이션 제어 정책이 가상환경의 `uvicorn.exe`를 막음 → `python -m uvicorn app.main:app --reload`로 실행 (README 확정 때 반영).
+
+**남은 확인**: 메일 웹앱과의 연결(sendMail·getQuota), Apps Script → 백엔드 자동 답장 전달 → merge·배포 후 실제 왕복 테스트.
+
