@@ -21,8 +21,8 @@
 -- =====================================================================
 
 
--- 1. 공통: updated_at 자동 갱신 ------------------------------------------
-create or replace function public.set_updated_at()
+-- 1. 공통: updated_at 자동 갱신 (다른 기능의 함수와 이름이 겹치지 않게 mail_ 을 붙였다) ------------------------------------------
+create or replace function public.mail_set_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -63,7 +63,7 @@ create table if not exists public.mentors (
 drop trigger if exists mentors_set_updated_at on public.mentors;
 create trigger mentors_set_updated_at
   before update on public.mentors
-  for each row execute function public.set_updated_at();
+  for each row execute function public.mail_set_updated_at();
 
 
 -- 3. 문의 ----------------------------------------------------------------
@@ -164,7 +164,7 @@ create table if not exists public.mail_settings (
 drop trigger if exists mail_settings_set_updated_at on public.mail_settings;
 create trigger mail_settings_set_updated_at
   before update on public.mail_settings
-  for each row execute function public.set_updated_at();
+  for each row execute function public.mail_set_updated_at();
 
 -- 기본값 (시트 "설정" 탭과 같음). 이미 있는 키는 건드리지 않는다.
 insert into public.mail_settings (key, value, description) values
@@ -220,4 +220,4 @@ grant select, insert, update, delete on public.mentors, public.inquiries, public
 -- 함수는 기본으로 누구나 실행할 수 있다 → 백엔드(service_role)만 실행하게 막는다
 revoke execute on function public.next_inquiry_id() from public, anon, authenticated;
 grant  execute on function public.next_inquiry_id() to service_role;
-revoke execute on function public.set_updated_at() from public, anon, authenticated;
+revoke execute on function public.mail_set_updated_at() from public, anon, authenticated;

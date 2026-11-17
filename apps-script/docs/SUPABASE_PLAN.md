@@ -51,6 +51,7 @@ Apps Script 매일 트리거 → 백엔드 /internal/mail/reminders → 백엔�
 - `available = true`인 멘토는 `consent = true`이고 `email`이 있어야 합니다. 메일 없는 멘토에게 문의가 가는 일이 생기지 않습니다.
 - 문의 기록이 있는 멘토는 지울 수 없습니다. 쉬게 할 때는 `available`을 끕니다.
 - 문의번호 형식 `q날짜-순번`, 이름 1~30자, 제목 1~100자, 내용 1~2000자, `replied`와 `replied_at`은 같이 움직입니다.
+- `updated_at` 자동 갱신 함수는 다른 기능과 이름이 겹치지 않게 `mail_set_updated_at()`으로 만들었습니다.
 - 모든 테이블은 RLS를 켜고 정책이 없습니다. 학생 화면(anon)은 아무것도 읽지 못하고, 백엔드(service_role)만 읽고 씁니다.
 - `next_inquiry_id()`: 한국 날짜마다 0001부터 번호를 만듭니다. 동시에 여러 요청이 와도 겹치지 않습니다 (30개 동시 호출로 확인). 발송 실패로 지운 문의의 번호는 건너뜁니다.
 
