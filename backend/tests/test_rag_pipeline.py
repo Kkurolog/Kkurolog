@@ -160,7 +160,9 @@ def test_adapter_uses_new_fields_and_keeps_l1_without_excerpt():
     p1, p2 = res["sources"]
     assert "창업 후 대학" in p1["excerpt"] and "마무리 이야기" in p1["excerpt"]
     assert p1["visibility"] == "L3" and p1["url"] == "https://example.com/p1" and p1["date"] == "2023-05-10"
+    assert p1["title"] == "p1 제목"  # L3 는 글 제목도 나간다
     assert p2["visibility"] == "L1" and p2["excerpt"] is None and p2["url"] is None
+    assert p2["title"] is None  # 익명 글은 제목을 내보내지 않는다
     assert "새벽" not in p2["alumni"]
 
 

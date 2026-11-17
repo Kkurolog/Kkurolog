@@ -32,8 +32,8 @@ class Source(BaseModel):
       - L0: 사용 불가 → 출처로 만들 수 없다 (만들려고 하면 오류)
       - L1: 익명으로 답변 근거만 → excerpt 를 자동으로 비운다 (원문 비공개)
       - L2: 익명 원문 구간 노출 → excerpt 는 채운다
-      - L3: 실명·멘토 연결 가능 → excerpt 를 채우고 url 도 보여준다
-    url(원문 글 주소)은 L3 일 때만 남긴다. gschool.kr 원문에는 작성자 이름이 있어서,
+      - L3: 실명·멘토 연결 가능 → excerpt 를 채우고 url·title 도 보여준다
+    url(원문 글 주소)과 title(글 제목)은 L3 일 때만 남긴다. gschool.kr 원문에는 작성자 이름이 있어서,
     L1·L2(익명) 글의 링크를 주면 누구인지 드러나기 때문이다.
     visibility 를 안 주면(None) 예전처럼 excerpt 를 그대로 보여준다. (demo·하위 호환, url 은 비움)
     """
@@ -47,6 +47,9 @@ class Source(BaseModel):
     visibility: Literal["L1", "L2", "L3"] | None = Field(None, description="공개 등급. 없으면 demo 데이터")
     date: str | None = Field(None, description="글·인터뷰 날짜 (예: '2021-05'). 오래된 정보인지 알려주는 용도")
     url: str | None = Field(None, description="원문 글 주소. L3 일 때만 채우고, 그 외에는 null (익명 보호)")
+    title: str | None = Field(
+        None, description="원문 글 제목. 제목에 졸업생 이름이 들어 있을 수 있어 L3 일 때만 채운다 (url 과 같은 규칙)"
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -59,7 +62,9 @@ class Source(BaseModel):
             if visibility == "L1":
                 data = {**data, "excerpt": None}
             if visibility != "L3":
-                data = {**data, "url": None}
+                data = {**data, "url": None, "title": None}
+            elif not data.get("title"):
+                data = {**data, "title": None}  # 빈 문자열은 null 로 통일
         return data
 
 

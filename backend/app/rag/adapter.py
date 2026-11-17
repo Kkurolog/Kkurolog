@@ -26,6 +26,7 @@ def _merge_source(source_id: str, group: list[RagSource]) -> Source:
         visibility=first.visibility,
         date=first.published_at,
         url=first.url,
+        title=first.title,  # L3 가 아니면 pipeline.public_title 이 이미 비웠고, Source 가 한 번 더 막는다
     )
 
 

@@ -28,6 +28,8 @@ export default function SourcePanel({ source, onClose }: { source: Source; onClo
         <div>
           <p className="text-[13px] font-bold text-brand">출처</p>
           <h2 className="mt-1 text-xl font-bold text-ink">{source.alumni}</h2>
+          {/* 글 제목은 공개 등급 L3 글에만 온다 */}
+          {source.title && <p className="mt-1 text-[15px] font-bold text-ink">「{source.title}」</p>}
           <p className="mt-1 text-sm text-muted">
             {source.interview_id}
             {source.date && ` · ${source.date}`}

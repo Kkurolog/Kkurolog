@@ -14,8 +14,21 @@ type Props = {
   isLatest?: boolean; // 가장 최근 메시지인지 (방금 도착한 답변에는 '찾았다!' 꾸로록이 빼꼼 나온다)
 };
 
-// 출처 링크 문구. 예: "출처 · 졸업생 A (demo) · demo-1"
+// 글 날짜를 읽기 쉽게. "2024-07-31" → "2024년 7월", "2021" → "2021년". 모양이 다르면 그대로 둔다.
+export function formatSourceDate(date: string) {
+  const match = /^(\d{4})(?:-(\d{1,2}))?/.exec(date);
+  if (!match) return date;
+  return match[2] ? `${match[1]}년 ${Number(match[2])}월` : `${match[1]}년`;
+}
+
+// 출처 링크 문구.
+// - 제목이 있으면(L3): "출처 · 2024년 7월 · 「글 제목」 · 새벽"
+// - 제목이 없으면(익명): "출처 · 2024년 7월 글 · 졸업생 (익명)"
+// - 날짜도 없으면(demo): "출처 · 졸업생 A (demo) · demo-1"
 export function sourceLabel(source: Source) {
+  const when = source.date ? formatSourceDate(source.date) : null;
+  if (source.title) return ["출처", when, `「${source.title}」`, source.alumni].filter(Boolean).join(" · ");
+  if (when) return `출처 · ${when} 글 · ${source.alumni}`;
   return `출처 · ${source.alumni} · ${source.interview_id}`;
 }
 
@@ -80,7 +93,7 @@ export default function ChatMessageView({ message, onOpenSource, onContact, isLa
       {message.sources.length > 0 && (
         <ul className="flex flex-col gap-1">
           {message.sources.map((source) => (
-            <li key={source.interview_id}>
+            <li key={source.interview_id} className="flex flex-col items-start">
               <button
                 type="button"
                 onClick={() => onOpenSource(source)}
@@ -88,6 +101,17 @@ export default function ChatMessageView({ message, onOpenSource, onContact, isLa
               >
                 {sourceLabel(source)}
               </button>
+              {/* 원문 주소는 공개 등급 L3 글에만 온다 (익명 글은 링크가 없다) */}
+              {source.url && (
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm break-all text-brand underline underline-offset-4"
+                >
+                  원문 보기: {source.url}
+                </a>
+              )}
             </li>
           ))}
         </ul>
