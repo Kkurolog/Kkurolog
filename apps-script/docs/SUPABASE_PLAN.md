@@ -137,10 +137,10 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 
 | 정한 것 (2026-11-18) | 내용 |
 |---|---|
-| 멘토 프로필 | `scripts/load_mentors.py`가 `mentors_demo.json`의 10명(mt-01~10)을 넣음. 메일 없음, 연락 가능 false |
+| 멘토 프로필 | `scripts/load_mentors.py`가 `mentors_demo.json`의 10명(mt-01~10)을 넣음. 메일 없음, 연락 가능 false. 다시 돌려도 **이미 있는 멘토는 건드리지 않음** (대시보드에서 고친 이름 유지). JSON으로 덮어쓰려면 `--update-profiles` |
 | 실제 메일·연락 가능 | Supabase 대시보드 Table Editor에서 mt-01~06에 직접 입력 (메일 주소가 파일·git에 남지 않음). **email을 먼저 넣고 available을 켬** (DB 규칙상 반대 순서는 막힘) |
 | mt-07~09 | 메일 없이, 연락 가능 false로 둠 (프로필은 사이트에 보이고 연락만 막힘) |
 | mt-10 | 참여 동의 false로 넣음. 어디에도 보이지 않음. 나중에 동의하면 consent만 켜면 됨 |
 | 기존 시트 문의 | 팀 테스트 문의라 옮기지 않고 새로 시작. 전환 뒤 예전 테스트 메일에 온 답장은 "없는 문의"로 무시됨 |
 
-**확인한 것**: 로컬 PostgreSQL(0001+0002)에서 `--dry-run`은 DB를 바꾸지 않음, 실제 실행 시 10명, 메일 없이 available=true는 DB가 막음, 메일 넣고 켠 뒤 다시 실행해도 email·available 유지.
+**확인한 것**: 로컬 PostgreSQL(0001+0002)에서 `--dry-run`은 DB를 바꾸지 않음, 실제 실행 시 10명, 메일 없이 available=true는 DB가 막음, 이름을 바꾼 뒤 다시 실행해도 이름·email·available 유지(빠진 멘토만 새로 넣음), `--update-profiles`는 프로필만 덮어쓰고 email·available 유지.
