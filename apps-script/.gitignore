@@ -5,6 +5,5 @@
 .clasprc.json
 # 실제 값이 들어간 로컬 메모·테스트 파일 (예: test.local.html, secrets.local.md)
 *.local.*
-# 실제 멘토·학생 데이터를 내려받은 파일 (예시 파일 *.example.csv 는 올린다)
-templates/*.csv
-!templates/*.example.csv
+# 실제 멘토·학생 데이터를 내려받은 파일 (CSV 등). 데이터는 Supabase 에만 둔다
+*.csv

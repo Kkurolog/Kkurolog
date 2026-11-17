@@ -1,13 +1,11 @@
 /**
  * Main.gs — 웹앱 입구 (라우터)
  *
- * 이 파일이 하는 일
- * - 팀 백엔드 서버가 웹앱 URL로 POST를 보내면 doPost가 받습니다.
- * - 본문(JSON)을 읽고 → apiKey를 확인하고 → action에 맞는 함수로 보냅니다.
- * - 관리자 action(getInquiries, getInquiry)은 adminToken도 확인합니다. (Step 5-2)
- *   순서: JSON → apiKey → action → adminToken → 입력 검사
+ * - 팀 백엔드가 웹앱 URL로 POST를 보내면 doPost가 받습니다.
+ * - 처리 순서: JSON 확인 → apiKey 확인(UNAUTHORIZED) → action 확인(INVALID_ACTION) → 입력 검사
  * - 어떤 오류가 나도 항상 {"ok":false,"error":{...}} 형식으로 답합니다.
  *   (Apps Script 웹앱은 HTTP 상태 코드를 바꿀 수 없어서 항상 200입니다. 성공 여부는 ok 값으로 봅니다)
+ * - action은 메일 보내기(sendMail)와 남은 발송 수(getQuota) 두 가지뿐입니다. 저장·판단은 백엔드가 합니다.
  */
 
 /** 웹앱 POST 입구 */
@@ -22,18 +20,14 @@ function doGet() {
 }
 
 /**
- * action 이름 → 처리 함수
- * (함수 안에 두어야 파일 순서와 상관없이 다른 파일의 함수를 찾을 수 있습니다)
+ * action 이름 → 처리 함수 (MailApi.gs)
  * @param {*} action
  * @return {function(Object): Object}
  */
 function getActionHandler_(action) {
   const handlers = {
-    getMentors: getMentorsAction_,
-    submitInquiry: submitInquiryAction_,
-    // 관리자 API (Step 5-2, Admin.gs). adminToken이 필요합니다 → isAdminAction_
-    getInquiries: getInquiriesAction_,
-    getInquiry: getInquiryAction_,
+    sendMail: sendMailAction_,
+    getQuota: getQuotaAction_,
   };
   if (typeof action !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, action)) {
     throw new AppError('INVALID_ACTION');
@@ -59,22 +53,6 @@ function parseRequestBody_(raw) {
   return req;
 }
 
-/**
- * adminToken이 필요한 관리자 action인지
- * @param {string} action
- * @return {boolean}
- */
-function isAdminAction_(action) {
-  return action === 'getInquiries' || action === 'getInquiry';
-}
-
-/** adminToken 확인. 틀리거나 없으면 UNAUTHORIZED */
-function verifyAdminToken_(adminToken) {
-  if (!safeEqual_(adminToken, getSecret_(PROPERTY_KEYS.ADMIN_TOKEN))) {
-    throw new AppError('UNAUTHORIZED');
-  }
-}
-
 /** apiKey 확인. 틀리면 UNAUTHORIZED */
 function verifyApiKey_(apiKey) {
   if (!safeEqual_(apiKey, getSecret_(PROPERTY_KEYS.API_KEY))) {
@@ -94,11 +72,10 @@ function handleRequest_(raw) {
     action = String(req.action);
     verifyApiKey_(req.apiKey);
     const handler = getActionHandler_(req.action);
-    if (isAdminAction_(req.action)) verifyAdminToken_(req.adminToken);
     return okResponse_(handler(req));
   } catch (err) {
     if (err instanceof AppError) {
-      // 로그에는 내부 설명까지, 응답에는 공개 문구만
+      // 로그에는 내부 설명까지, 응답에는 공개 문구만. (메일 주소·본문은 로그에 남기지 않음)
       console.warn(`[${action}] ${err.code}: ${err.message} ${err.detail}`);
       return errorResponse_(err.code, err.message);
     }

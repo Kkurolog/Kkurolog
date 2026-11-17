@@ -1,6 +1,6 @@
 # 메일 자동화 Supabase 이전 계획 (B 방식)
 
-> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase 프로젝트에 적용). 이 문서는 단계마다 갱신합니다.
+> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드, 운영 시트 적용은 B-3 뒤). 이 문서는 단계마다 갱신합니다.
 > 지금 운영 중인 구조(구글 시트 + Apps Script)는 B-3까지 끝나고 실제 왕복 테스트를 통과할 때까지 그대로 둡니다.
 
 ## 1. 왜 바꾸나
@@ -68,32 +68,40 @@ python run_sql.py ../supabase/migrations/0002_mail_tables.sql
 python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이면 성공
 ```
 
-## 4. 백엔드 ↔ Apps Script 약속 (초안, B-2에서 확정)
+## 4. 백엔드 ↔ Apps Script 약속 (B-2에서 확정)
 
-### 4-1. 백엔드 → Apps Script (웹앱, `apiKey` 필요)
-| action | 보내는 것 | 돌려받는 것 |
+자세한 형식은 [API.md](./API.md) v1.0에 있습니다. 요약:
+
+| 방향 | 주소·action | 언제 | 인증 |
+|---|---|---|---|
+| 백엔드 → Apps Script | `sendMail` (받는 사람, 문의번호(선택), 보낸 이름, 제목, 글자·HTML 본문) | 문의·사본·답장 전달·리마인드를 보낼 때 | 본문 `apiKey` |
+| 백엔드 → Apps Script | `getQuota` (오늘 남은 발송 수) | 문의 저장 전 (2통 필요) | 본문 `apiKey` |
+| Apps Script → 백엔드 | `POST /internal/mail/inbound` (답장 후보, 최대 5통씩) | 5분마다 | 헤더 `X-Kkurolog-Mail-Secret` |
+| Apps Script → 백엔드 | `POST /internal/mail/reminders` | 매일 10~11시 | 헤더 `X-Kkurolog-Mail-Secret` |
+
+- **답장 주소(Reply-To)는 Apps Script가 만듭니다.** 백엔드는 `replyToInquiryId`(문의번호)만 넘기고, 웹앱이 `중계계정+문의번호@도메인`을 만듭니다. 백엔드는 중계 메일 주소를 몰라도 되고, 기관 계정으로 바뀌어도 백엔드 설정은 그대로입니다.
+- **관계없는 메일은 백엔드로 보내지 않습니다.** Apps Script는 받는 주소에 `+문의번호`가 있거나 본문에 `문의번호: q…` 줄이 있는 메일만 넘깁니다. 최종 판단(진짜 그 문의인지, 보낸 사람이 멘토인지)은 백엔드가 합니다.
+- **백엔드가 응답하지 않으면** Apps Script는 그 메일을 처리 완료로 기억하지 않고 다음 차례에 다시 보냅니다. 백엔드는 `mail_replies.message_id`로 같은 메일을 한 번만 처리합니다.
+- Render 무료 플랜은 15분 동안 요청이 없으면 잠들고 깨는 데 30~60초가 걸립니다. 5분 트리거가 자주 깨우므로 보통은 깨어 있습니다.
+
+**Apps Script 스크립트 속성 (B-2)**
+| 이름 | 누가 넣나 | 백엔드 환경변수 |
 |---|---|---|
-| `sendMail` | `to`, `replyTo`(선택), `fromName`, `subject`, `textBody`, `htmlBody` | `{ok:true}` 또는 `SEND_FAILED` |
-| `getQuota` | (없음) | 오늘 남은 Gmail 발송 수 |
+| `API_KEY` | setup이 만듦 | `APPS_SCRIPT_API_KEY` (같은 값) |
+| `MAIL_WEBHOOK_SECRET` | setup이 만듦 | `MAIL_WEBHOOK_SECRET` (같은 값) |
+| `BACKEND_URL` | 직접 추가 (예: `https://YOUR_BACKEND.onrender.com`) | — |
+| `TEST_STUDENT_EMAIL` | 직접 추가 (테스트 메일 받을 주소) | — |
+| (이전 버전) `ADMIN_TOKEN` | setup이 지움 | — |
 
-- 메일 문장(제목·본문)은 백엔드가 `mail_settings` 값으로 만들어서 보냅니다. Apps Script는 받은 대로 보내기만 합니다.
-- Reply-To(`중계계정+문의번호@gmail.com`)를 만들려면 중계 주소가 필요합니다. `getQuota` 응답에 중계 주소도 같이 돌려줄지 B-2에서 정합니다.
-
-### 4-2. Apps Script → 백엔드 (헤더 `X-Kkurolog-Mail-Secret`)
-| 주소 | 언제 | 내용 |
-|---|---|---|
-| `POST /internal/mail/inbound` | 5분 트리거 | 새로 받은 메일 목록(메일 ID, 받은 시각, 보낸 주소, 받는 주소들, 본문 글자) → 백엔드가 메일마다 결과(전달함/확인필요/무시/다시 시도)를 돌려줌 → Apps Script가 라벨을 붙이고 처리 완료로 기억 |
-| `POST /internal/mail/reminders` | 매일 10~11시 | 백엔드가 리마인드 대상을 찾아 보내고 결과 요약을 돌려줌 |
-
-- 백엔드가 응답하지 못하면(서버가 잠들었다 깨어나는 중 등) Apps Script는 그 메일을 처리 완료로 기억하지 않고 다음 차례에 다시 보냅니다. 같은 메일이 두 번 와도 `mail_replies.message_id`로 한 번만 처리합니다.
-- Render 무료 플랜은 15분 동안 요청이 없으면 잠들고 깨어나는 데 30~60초가 걸립니다. 그래서 5분 트리거가 이 지연을 견디게 만듭니다.
+- 다른 계정이 프로젝트를 복사해 setup을 실행하면 `API_KEY`, `MAIL_WEBHOOK_SECRET`, `BACKEND_URL`, 처리 기록을 지우고 새로 만듭니다. 복사본이 이전 팀의 백엔드로 학생 메일을 넘기는 일을 막기 위해서입니다.
+- 트리거 함수 이름(`checkReplies`, `sendReminders`)은 바꾸지 않았습니다. 코드를 바꿔 붙여넣어도 기존 트리거가 그대로 새 코드를 부릅니다.
 
 ## 5. 단계
 
 | 스텝 | 내용 | 상태 |
 |---|---|---|
 | **B-1** | Supabase 테이블 SQL + 이 설계 문서 + `docs/DATA.md` 갱신 | ✅ (팀 Supabase 적용 완료) |
-| B-2 | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | |
+| **B-2** | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | ✅ 코드 완료 (운영 시트 적용은 B-3 뒤) |
 | B-3 | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | |
 | B-4 | 데이터 옮기기: 데모 멘토 프로필 + 시트 멘토 메일, 기존 문의 기록을 Supabase로 적재하는 스크립트 (실제 메일은 git에 올리지 않음) | |
 | B-5 | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | |
@@ -101,8 +109,8 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 
 ## 6. 바뀌거나 없어지는 것
 
-- **구글 시트**: 저장소로 쓰지 않습니다. 전환이 끝나면 Apps Script는 시트 없이 단독 프로젝트로 둘 수 있습니다 (B-2에서 정함).
-- **`apps-script/src/Admin.gs`(관리자 API)**: 관리자 조회를 백엔드가 Supabase에서 직접 하므로 B-2에서 지웁니다.
+- **구글 시트**: 저장소로 쓰지 않습니다. Apps Script는 지금 시트에 붙은 프로젝트를 그대로 씁니다 (웹앱 링크·키·트리거 유지). 시트의 메뉴("메일 자동화")만 쓰고, 탭은 비워 두거나 지워도 됩니다.
+- **`apps-script/src/Admin.gs`(관리자 API)**: B-2에서 지웠습니다. 관리자 조회는 백엔드가 Supabase에서 직접 합니다 (B-5). 시트·판단 관련 파일(`Sheets`, `Mentors`, `Inquiries`, `MailTemplates`, `ReplyParser`, `Replies`)과 `templates/*.csv`도 지웠습니다. 메일 문장 만들기·인용문 지우기는 B-3에서 백엔드(파이썬)로 옮깁니다.
 - **`apps-script/docs/BACKEND_INTEGRATION.md`**: 시트 방식 기준의 연결 안내라 B-3이 끝나면 새 구조로 다시 씁니다.
 - **`backend/app/data/mentors_demo.json`**: B-3에서 `mentors` 테이블로 바뀝니다. 테스트용 가짜 데이터로만 남길지 B-3에서 정합니다.
 - **인수인계**: "시트 사본 + 계정 교체"에서 "관리자 페이지로 운영 + 처음 한 번 설치(Supabase·백엔드·Apps Script)"로 바뀝니다. `HANDOVER.md`는 마무리 단계에서 다시 씁니다.

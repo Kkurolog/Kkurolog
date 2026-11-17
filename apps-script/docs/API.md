@@ -1,128 +1,129 @@
-# 메일 자동화 API 명세 (v0.6)
+# 메일 자동화 API 명세 (v1.0 — B 방식: Supabase + 메일 전용 Apps Script)
 
-팀 백엔드 서버가 Apps Script 웹앱을 호출할 때 쓰는 형식입니다. 학생 화면(프론트)에서 직접 호출하지 않습니다.
+메일 자동화는 두 방향으로 요청을 주고받습니다. 저장·판단은 팀 백엔드 + Supabase가 하고, Apps Script는 중계 Gmail로 메일을 보내고 받기만 합니다.
+(전체 설계: [SUPABASE_PLAN.md](./SUPABASE_PLAN.md))
+
+| 방향 | 무엇 | 인증 |
+|---|---|---|
+| 백엔드 → Apps Script 웹앱 | `sendMail`, `getQuota` (1장) | 요청 본문의 `apiKey` = 웹앱 스크립트 속성 `API_KEY` = 백엔드 `APPS_SCRIPT_API_KEY` |
+| Apps Script → 백엔드 | `POST /internal/mail/inbound`, `POST /internal/mail/reminders` (2장) | 헤더 `X-Kkurolog-Mail-Secret` = 웹앱 스크립트 속성 `MAIL_WEBHOOK_SECRET` = 백엔드 `MAIL_WEBHOOK_SECRET` |
 
 ## 변경 기록
 | 버전 | 날짜 | 내용 |
 |---|---|---|
-| v0.2 | 2026-11-08 | 첫 명세 |
-| v0.3 | 2026-11-10 | 멘토 ID 예시를 백엔드 형식(`mt-01`)으로 변경. `consent` → `privacyConsent`, `CONSENT_REQUIRED` → `PRIVACY_CONSENT_REQUIRED`로 이름 변경 (기존 코드의 멘토 참여 동의 `consent`와 헷갈리지 않게) |
-| v0.3.1 | 2026-11-10 | 형식 변화 없음. "호출할 때 주의할 점" 추가 (리다이렉트, HTTP 200, 잘못된 JSON·mentorId 처리) |
-| v0.3.2 | 2026-11-10 | 형식 변화 없음. 답장 자동 전달 규칙(문의번호 찾기 순서, 보낸 사람 확인, repliedAt = 첫 답장 시각) 정리 |
-| v0.4 | 2026-11-12 | 에러 코드 `TOO_MANY_REQUESTS` 추가 (같은 학생 메일 10분 3건·하루 5건 제한). `submitInquiry`가 학생에게 "보낸 문의 사본"도 보냄 (요청·응답 형식은 그대로). 답장 없는 문의 10일째 멘토 리마인드 추가 (API 아님). 관리자 API 응답에 `remindedAt` 추가 예정 (Step 5-2) |
-| v0.5 | 2026-11-16 | 개인정보 동의 `privacyConsent` 검사와 `PRIVACY_CONSENT_REQUIRED` 에러 삭제 (보내도 무시). 사이트는 동의 체크박스 대신 "이대로 보내시겠습니까?" 확인 창을 씀. 백엔드 연결 안내 [BACKEND_INTEGRATION.md](./BACKEND_INTEGRATION.md) 추가 |
-| v0.6 | 2026-11-16 | 관리자 API `getInquiries`, `getInquiry` 구현 (Step 5-2). 멘토 탭에서 지워진 멘토의 문의는 `mentorName: null` |
+| v0.2 ~ v0.6 | 2026-11-08 ~ 11-16 | 시트 방식. 웹앱이 `getMentors`, `submitInquiry`, `getInquiries`, `getInquiry`를 제공하고 구글 시트에 저장 (main의 이전 버전 문서 참고) |
+| **v1.0** | 2026-11-18 | B 방식. 웹앱 action을 `sendMail`, `getQuota` 두 개로 줄임. 문의·답장·리마인드·관리자 조회는 백엔드가 Supabase로 처리. Apps Script → 백엔드 내부 API 2개 추가. 에러 코드 `QUOTA_EXCEEDED` 추가, 문의 관련 에러(`MENTOR_NOT_FOUND`, `TOO_MANY_REQUESTS` 등)는 백엔드로 이동 |
 
-## 공통 규칙
-- 모든 요청은 `POST`, `Content-Type: text/plain`, 본문은 JSON 문자열입니다. 기능은 본문의 `action`으로 구분합니다.
-- 모든 요청에 `apiKey`가 필요합니다. 관리자 API는 `adminToken`도 필요합니다.
-- 시간은 ISO 8601 한국 시간입니다. 예: `2026-11-08T14:03:00+09:00`
-- 성공: `{"ok":true,"data":{...}}` / 실패: `{"ok":false,"error":{"code":"...","message":"..."}}`
-- `mentorId`는 형식을 정해 두지 않은 **문자열**입니다. 시트 "멘토" 탭의 값과 똑같은지만 비교합니다. 예시의 `mt-01`은 지금 백엔드 데모 데이터의 형식입니다.
-- 멘토 이메일은 어떤 응답에도 들어가지 않습니다.
+---
 
-## 호출할 때 주의할 점
-- 웹앱은 응답 전에 한 번 리다이렉트(302)합니다. HTTP 클라이언트가 **리다이렉트를 따라가게** 설정해야 합니다. (curl은 `-L`, Python `requests`는 기본으로 따라감)
-- HTTP 상태 코드는 성공·실패와 상관없이 **항상 200**입니다. 성공 여부는 본문의 `ok`로 판단합니다.
-- 본문이 JSON 객체가 아니면 `INVALID_INPUT`입니다.
-- 처리 순서: JSON 확인 → `apiKey` 확인(`UNAUTHORIZED`) → `action` 확인(`INVALID_ACTION`) → 입력 검사.
-  - `submitInquiry`는 입력 검사 뒤에 멘토 확인(`MENTOR_NOT_FOUND`) → 발송 한도 확인(`SEND_FAILED`) → 횟수 제한(`TOO_MANY_REQUESTS`) → 저장·발송 순서입니다.
-- `mentorId`가 문자열이 아니거나 비어 있으면 `INVALID_INPUT`, 문자열인데 시트에 없거나 비활성이면 `MENTOR_NOT_FOUND`입니다.
-- 이름·제목·내용은 앞뒤 공백을 지운 뒤 길이를 셉니다. 학생 이메일도 앞뒤 공백을 지웁니다.
-- `INTERNAL_ERROR`의 자세한 원인은 응답에 나가지 않고 Apps Script 실행 로그에만 남습니다.
+## 1. 백엔드 → Apps Script 웹앱
 
-## 1) getMentors — 활성 멘토 목록
+### 공통 규칙
+- 모든 요청은 `POST`, `Content-Type: text/plain`, 본문은 JSON 문자열. 기능은 `action`으로 구분합니다.
+- 웹앱은 응답 전에 한 번 리다이렉트(302)합니다. 클라이언트가 리다이렉트를 따라가야 합니다 (httpx `follow_redirects=True`, curl `-L`).
+- HTTP 상태는 항상 200입니다. 성공 여부는 본문의 `ok`로 판단합니다.
+- 성공 `{"ok":true,"data":{...}}` / 실패 `{"ok":false,"error":{"code":"...","message":"..."}}`
+- 처리 순서: JSON 확인(`INVALID_INPUT`) → `apiKey`(`UNAUTHORIZED`) → `action`(`INVALID_ACTION`) → 입력 검사
+- 웹앱은 메일 내용·주소를 저장하지 않고, 로그에도 남기지 않습니다.
+
+### 1-1. sendMail — 메일 한 통 보내기
 ```json
-{ "apiKey": "YOUR_API_KEY", "action": "getMentors" }
+{ "apiKey": "YOUR_API_KEY", "action": "sendMail",
+  "to": "student@example.com",
+  "replyToInquiryId": "q20261117-0001",
+  "fromName": "꾸로록",
+  "subject": "[꾸로록 문의] 진로 고민이 있어요",
+  "textBody": "글자 버전 본문",
+  "htmlBody": "<p>HTML 버전 본문</p>" }
 ```
 ```json
-{ "ok": true, "data": { "mentors": [ { "mentorId": "mt-01", "name": "새벽 (demo)" } ] } }
+{ "ok": true, "data": { "sentAt": "2026-11-17T14:03:00+09:00" } }
 ```
 
-## 2) submitInquiry — 문의 저장 + 멘토에게 발송
-```json
-{ "apiKey": "YOUR_API_KEY", "action": "submitInquiry", "mentorId": "mt-01",
-  "studentName": "테스트학생", "studentEmail": "student@example.com",
-  "title": "진로 고민이 있어요", "body": "문의 내용" }
-```
-```json
-{ "ok": true, "data": { "inquiryId": "q20261108-0001", "createdAt": "2026-11-08T14:03:00+09:00" } }
-```
-- 검증: 학생 이름 1~30자, 이메일 형식, 제목 1~100자, 내용 1~2000자, 활성 멘토만.
-- (v0.5) `privacyConsent`는 더 이상 필요 없습니다. 보내도 무시합니다.
-- **횟수 제한** (v0.4): 같은 학생 메일(대소문자·앞뒤 공백 무시)로
-  - 최근 **10분** 안에 이미 **3건**을 보냈으면 (4번째부터) `TOO_MANY_REQUESTS` (message: "현재 메일 발송량이 많아 전송이 잠시 제한되었어요. 10분 후 다시 시도해 주세요.")
-  - 오늘(한국 시간 자정 기준) 이미 **5건**을 보냈으면 `TOO_MANY_REQUESTS` (message: "…하루에 5건까지 보낼 수 있어요. 내일 다시 시도해 주세요.")
-  - 숫자는 시트 설정 탭 `rateLimitMinutes`(10), `rateLimitPerWindow`(3), `rateLimitPerDay`(5)에서 바꿀 수 있고, 0이면 그 제한을 쓰지 않습니다. (테스트 기간에는 0으로 꺼 둘 수 있음) 실제 숫자는 `message`에 들어 있으니 백엔드는 `message`를 그대로 학생에게 보여 주면 됩니다.
-- **학생 사본** (v0.4): 멘토에게 보낸 직후 학생 메일로 "보낸 문의 사본"이 1통 갑니다 (멘토 이름·제목·내용·보낸 일시. 멘토 이메일·문의번호 없음).
-  - 사본 발송이 실패해도 응답은 성공(`ok: true`)입니다. 실패는 실행 로그에만 남습니다.
-  - 그래서 문의 1건에 Gmail 발송 2통을 씁니다. 오늘 남은 발송 수가 2통보다 적으면 `SEND_FAILED`입니다.
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `to` | ○ | 메일 형식, 254자 이하. 앞뒤 공백은 지움 |
+| `replyToInquiryId` | | 문의번호 형식 `q숫자8개-숫자4개 이상`. 주면 Reply-To가 **`중계계정+문의번호@도메인`** 이 됩니다 (웹앱이 만듦). 멘토에게 보내는 문의·리마인드 메일에 씁니다. 학생에게 보내는 메일(사본·답장 전달)에는 넣지 않습니다 |
+| `fromName` | ○ | 1~100자. 메일 '보낸 사람' 이름 (mail_settings `senderName`) |
+| `subject` | ○ | 1~200자 |
+| `textBody` | ○ | 1~50000자. 글자만 보이는 메일 앱용 |
+| `htmlBody` | | 1~100000자. 없으면 글자 메일만 보냄 |
 
-## 3) getInquiries — 문의 목록 (관리자, v0.6)
+- 백엔드가 멘토 메일 맨 아래에 `문의번호: q…` 한 줄을 꼭 넣어 주세요. 멘토가 Reply-To를 지우고 답장해도, 인용된 본문의 이 줄로 답장 후보를 찾습니다 (2-1).
+- 오늘 남은 Gmail 발송 수가 0이면 보내지 않고 `QUOTA_EXCEEDED`.
+
+### 1-2. getQuota — 오늘 남은 발송 수
 ```json
-{ "apiKey": "YOUR_API_KEY", "action": "getInquiries", "adminToken": "YOUR_ADMIN_TOKEN",
-  "filter": { "replied": false }, "page": 1, "pageSize": 20 }
+{ "apiKey": "YOUR_API_KEY", "action": "getQuota" }
 ```
 ```json
-{ "ok": true, "data": { "total": 1, "items": [ {
-  "inquiryId": "q20261108-0001", "createdAt": "2026-11-08T14:03:00+09:00",
-  "mentorId": "mt-01", "mentorName": "새벽 (demo)",
-  "studentName": "테스트학생", "studentEmail": "student@example.com",
-  "title": "진로 고민이 있어요", "body": "문의 내용",
-  "replied": false, "repliedAt": null, "remindedAt": null } ] } }
+{ "ok": true, "data": { "remaining": 87 } }
 ```
-- `filter.replied`는 `true` / `false` / 생략(전체). 최신순입니다. 답장 전이면 `replied: false`, `repliedAt: null`.
-- `remindedAt`: 멘토에게 리마인드를 보낸 시각. 안 보냈으면 `null`. (관리자 화면 8개 항목에는 없는 추가 정보)
-- 페이지: `page` 생략 시 1, `pageSize` 생략 시 20, `pageSize` 최대 100. 0·음수·소수·글자이거나 `pageSize`가 100보다 크면 `INVALID_INPUT`. 마지막 페이지를 넘는 `page`는 빈 목록(`items: []`). `total`은 필터를 적용한 전체 건수.
-- `filter.replied`가 true/false가 아닌 값이면 `INVALID_INPUT`, `filter`를 생략하면 전체.
-- 최신순 = 보낸 일시(`createdAt`)가 늦은 것부터. 같은 시각이면 문의번호가 큰 것부터.
-- `mentorName`은 시트 "멘토" 탭에서 `mentorId`로 찾은 이름입니다. 멘토 줄이 지워졌으면 `null`. 멘토 이메일은 들어가지 않습니다.
-- 응답에 학생 이름·메일(개인정보)이 들어 있습니다. 백엔드는 관리자 로그인에 성공한 경우에만 호출하고, 학생 화면에 보내지 않습니다.
+- 문의 1건 = 2통(멘토 + 학생 사본). 백엔드는 문의를 저장하기 전에 `remaining >= 2`인지 확인합니다.
 
-| 관리자 화면 항목 | 응답 필드 |
-|---|---|
-| 학생 이름 | studentName |
-| 학생 메일 | studentEmail |
-| 멘토 이름 | mentorName |
-| 메일 제목 | title |
-| 메일 내용 | body |
-| 보낸 일시 | createdAt |
-| 멘토 답변 여부 | replied |
-| 멘토 답변 일시 | repliedAt |
-
-## 4) getInquiry — 한 건 조회 (관리자, v0.6)
-```json
-{ "apiKey": "YOUR_API_KEY", "action": "getInquiry", "adminToken": "YOUR_ADMIN_TOKEN",
-  "inquiryId": "q20261108-0001" }
-```
-응답은 `data.item`이고, 3번 `items`의 한 건과 같은 모양입니다.
-- 문의번호 대소문자는 구분하지 않습니다. 형식이 틀리면 `INVALID_INPUT`, 시트에 없으면 `INQUIRY_NOT_FOUND`.
-- 관리자 API 처리 순서: JSON → `apiKey` → `action` → `adminToken`(`UNAUTHORIZED`) → 입력 검사.
-
-## 에러 코드
+### 1-3. 에러 코드
 | 코드 | 뜻 |
 |---|---|
-| UNAUTHORIZED | apiKey 또는 adminToken이 틀림 |
+| UNAUTHORIZED | `apiKey`가 틀림 |
 | INVALID_ACTION | 없는 action |
-| INVALID_EMAIL | 학생 이메일 형식 오류 |
-| INVALID_INPUT | 이름·제목·내용 길이 오류 등 |
-| MENTOR_NOT_FOUND | 없는 멘토이거나 비활성 멘토 |
-| INQUIRY_NOT_FOUND | 없는 문의번호 |
-| SEND_FAILED | 메일 발송 실패 (오늘 Gmail 발송 한도 부족 포함) |
-| TOO_MANY_REQUESTS | 같은 학생 메일로 너무 자주 보냄 (v0.4) |
-| INTERNAL_ERROR | 그 밖의 서버 오류 |
+| INVALID_EMAIL | `to` 형식 오류 |
+| INVALID_INPUT | JSON 아님, 길이·형식 오류 |
+| QUOTA_EXCEEDED | 오늘 Gmail 발송 한도를 다 씀 |
+| SEND_FAILED | Gmail 발송 실패 |
+| INTERNAL_ERROR | 그 밖의 오류 (원인은 Apps Script 실행 로그에만) |
 
-## 답장 자동 전달 (API 아님)
-5분마다 도는 시간 트리거(`checkReplies`)가 처리합니다. 백엔드가 호출할 것은 없습니다.
-- 문의번호 찾기: ① 받는 주소의 `+문의번호` → ② 인용 부분의 `문의번호: q...` 줄 → ③ 없으면 무시
-- 보낸 사람이 그 문의의 멘토(시트 등록 메일)일 때만 학생에게 전달합니다.
-- 전달되면 `getInquiries`에서 `replied: true`, `repliedAt` = **첫 답장 시각**으로 보입니다. 여러 번 답장해도 `repliedAt`은 바뀌지 않습니다.
-- 멘토가 **'답장' 버튼**이 아니라 새 메일로 보내면 문의번호가 없어 매칭되지 않습니다.
+---
 
-## 멘토 리마인드 (API 아님, v0.4)
-매일 오전 10시~11시 사이에 도는 시간 트리거(`sendReminders`)가 처리합니다. 백엔드가 호출할 것은 없습니다.
-- 대상: 답장여부 FALSE + 리마인드를 아직 안 보냄 + 보낸 날짜 + 10일째(한국 날짜 기준)가 됐거나 지남. 예: 11월 1일 문의 → 11월 11일.
-- 멘토가 지금 비활성이면 보내지 않습니다.
-- 원래 문의 메일과 같은 내용에, 제목 말머리 `[꾸로록 리마인드]`와 맨 위 리마인드 문구가 붙습니다. 한 문의에 **한 번만** 보냅니다.
-- 답장 주소는 원래와 같은 `중계계정+문의번호`라서, 멘토가 리마인드 메일에 '답장'해도 학생에게 자동 전달됩니다.
-- 보낸 시각은 시트 "문의" 탭 `리마인드일시`에 남고, 관리자 API에서 `remindedAt`으로 보입니다.
+## 2. Apps Script → 백엔드 (백엔드가 B-3에서 구현)
+
+### 공통 규칙
+- 주소: 웹앱 스크립트 속성 `BACKEND_URL` + 경로. 예: `https://YOUR_BACKEND.onrender.com/internal/mail/inbound`
+- `POST`, `Content-Type: application/json`, 헤더 `X-Kkurolog-Mail-Secret: YOUR_MAIL_WEBHOOK_SECRET`
+- 백엔드는 헤더 값이 다르거나 없으면 401로 거절합니다. (학생 화면에서 부르는 API가 아님)
+- 백엔드는 처리하면 200과 JSON을 돌려줍니다. 200이 아니거나 응답이 없으면(서버가 잠들었다 깨는 중 등) Apps Script는 **처리하지 않은 것으로 보고 다음 차례에 다시** 보냅니다.
+
+### 2-1. POST /internal/mail/inbound — 멘토 답장 후보 (5분마다)
+Apps Script는 중계 Gmail에 새로 온 메일 중 **답장 후보만** 보냅니다. 후보 = 받는 주소에 `중계계정+문의번호`가 있거나, 본문에 `문의번호: q…` 줄이 있는 메일. 관계없는 메일(광고 등)은 보내지 않습니다.
+한 번에 최대 5통, 한 차례(5분)에 최대 20통.
+
+```json
+{ "messages": [
+  { "messageId": "18c2f…",
+    "receivedAt": "2026-11-17T15:20:00+09:00",
+    "from": "mentor@example.com",
+    "recipients": ["꾸로록 <relay+q20261117-0001@gmail.com>"],
+    "subject": "Re: [꾸로록 문의] 진로 고민이 있어요",
+    "plainBody": "좋은 질문이에요 …\n\n2026년 11월 17일 (월) … 작성:\n> …" } ] }
+```
+```json
+{ "results": [ { "messageId": "18c2f…", "result": "forwarded" } ] }
+```
+
+| 필드 | 설명 |
+|---|---|
+| `messageId` | Gmail 메일 ID. `mail_replies.message_id`로 써서 같은 메일을 두 번 처리하지 않음 |
+| `from` | 보낸 주소 (소문자) |
+| `recipients` | To, Cc, Delivered-To, X-Original-To (원문 그대로) |
+| `plainBody` | 글자 본문. 20000자에서 자름 |
+
+백엔드가 할 일 (B-3): 문의번호 찾기(받는 주소의 `+문의번호` → 본문의 `문의번호:` 줄) → 문의 확인 → 보낸 사람 = 그 문의 멘토의 메일인지 확인 → 인용문·안내 문구·문의번호 줄 지우기 → 학생에게 `sendMail`(Reply-To 없음) → `inquiries.replied/replied_at`(첫 답장만), `mail_replies` 기록.
+
+| `result` | 뜻 | Apps Script가 하는 일 |
+|---|---|---|
+| `forwarded` | 학생에게 전달함 | `메일자동화/전달완료` 라벨 (`확인필요` 라벨은 뗌), 처리 완료로 기억 |
+| `needs_review` | 사람이 봐야 함 (보낸 사람이 멘토가 아님, 전달할 내용이 비어 있음 등) | `메일자동화/확인필요` 라벨, 처리 완료로 기억 |
+| `ignored` | 문의와 관계없음 (없는 문의번호 등) | 처리 완료로 기억 |
+| `retry` | 지금은 못 함 (발송 한도, 일시 오류) | 기억하지 않고 다음 차례에 다시 보냄 |
+
+- 같은 `messageId`가 다시 오면(백엔드는 처리했지만 응답이 늦어 Apps Script가 못 받은 경우) 백엔드는 다시 전달하지 않고 이전 결과를 돌려줍니다.
+- `messages`가 빈 목록이면 `{"results": []}`를 돌려줍니다. (Apps Script `testBackendConnection`이 비밀값 확인에 씀)
+
+### 2-2. POST /internal/mail/reminders — 리마인드 실행 (매일 10~11시)
+```json
+{}
+```
+```json
+{ "summary": "리마인드 2건 보냄, 비활성 멘토 1건 건너뜀" }
+```
+백엔드가 할 일 (B-3): `mail_settings.reminderDays`(0이면 안 함) 기준으로, 답장 없음 + 리마인드 안 함 + 보낸 날짜로부터 그 일수째(한국 날짜)가 된 문의를 찾아, 멘토가 활성이면 리마인드 메일을 `sendMail`(Reply-To = 그 문의번호)로 보내고 `inquiries.reminded_at`을 기록.
+- `summary`는 Apps Script 실행 로그에만 남습니다. 개인정보를 넣지 않습니다.

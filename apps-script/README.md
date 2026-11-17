@@ -1,5 +1,15 @@
 # 꾸로록 메일 자동화 (Google Apps Script)
 
+> ## ⚠ Supabase 전환 중 (B 방식, 브랜치 `feat/mail-supabase`)
+> 저장소를 구글 시트에서 **Supabase**로 옮기고 있습니다. 설계와 진행 상황: [docs/SUPABASE_PLAN.md](./docs/SUPABASE_PLAN.md)
+>
+> - **`src/`는 이미 새 버전(메일 전용)입니다.** 웹앱 action은 `sendMail`, `getQuota` 두 개뿐이고, 시트를 읽고 쓰는 코드는 없습니다. 형식: [docs/API.md](./docs/API.md) v1.0
+>   - 파일: `Main`, `Config`, `Response`, `MailApi`(새), `Mailer`, `Receiver`, `Backend`(새), `Inbound`(새), `Reminders`, `Triggers`, `Setup`, `Menu`, `Test`
+>   - 지운 파일: `Sheets`, `Mentors`, `Inquiries`, `MailTemplates`, `ReplyParser`, `Replies`, `Admin`, `templates/*.csv` (판단·저장은 백엔드로)
+> - **운영 중인 시트의 Apps Script에는 아직 붙여넣지 않습니다.** 백엔드(B-3)가 준비되기 전에 붙여넣으면 문의·답장·리마인드가 멈춥니다.
+> - 아래 0~12장은 **시트 방식(이전 버전)** 설명입니다. 전환이 끝나면 새 구조로 다시 씁니다.
+
+
 학생이 멘토에게 보낸 문의를 **중계 Gmail 계정**을 거쳐 멘토에게 보내고,
 멘토가 '답장'하면 그 답장을 학생에게 자동으로 전달하는 기능입니다.
 모든 기록은 **구글 시트**에 남습니다.
