@@ -20,6 +20,7 @@ from app.schemas import (
     RecommendRequest,
     RecommendResponse,
 )
+from app.mail.router import router as mail_router
 from app.rate_limit import limit_ask
 from app.services.answer import looks_like_crisis, make_answer, safety_answer
 from app.services.contact import deliver_contact_request
@@ -38,6 +39,9 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Apps Script(메일 웹앱) → 백엔드 내부 API: /internal/mail/inbound, /internal/mail/reminders (app/mail/router.py)
+app.include_router(mail_router)
 
 
 @app.get("/health")
@@ -76,10 +80,11 @@ def mentors_recommend(request: RecommendRequest) -> RecommendResponse:
 @app.post("/contact-requests", response_model=ContactResponse, status_code=201)
 def contact_requests(request: ContactRequest) -> ContactResponse:
     """
-    학생이 멘토에게 보내는 첫 연락을 받아 꾸로록이 전달한다. (지금은 실제 메일을 보내지 않음)
+    학생이 멘토에게 보내는 첫 연락을 받아 꾸로록이 전달한다. (MAIL_ENABLED=true 일 때만 실제 메일)
     - 입력 형식이 틀리면 422 (이메일 형식, 길이 등은 schemas.ContactRequest 가 검사)
     - 없는 멘토(또는 동의하지 않은 멘토)면 404
     - 지금 연락을 받지 않는 멘토면 409
+    - (MAIL_ENABLED=true) 같은 메일로 너무 자주 보내면 429, 메일 발송 실패 503, 메일·DB 연결 문제 502
     """
     mentor = get_mentor(request.mentor_id)
     if mentor is None:

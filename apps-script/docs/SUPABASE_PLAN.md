@@ -1,6 +1,6 @@
 # 메일 자동화 Supabase 이전 계획 (B 방식)
 
-> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드, 운영 시트 적용은 B-3 뒤). 이 문서는 단계마다 갱신합니다.
+> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드 / B-3 완료: 백엔드 코드, `MAIL_ENABLED=false`로 꺼 둔 상태). 운영 적용은 B-4(데이터 옮기기) 뒤. 이 문서는 단계마다 갱신합니다.
 > 지금 운영 중인 구조(구글 시트 + Apps Script)는 B-3까지 끝나고 실제 왕복 테스트를 통과할 때까지 그대로 둡니다.
 
 ## 1. 왜 바꾸나
@@ -102,7 +102,7 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 |---|---|---|
 | **B-1** | Supabase 테이블 SQL + 이 설계 문서 + `docs/DATA.md` 갱신 | ✅ (팀 Supabase 적용 완료) |
 | **B-2** | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | ✅ 코드 완료 (운영 시트 적용은 B-3 뒤) |
-| B-3 | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | |
+| **B-3** | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | ✅ 코드 완료 (`backend/app/mail/`, pytest 158개 통과). `MAIL_ENABLED=true`로 켜기 전까지는 예전과 같이 동작 |
 | B-4 | 데이터 옮기기: 데모 멘토 프로필 + 시트 멘토 메일, 기존 문의 기록을 Supabase로 적재하는 스크립트 (실제 메일은 git에 올리지 않음) | |
 | B-5 | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | |
 | 마무리 | 실제 왕복 테스트, 문서(README·HANDOVER·BACKEND_INTEGRATION) 정리, PR | |
@@ -114,3 +114,21 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 - **`apps-script/docs/BACKEND_INTEGRATION.md`**: 시트 방식 기준의 연결 안내라 B-3이 끝나면 새 구조로 다시 씁니다.
 - **`backend/app/data/mentors_demo.json`**: B-3에서 `mentors` 테이블로 바뀝니다. 테스트용 가짜 데이터로만 남길지 B-3에서 정합니다.
 - **인수인계**: "시트 사본 + 계정 교체"에서 "관리자 페이지로 운영 + 처음 한 번 설치(Supabase·백엔드·Apps Script)"로 바뀝니다. `HANDOVER.md`는 마무리 단계에서 다시 씁니다.
+
+## 7. 백엔드 구현 (B-3)
+
+`backend/app/mail/` (구조는 `backend/CLAUDE.md`).
+
+| 정한 것 | 내용 |
+|---|---|
+| 스위치 | `MAIL_ENABLED=true`일 때만 새 방식. 꺼져 있으면(기본) 멘토는 `mentors_demo.json`, 문의는 로그만 (예전과 같음). `SUPABASE_URL/KEY`는 RAG도 쓰기 때문에, RAG를 켰다고 멘토 목록이 바뀌지 않게 스위치를 따로 둠 |
+| Supabase 연결 | 이미 설치된 `httpx`로 REST API를 직접 부름 (`store.py`). `supabase` 패키지를 기본 설치에 넣지 않음 |
+| 학생 메일 | 소문자로 저장 (횟수 제한을 대소문자 상관없이 세기 위해) |
+| 문의 실패 응답 | 429 너무 자주(웹앱 시절과 같은 문구), 503 발송 실패·한도 부족·설정 빠짐, 502 Supabase·메일 웹앱 연결 문제. `detail`에 학생용 문구 |
+| 답장 처리 결과 | `forwarded` / `needs_review`(보낸 사람이 멘토가 아님 `sender_mismatch`, 내용 없음 `empty_body`) / `ignored`(문의번호 없음·없는 문의) / `retry`(학생에게 전달 실패, 기록 안 함) |
+| 리마인드 | 한국 날짜 기준 `reminderDays`일째부터 대상, 한 번에 최대 30통, 비활성 멘토 건너뜀, 한도 부족이면 다음 날 |
+| 멘토 목록 | Supabase `mentors`에서 `exit_year`가 비어 있는 멘토는 화면에서 뺌 (로그 경고) |
+
+**확인한 것 (pytest 158개 통과)**: 기존 92개(스위치 꺼짐 = 예전과 같음) + 답장 정리·메일 문장 22개 + 흐름 31개(가짜 Supabase·가짜 메일 웹앱: 문의, 횟수 제한, 한도, 실패 시 삭제, 답장 전달·중복·확인필요·재시도, 리마인드, 내부 API 인증) + Supabase 요청 모양 13개.
+
+**아직 확인하지 않은 것**: 진짜 Supabase·진짜 메일 웹앱과의 연결. B-4(데이터 옮기기) 뒤에 팀 Supabase + 운영 Apps Script로 실제 왕복 테스트를 한다.
