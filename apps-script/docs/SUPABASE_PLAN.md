@@ -103,7 +103,7 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | **B-1** | Supabase 테이블 SQL + 이 설계 문서 + `docs/DATA.md` 갱신 | ✅ (팀 Supabase 적용 완료) |
 | **B-2** | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | ✅ 코드 완료 (운영 시트 적용은 B-3 뒤) |
 | **B-3** | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | ✅ 코드 완료 (`backend/app/mail/`, pytest 158개 통과). `MAIL_ENABLED=true`로 켜기 전까지는 예전과 같이 동작 |
-| B-4 | 데이터 옮기기: 데모 멘토 프로필 + 시트 멘토 메일, 기존 문의 기록을 Supabase로 적재하는 스크립트 (실제 메일은 git에 올리지 않음) | |
+| **B-4** | 데이터 옮기기: 멘토 프로필은 `scripts/load_mentors.py`로, 실제 메일·연락 가능은 Table Editor에서 직접. 기존 시트 문의(팀 테스트)는 옮기지 않고 새로 시작 | ✅ 스크립트 완료 (팀 Supabase 적용은 직접) |
 | B-5 | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | |
 | 마무리 | 실제 왕복 테스트, 문서(README·HANDOVER·BACKEND_INTEGRATION) 정리, PR | |
 
@@ -132,3 +132,15 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 **확인한 것 (pytest 158개 통과)**: 기존 92개(스위치 꺼짐 = 예전과 같음) + 답장 정리·메일 문장 22개 + 흐름 31개(가짜 Supabase·가짜 메일 웹앱: 문의, 횟수 제한, 한도, 실패 시 삭제, 답장 전달·중복·확인필요·재시도, 리마인드, 내부 API 인증) + Supabase 요청 모양 13개.
 
 **아직 확인하지 않은 것**: 진짜 Supabase·진짜 메일 웹앱과의 연결. B-4(데이터 옮기기) 뒤에 팀 Supabase + 운영 Apps Script로 실제 왕복 테스트를 한다.
+
+## 8. 데이터 옮기기 (B-4)
+
+| 정한 것 (2026-11-18) | 내용 |
+|---|---|
+| 멘토 프로필 | `scripts/load_mentors.py`가 `mentors_demo.json`의 10명(mt-01~10)을 넣음. 메일 없음, 연락 가능 false |
+| 실제 메일·연락 가능 | Supabase 대시보드 Table Editor에서 mt-01~06에 직접 입력 (메일 주소가 파일·git에 남지 않음). **email을 먼저 넣고 available을 켬** (DB 규칙상 반대 순서는 막힘) |
+| mt-07~09 | 메일 없이, 연락 가능 false로 둠 (프로필은 사이트에 보이고 연락만 막힘) |
+| mt-10 | 참여 동의 false로 넣음. 어디에도 보이지 않음. 나중에 동의하면 consent만 켜면 됨 |
+| 기존 시트 문의 | 팀 테스트 문의라 옮기지 않고 새로 시작. 전환 뒤 예전 테스트 메일에 온 답장은 "없는 문의"로 무시됨 |
+
+**확인한 것**: 로컬 PostgreSQL(0001+0002)에서 `--dry-run`은 DB를 바꾸지 않음, 실제 실행 시 10명, 메일 없이 available=true는 DB가 막음, 메일 넣고 켠 뒤 다시 실행해도 email·available 유지.
