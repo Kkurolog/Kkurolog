@@ -1,6 +1,6 @@
 # 메일 자동화 Supabase 이전 계획 (B 방식)
 
-> 상태: **진행 중** (B-1 완료: 테이블 SQL). 이 문서는 단계마다 갱신합니다.
+> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase 프로젝트에 적용). 이 문서는 단계마다 갱신합니다.
 > 지금 운영 중인 구조(구글 시트 + Apps Script)는 B-3까지 끝나고 실제 왕복 테스트를 통과할 때까지 그대로 둡니다.
 
 ## 1. 왜 바꾸나
@@ -57,6 +57,10 @@ Apps Script 매일 트리거 → 백엔드 /internal/mail/reminders → 백엔�
 
 **확인한 것**: 로컬 PostgreSQL 16 + pgvector에서 0001 → 0002 실행, 0002 두 번 실행(다시 실행해도 안전), 위 제약·권한·트리거 동작.
 
+**적용 기록 (2026-11-17, 팀 Supabase, Postgres 17)**: 적용 전 확인(경험 데이터 39/40/274 있음, 같은 이름 테이블·함수 없음) → `run_sql.py`로 실행 → 테이블 5개 생성, `mail_settings` 16행, 경험 데이터 39/40/274 그대로.
+
+**`people.is_mentor`**: 멘토 여부는 이제 `mentors` 테이블(필요하면 `person_id`로 연결)로 판단하므로 쓰지 않습니다. 데이터 스크립트(`build_dataset.py`)가 이 칸을 항상 false로 덮어쓰기 때문에, 멘토 정보를 `people`에 두지 않기로 했습니다. 칸 삭제는 경험 데이터 쪽 작업이라 그대로 둡니다.
+
 **실행 방법** (팀원 중 Supabase 접속 정보가 있는 사람)
 ```bash
 cd scripts && source .venv/bin/activate
@@ -88,7 +92,7 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 
 | 스텝 | 내용 | 상태 |
 |---|---|---|
-| **B-1** | Supabase 테이블 SQL + 이 설계 문서 + `docs/DATA.md` 갱신 | ✅ |
+| **B-1** | Supabase 테이블 SQL + 이 설계 문서 + `docs/DATA.md` 갱신 | ✅ (팀 Supabase 적용 완료) |
 | B-2 | Apps Script를 메일 전용으로 정리 (`sendMail`·`getQuota` action, 받은 메일을 백엔드로 넘기기, 리마인드 트리거가 백엔드를 부르기). 시트 읽기·쓰기 코드 삭제 | |
 | B-3 | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | |
 | B-4 | 데이터 옮기기: 데모 멘토 프로필 + 시트 멘토 메일, 기존 문의 기록을 Supabase로 적재하는 스크립트 (실제 메일은 git에 올리지 않음) | |
