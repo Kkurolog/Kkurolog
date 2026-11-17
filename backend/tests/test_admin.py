@@ -263,3 +263,17 @@ def test_settings_update_validation(env, headers):
     too_long = client.patch("/admin/settings", json={"values": {"mentorFooter": "가" * 1001}}, headers=headers)
     assert too_long.status_code == 422
     assert client.patch("/admin/settings", json={"values": {}}, headers=headers).status_code == 422
+
+
+def test_docs_show_bearer_authorize_button(env):
+    """/docs 의 Authorize 버튼으로 표를 넣을 수 있게 관리자 API 가 Bearer 보안 방식으로 표시된다."""
+    spec = client.get("/openapi.json").json()
+    assert spec["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
+    assert {"HTTPBearer": []} in spec["paths"]["/admin/mentors"]["get"]["security"]
+    assert "security" not in spec["paths"]["/admin/login"]["post"]  # 로그인은 표 없이
+
+
+def test_bearer_scheme_is_case_insensitive(env, headers):
+    token = headers["Authorization"].split()[1]
+    assert client.get("/admin/mentors", headers={"Authorization": f"bearer {token}"}).status_code == 200
+

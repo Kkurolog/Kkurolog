@@ -7,6 +7,7 @@
 - 주소: 팀 백엔드 주소 + `/admin/...` (예: `https://YOUR_BACKEND.onrender.com/admin/inquiries`)
 - 백엔드 환경변수 `MAIL_ENABLED=true`(+ Supabase·메일 설정)와 `ADMIN_PASSWORD`(12자 이상)가 있어야 동작합니다. 없으면 503.
 - 로그인(`POST /admin/login`)을 뺀 모든 요청에 헤더 `Authorization: Bearer <token>`이 필요합니다. 없거나 틀리거나 만료되면 **401 → 로그인 화면으로** 보냅니다.
+- 백엔드 `/docs` 화면에서 직접 시험할 때는 오른쪽 위 **Authorize**(자물쇠) 버튼에 token만 넣으면 모든 관리자 요청에 자동으로 붙습니다.
 - 실패하면 `{"detail": "화면에 보여 줄 문구"}` (FastAPI 기본 형식). 422는 입력 형식 오류(FastAPI가 만든 목록 형식일 수도 있음).
 - 시각은 ISO 8601 (예: `2026-11-17T06:03:00+00:00`). 화면에 보여 줄 때 한국 시간으로 바꿉니다.
 - 응답에 **학생 이름·메일, 멘토 메일**이 들어 있습니다. 화면을 캡처해 공유하거나 브라우저 저장소(localStorage)에 기록 내용을 남기지 않습니다.
