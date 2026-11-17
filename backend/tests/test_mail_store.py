@@ -10,7 +10,7 @@ from urllib.parse import parse_qsl
 import httpx
 import pytest
 
-from app.mail.store import StoreError, SupabaseMailStore
+from app.mail.store import StoreError, SupabaseMailStore, base_rest_url
 from app.mail.timeutil import KST
 
 URL = "https://db.example.invalid"
@@ -182,4 +182,19 @@ def test_upsert_settings_only_touches_values():
     assert ("on_conflict", "key") in query(req) and ("columns", "key,value") in query(req)
     assert "resolution=merge-duplicates" in req.headers["Prefer"]
     assert json.loads(req.content) == [{"key": "senderName", "value": "꾸로록"}]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://abc.supabase.co",
+        "https://abc.supabase.co/",
+        "https://abc.supabase.co/rest/v1",
+        "https://abc.supabase.co/rest/v1/",
+        " https://abc.supabase.co/rest/v1/ ",
+    ],
+)
+def test_supabase_url_with_or_without_rest_path(url):
+    """대시보드의 REST 주소(/rest/v1)를 넣어도 /rest/v1/rest/v1 이 되지 않는다 (PGRST125 방지)."""
+    assert base_rest_url(url) == "https://abc.supabase.co/rest/v1"
 

@@ -33,9 +33,21 @@ class StoreError(Exception):
         self.code = code
 
 
+def base_rest_url(url: str) -> str:
+    """
+    SUPABASE_URL → REST API 주소. 프로젝트 주소(https://xxx.supabase.co)가 맞지만,
+    대시보드의 REST 주소(…/rest/v1/)를 그대로 넣는 실수가 흔해서 끝의 /rest/v1 은 떼고 다시 붙인다.
+    (안 떼면 /rest/v1/rest/v1/… 이 되어 Supabase 가 404 PGRST125 를 돌려줌)
+    """
+    base = url.strip().rstrip("/")
+    if base.endswith("/rest/v1"):
+        base = base[: -len("/rest/v1")]
+    return base + "/rest/v1"
+
+
 class SupabaseMailStore:
     def __init__(self, url: str, key: str, client: httpx.Client | None = None) -> None:
-        self._base = url.rstrip("/") + "/rest/v1"
+        self._base = base_rest_url(url)
         self._headers = {"apikey": key, "Authorization": f"Bearer {key}"}
         self._client = client or httpx.Client(timeout=TIMEOUT_SECONDS)
 
