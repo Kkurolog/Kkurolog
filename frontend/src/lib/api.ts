@@ -23,13 +23,46 @@ export type Source = {
 // [추가] 답변 종류. safety(위기 신호)면 멘토 추천 대신 상담 안내를 보여주는 게 좋다.
 export type AnswerType = "answer" | "no_evidence" | "off_topic" | "safety";
 
+// [추가] 카드형 답변의 카드 한 장 = 선배 한 명의 이야기
+export type AnswerCard = {
+  id: string; // "card-1" (목록 key, 순번)
+  nickname: string | null; // 선배 별명. 공개 등급 L3 일 때만 오고, 그 외에는 null → label 을 제목으로 쓴다
+  label: string; // 그 선배가 택한 길 = 어떻게 갔나 (예: "작게 바로 시작한 길")
+  one_liner: string | null; // 그 선배가 지금 무엇을 하고 있나 (예: "지금은 여행 스타트업을 운영해요"). 글에 없으면 null
+  body: string[]; // 본문 조각 2~4개 (주어 없이 쓴 문장)
+  sources: Source[]; // 이 카드가 인용한 글 (카드별 출처, 보통 1개)
+  avatar_id: string; // "avatar-1"~"avatar-8". 같은 선배는 항상 같은 값. 그림이 없는 동안은 순번 배지를 쓴다
+};
+
+// [추가] 카드형 답변. components/AnswerCards.tsx 가 그린다
+export type StructuredAnswer = {
+  headline: string; // 질문에 대한 한 문장 답
+  compare: string | null; // 선배들의 길이 어떻게 다른지 한 줄 (카드 2장 이상일 때만)
+  cards: AnswerCard[]; // 1~4장
+  closing: string | null; // 다음에 해 볼 만한 것 한 문장
+};
+
 // /ask 응답
 export type AskResponse = {
-  answer: string;
+  answer: string; // structured 가 있으면 같은 내용을 글로 풀어 쓴 것
+  structured?: StructuredAnswer | null; // [추가] 카드형 답변. 실제 답변일 때만 오고, 안내 문구·demo 는 null
   sources: Source[];
   has_enough_evidence: boolean; // no_evidence 일 때만 false
   answer_type?: AnswerType; // [추가]
+  intent?: Intent | null; // [추가] 학생의 말을 어떻게 이해했는지. 분석하지 않았으면 null
+  user_context?: string | null; // [추가] 학생이 질문에서 스스로 밝힌 상황 (예: "18세, 창업 준비 중"). 없으면 null
+  // [추가] 꾸로록 자신에 대한 질문(왜·누가 만들었는지, 자료, 신뢰, 질문 저장)에 고정 문구로 답했을 때 어느 측면인지.
+  // 선배 글이 아니라 꾸로록의 설명이라 sources 는 비어 있다. answer 끝에 "꾸로록이 직접 알려드리는 내용이에요."가 붙는다
+  about_aspect?: AboutAspect | null;
+  follow_ups?: string[]; // [추가] 다음에 물어볼 예시 질문 (about_service 일 때 2개). answer 글에도 들어 있다
 };
+
+// [추가] backend/app/schemas.py 의 AboutAspect 와 같다
+export type AboutAspect = "what" | "why" | "who" | "data" | "trust" | "privacy";
+
+// [추가] 1차 의도 분석 결과 (backend/app/schemas.py 의 Intent 와 같다)
+// greeting·about_service·smalltalk·unclear 는 backend 가 고정 안내 문구로 답한다 (answer_type 은 off_topic)
+export type Intent = "greeting" | "about_service" | "career_question" | "smalltalk" | "unclear";
 
 // [추가] 브라우저별 익명 ID. backend 가 '학생 한 명당 질문 횟수'를 셀 때 쓴다.
 // 학교 와이파이는 모두 IP가 같아서 IP로는 학생을 구분할 수 없다.
@@ -57,11 +90,17 @@ export async function askQuestion(question: string): Promise<AskResponse> {
   const clientId = getClientId(); // [추가]
   if (clientId) headers["X-Client-Id"] = clientId;
 
-  const res = await fetch(`${API_URL}/ask`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ question }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/ask`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ question }),
+    });
+  } catch {
+    // [추가] 서버에 아예 닿지 못한 경우. 브라우저의 영어 문구("Failed to fetch")가 화면에 그대로 나오지 않게 한다
+    throw new Error("서버 오류 (연결 실패)");
+  }
 
   if (!res.ok) {
     // [추가] 429(질문 횟수 초과)는 backend 가 한국어 안내(detail)를 보내준다.

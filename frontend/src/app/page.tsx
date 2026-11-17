@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
 import ContactModal from "@/components/ContactModal";
 import GuidePage from "@/components/GuidePage";
-import { KkuroEyes, MiniKkuro } from "@/components/Kkuro";
+import { KkuroEyes } from "@/components/Kkuro";
+import LoadingStatus from "@/components/LoadingStatus";
 import QuestionForm from "@/components/QuestionForm";
 import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
@@ -215,24 +216,12 @@ export default function Home() {
               isLatest={i === messages.length - 1}
               onOpenSource={setOpenSource}
               onContact={(mentor, question) => setContact({ mentor, question })}
+              onAsk={ask} // 예시 질문 버튼: 입력창에서 보낸 것과 똑같이 바로 보낸다
+              askDisabled={loading}
             />
           ))}
-          {loading && (
-            // 생각 중: 꾸로록이 눈을 감고, 점 세 개가 통통 튄다
-            <div className="flex items-end gap-3 motion-safe:animate-rise-in" role="status">
-              <MiniKkuro mood="thinking" className="w-[72px]" />
-              <span className="flex gap-1.5 pb-1.5" aria-hidden="true">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="block size-2 rounded-full bg-brand motion-safe:animate-dot"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </span>
-              <p className="pb-0.5 text-[15px] text-muted">답변을 준비하고 있어요...</p>
-            </div>
-          )}
+          {/* 생각 중: 꾸로록이 눈을 감고, 점 세 개가 통통 튀고, 시간이 지나면 문구가 바뀐다 */}
+          {loading && <LoadingStatus />}
           <div ref={bottomRef} />
         </div>
 

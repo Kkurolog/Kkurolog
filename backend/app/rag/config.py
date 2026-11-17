@@ -27,6 +27,11 @@ class RagSettings:
     claude_max_tokens: int = 16000
     claude_use_fallbacks: bool = True  # Claude Haiku 5.5 를 쓰면 false (fallback 미지원)
 
+    # ---- 1차 의도 분석 (app/rag/intent.py) ----
+    intent_enabled: bool = True  # false 면 예전처럼 모든 질문을 바로 검색·답변 생성으로 보낸다
+    intent_model: str = "claude-haiku-5-5"  # 인사인지 질문인지만 가르므로 작고 빠른 모델
+    intent_timeout_seconds: float = 10.0  # 넘기면 분석을 건너뛰고 기존 흐름으로 간다
+
     # ---- 대기 시간 상한 (초) ----
     # SDK 기본값은 10분이라, 학생이 답을 너무 오래 기다리지 않게 줄인다.
     # SDK 는 실패하면 기본 2번 다시 시도하므로 최악의 대기 시간은 이 값의 약 3배다.

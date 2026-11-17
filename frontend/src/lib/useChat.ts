@@ -17,28 +17,9 @@ function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// 온보딩: "자기소개 부탁해" 같은 질문이나 "안녕" 같은 인사에는 backend 를 부르지 않고 꾸로록 소개로 답한다 (와이어프레임 02-1)
-const ONBOARDING_ANSWER = [
-  "안녕! 나는 꾸로록이야.",
-  "나는 거꾸로캠퍼스를 먼저 졸업한 선배들의 인터뷰를 바탕으로 너와 이야기를 나누는 챗봇이야.",
-  "선배들이 어떤 진로를 선택했는지뿐 아니라, 그 과정에서 어떤 고민을 했고, 무엇을 시도했으며, 어떤 실패와 시행착오를 겪었는지도 들려줄 수 있어.",
-  "아직 진로를 정하지 못했거나 무슨 질문을 해야 할지 모르겠어도 괜찮아. 우리 천천히 이야기해 보자!",
-  "선배들의 어떤 경험이 궁금해?",
-].join("\n\n");
-
-// 메시지 '전체'가 인사일 때만 온보딩으로 보낸다. ("안녕! 창업한 선배 있어?" 처럼 질문이 같이 있으면 backend 로)
-// 끝에 붙는 문장부호·웃음(ㅎㅋ)·물결은 지우고 비교한다. 예: "안녕하세요!!", "하이 ㅎㅎ", "반가워~"
-const GREETING_ONLY =
-  /^(안녕(하세요|하십니까|하셔요)?|하이|헬로|hi|hello|hey|반가워(요)?|반갑습니다|처음\s*왔어(요)?|꾸로록(아|님)?|꾸로록(이|은)?\s*(뭐야|뭐예요|뭐에요|뭐니))$/i;
-
-function isGreetingOnly(question: string) {
-  const text = question.trim().replace(/[\s!?.~,ㅎㅋ^]+$/g, "").replace(/^[\s!?.~,]+/, "");
-  return GREETING_ONLY.test(text);
-}
-
-function isOnboardingQuestion(question: string) {
-  return /자기\s*소개|너는\s*누구|넌\s*누구|누구야/.test(question) || isGreetingOnly(question);
-}
+// 인사("안녕")·자기소개 요청("넌 누구야")도 backend 로 보낸다.
+// backend 가 문맥으로 판단해서(1차 의도 분석, backend/app/rag/intent.py) 꾸로록 소개 문구로 답한다.
+// 예전에는 여기서 키워드로 골랐는데, "창업한 선배는 누구야?" 같은 진짜 질문까지 소개로 답하는 문제가 있었다.
 
 function useChatState() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -51,49 +32,39 @@ function useChatState() {
 
     // 2. 답변 메시지를 만든다
     let reply: AssistantMessage;
-    if (isOnboardingQuestion(question)) {
-      await new Promise((resolve) => setTimeout(resolve, 700)); // '답변 준비 중' 화면이 잠깐 보이게
+    try {
+      // 답변과 멘토 추천을 동시에 요청한다.
+      // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
+      const [result, recommend] = await Promise.all([
+        askQuestion(question),
+        recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
+      ]);
       reply = {
         id: newId(),
         role: "assistant",
-        content: ONBOARDING_ANSWER,
+        content: result.answer,
+        question,
+        sources: result.sources,
+        structured: result.structured ?? null,
+        aboutAspect: result.about_aspect ?? null,
+        followUps: result.follow_ups ?? [],
+        hasEnoughEvidence: result.has_enough_evidence,
+        mentors: recommend.recommendations,
+      };
+    } catch (err) {
+      reply = {
+        id: newId(),
+        role: "assistant",
+        content:
+          err instanceof Error && !err.message.startsWith("서버 오류")
+            ? err.message // 429(질문 횟수 초과) 같은 안내 문구
+            : "답변을 가져오지 못했어요. backend 서버가 켜져 있는지 확인해 주세요.",
         question,
         sources: [],
         hasEnoughEvidence: true,
         mentors: [],
+        isError: true,
       };
-    } else {
-      try {
-        // 답변과 멘토 추천을 동시에 요청한다.
-        // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
-        const [result, recommend] = await Promise.all([
-          askQuestion(question),
-          recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
-        ]);
-        reply = {
-          id: newId(),
-          role: "assistant",
-          content: result.answer,
-          question,
-          sources: result.sources,
-          hasEnoughEvidence: result.has_enough_evidence,
-          mentors: recommend.recommendations,
-        };
-      } catch (err) {
-        reply = {
-          id: newId(),
-          role: "assistant",
-          content:
-            err instanceof Error && !err.message.startsWith("서버 오류")
-              ? err.message // 429(질문 횟수 초과) 같은 안내 문구
-              : "답변을 가져오지 못했어요. backend 서버가 켜져 있는지 확인해 주세요.",
-          question,
-          sources: [],
-          hasEnoughEvidence: true,
-          mentors: [],
-          isError: true,
-        };
-      }
     }
 
     // 3. 답변을 화면에 쌓는다

@@ -1,9 +1,14 @@
 // 채팅 메시지 하나를 그린다. (와이어프레임 02-1, 02-2)
 // - 학생 질문: 오른쪽 정렬, 연한 블루(sky) 말풍선
-// - 꾸로록 답변: 말풍선 없이 글로 표시 + 아래에 '출처 · …' 링크 (누르면 오른쪽에 출처 패널이 열린다)
+// - 꾸로록 답변은 세 가지 모양 중 하나로 그린다:
+//     1) 선배 이야기(structured 에 카드가 있음) → 선배별 카드 (AnswerCards). 출처는 카드 안에만
+//     2) 꾸로록 자신에 대한 설명(aboutAspect 가 있음) → 설명 블록 + "꾸로록이 직접 알려드리는 내용이에요."
+//     3) 그 외 → 글(문단) + 아래에 '출처 · …' 링크 (누르면 오른쪽에 출처 패널이 열린다)
+//   예시 질문(followUps)이 있으면 답변 아래에 버튼으로 그린다.
 // - 근거가 부족하면(hasEnoughEvidence=false) 안내 문구와 함께 이 경험을 가진 선배(멘토)를 보여준다.
 import type { Mentor, Source } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
+import AnswerCards, { formatSourceDate } from "./AnswerCards";
 import { MiniKkuro } from "./Kkuro";
 import MentorCard from "./MentorCard";
 
@@ -12,16 +17,25 @@ type Props = {
   onOpenSource: (source: Source) => void; // 출처 링크를 눌렀을 때
   onContact: (mentor: Mentor, question: string) => void; // 멘토의 메일 버튼을 눌렀을 때
   isLatest?: boolean; // 가장 최근 메시지인지 (방금 도착한 답변에는 '찾았다!' 꾸로록이 빼꼼 나온다)
+  onAsk?: (question: string) => void; // 예시 질문 버튼을 눌렀을 때 (그 질문을 바로 보낸다)
+  askDisabled?: boolean; // 답변을 기다리는 동안에는 예시 질문 버튼을 누를 수 없다
 };
 
-// 글 날짜를 읽기 쉽게. "2024-07-31" → "2024년 7월", "2021" → "2021년". 모양이 다르면 그대로 둔다.
-export function formatSourceDate(date: string) {
-  const match = /^(\d{4})(?:-(\d{1,2}))?/.exec(date);
-  if (!match) return date;
-  return match[2] ? `${match[1]}년 ${Number(match[2])}월` : `${match[1]}년`;
+// 꾸로록 자신에 대한 설명(왜·누가 만들었는지 등) 아래에 붙이는 안내. 선배 글이 아니라 꾸로록이 하는 말이라는 표시다.
+const ABOUT_NOTICE = "꾸로록이 직접 알려드리는 내용이에요.";
+
+// 설명 블록에 그릴 문단만 고른다.
+// backend 의 answer 글에는 (본문) + (예시 질문 문단) + (안내 한 줄)이 함께 들어 있다.
+// 예시 질문은 버튼으로, 안내는 블록 아래 작은 글씨로 따로 그리므로 글에서는 뺀다 (같은 내용이 두 번 나오지 않게).
+function aboutParagraphs(content: string, followUps: string[]) {
+  return content.split(/\n\s*\n/).filter((paragraph) => {
+    if (paragraph.trim() === ABOUT_NOTICE) return false;
+    if (followUps.length > 0 && followUps.every((q) => paragraph.includes(q))) return false;
+    return true;
+  });
 }
 
-// 출처 링크 문구.
+// 출처 링크 문구. (카드형 답변은 카드 안에 출처가 있어서 이 문구를 쓰지 않는다)
 // - 제목이 있으면(L3): "출처 · 2024년 7월 · 「글 제목」 · 새벽"
 // - 제목이 없으면(익명): "출처 · 2024년 7월 글 · 졸업생 (익명)"
 // - 날짜도 없으면(demo): "출처 · 졸업생 A (demo) · demo-1"
@@ -32,7 +46,14 @@ export function sourceLabel(source: Source) {
   return `출처 · ${source.alumni} · ${source.interview_id}`;
 }
 
-export default function ChatMessageView({ message, onOpenSource, onContact, isLatest = false }: Props) {
+export default function ChatMessageView({
+  message,
+  onOpenSource,
+  onContact,
+  isLatest = false,
+  onAsk,
+  askDisabled = false,
+}: Props) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end motion-safe:animate-rise-in">
@@ -77,6 +98,12 @@ export default function ChatMessageView({ message, onOpenSource, onContact, isLa
     );
   }
 
+  // 답변을 어떤 모양으로 그릴지 고른다. 아래 3) 문단 표시는 지우면 안 된다:
+  // 근거 부족·위기 안내·무관한 질문은 structured 가 없고, 예전 backend 는 structured 를 아예 보내지 않는다.
+  const cards = message.structured && message.structured.cards.length > 0 ? message.structured : null;
+  const isAbout = Boolean(message.aboutAspect);
+  const followUps = message.followUps ?? [];
+
   return (
     <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
       {/* 방금 도착한 답변: 꾸로록이 눈을 반짝이며 빼꼼 (지난 답변은 기본 표정) */}
@@ -84,13 +111,49 @@ export default function ChatMessageView({ message, onOpenSource, onContact, isLa
         <MiniKkuro mood={isLatest ? "found" : "default"} className="w-[72px] motion-safe:animate-pop-in" />
         <span className="pb-0.5 text-[13px] font-bold text-brand">꾸로록</span>
       </div>
-      {/* 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
-      {message.content.split(/\n\s*\n/).map((paragraph, i) => (
-        <p key={i} className="whitespace-pre-wrap">
-          {paragraph}
-        </p>
-      ))}
-      {message.sources.length > 0 && (
+      {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
+      {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
+
+      {/* 2) 꾸로록 자신에 대한 설명: 한 덩어리 블록. 선배 글이 아니라서 출처 대신 안내 한 줄을 붙인다 */}
+      {!cards && isAbout && (
+        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5">
+          {aboutParagraphs(message.content, followUps).map((paragraph, i) => (
+            <p key={i} className="leading-[1.7] whitespace-pre-wrap">
+              {paragraph}
+            </p>
+          ))}
+          <p className="mt-1 border-t border-line pt-3 text-xs leading-5 text-muted">{ABOUT_NOTICE}</p>
+        </section>
+      )}
+
+      {/* 3) 그 외(근거 부족이 아닌 안내 문구·demo·예전 backend): 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
+      {!cards &&
+        !isAbout &&
+        message.content.split(/\n\s*\n/).map((paragraph, i) => (
+          <p key={i} className="whitespace-pre-wrap">
+            {paragraph}
+          </p>
+        ))}
+
+      {/* 다음에 물어볼 예시 질문: 누르면 그 질문을 바로 보낸다 */}
+      {followUps.length > 0 && onAsk && (
+        <ul className="flex flex-wrap gap-2">
+          {followUps.map((question) => (
+            <li key={question} className="max-w-full">
+              <button
+                type="button"
+                onClick={() => onAsk(question)}
+                disabled={askDisabled}
+                className="max-w-full rounded-full border-2 border-brand bg-surface px-4 py-1.5 text-left text-sm leading-6 font-bold text-brand hover:bg-sky focus-visible:bg-sky disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {question}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!cards && !isAbout && message.sources.length > 0 && (
         <ul className="flex flex-col gap-1">
           {message.sources.map((source) => (
             <li key={source.interview_id} className="flex flex-col items-start">

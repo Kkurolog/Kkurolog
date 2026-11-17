@@ -7,7 +7,7 @@ from app.rag.adapter import to_ask_response
 from app.rag.config import RagSettings
 from app.rag.generator import ClaudeGenerator, build_user_message
 from app.rag.messages import NO_EVIDENCE_MESSAGE, OFF_TOPIC_MESSAGE, SAFETY_MESSAGE, TEMPORARY_ERROR_MESSAGE
-from app.rag.models import Chunk, GeneratorOutput
+from app.rag.models import CardPiece, Chunk, GeneratedCard, GeneratorOutput
 from app.rag.pipeline import RagPipeline, to_source
 from app.rag.store import InMemoryVectorStore, _flatten_row
 
@@ -24,9 +24,11 @@ class FakeGenerator:
     def __init__(self, output: GeneratorOutput):
         self.output = output
         self.calls = []
+        self.intents = []  # 호출마다 넘어온 1차 의도 분석 결과
 
-    def generate(self, question, docs):
+    def generate(self, question, docs, intent=None):
         self.calls.append((question, docs))
+        self.intents.append(intent)
         return self.output
 
 
@@ -64,8 +66,18 @@ def pipeline(output, **settings):
     return RagPipeline(FakeEmbedder(), InMemoryVectorStore(CHUNKS), gen, s), gen
 
 
+def card(label, *pieces):
+    """카드 한 장. pieces 는 (글, [근거 chunk id]) 묶음."""
+    return GeneratedCard(label=label, one_liner=f"{label} 한 줄", body=[CardPiece(text=t, chunk_ids=i) for t, i in pieces])
+
+
 def answer_output(ids):
-    return GeneratorOutput(answer_type="answer", answer="선배는 이렇게 선택했어요.", used_chunk_ids=ids)
+    """ids 를 근거로 든 카드 한 장짜리 답변."""
+    return GeneratorOutput(
+        answer_type="answer",
+        headline="선배는 이렇게 선택했어요.",
+        cards=[card("먼저 해 본 길", ("직접 해 보며 배웠대요.", ids))],
+    )
 
 
 def test_answer_uses_only_cited_chunks_and_adds_neighbors():
@@ -111,7 +123,7 @@ def test_safety_keyword_skips_search_and_claude():
 
 
 def test_no_hits_still_classified_by_claude():
-    p, gen = pipeline(GeneratorOutput(answer_type="off_topic", answer="", used_chunk_ids=[]))
+    p, gen = pipeline(GeneratorOutput(answer_type="off_topic"))
     result = p.answer("오늘 저녁 메뉴 추천")
     assert gen.calls and gen.calls[0][1] == []  # 근거 없이 분류만
     assert result.answer_type == "off_topic" and result.answer == OFF_TOPIC_MESSAGE
@@ -129,7 +141,8 @@ def test_no_hits_without_classification_skips_claude():
 
 
 def test_claude_safety_overrides_answer_text():
-    p, _ = pipeline(GeneratorOutput(answer_type="safety", answer="무언가", used_chunk_ids=["p1-02"]))
+    output = answer_output(["p1-02"]).model_copy(update={"answer_type": "safety"})
+    p, _ = pipeline(output)
     result = p.answer("창업 하다가 너무 지쳤어")
     assert result.answer == SAFETY_MESSAGE and result.sources == []
 
@@ -214,10 +227,16 @@ def text_response(payload, stop_reason="end_turn"):
 
 
 def test_claude_generator_parses_structured_output():
-    payload = {"answer_type": "answer", "answer": "답", "used_chunk_ids": ["p1-02"]}
+    payload = {
+        "answer_type": "answer",
+        "headline": "답",
+        "compare": None,
+        "cards": [{"label": "길", "one_liner": "한 줄", "body": [{"text": "조각", "chunk_ids": ["p1-02"]}]}],
+        "closing": None,
+    }
     client, messages = fake_client(text_response(payload))
     out = ClaudeGenerator("claude-opus-5-5", "medium", 16000, client=client).generate("질문", [])
-    assert out.used_chunk_ids == ["p1-02"]
+    assert out.cards[0].body[0].chunk_ids == ["p1-02"]
     assert messages.kwargs["output_config"]["format"]["type"] == "json_schema"
     assert messages.kwargs["fallbacks"] == "default"
 
@@ -238,7 +257,7 @@ def test_user_message_escapes_injection_tags():
 
 
 class BrokenGenerator:
-    def generate(self, question, docs):
+    def generate(self, question, docs, intent=None):
         raise TimeoutError("Claude 응답 시간 초과")
 
 

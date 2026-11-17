@@ -27,6 +27,7 @@ import logging
 import re
 
 from app import config
+from app.rag.intent import INTRO_MESSAGE, fast_path_intent
 from app.schemas import AnswerType, AskResponse, Source
 
 logger = logging.getLogger("uvicorn.error")
@@ -161,6 +162,12 @@ def make_answer(question: str) -> AskResponse:
         return _rag_answer(question)
 
     # ---- 아래는 demo 답변 ----
+    # 인사만 온 경우: demo 에서도 꾸로록 소개로 답한다 (LLM 없이 빠른 경로만. 자세한 건 app/rag/intent.py)
+    if fast_path_intent(question) is not None:
+        return AskResponse(
+            answer=INTRO_MESSAGE, sources=[], has_enough_evidence=True, answer_type="off_topic", intent="greeting"
+        )
+
     if any(word in question for word in OFF_TOPIC_KEYWORDS):
         return _special_answer("off_topic", OFF_TOPIC_MESSAGE)
 
