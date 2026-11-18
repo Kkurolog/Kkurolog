@@ -6,10 +6,10 @@ fastapi>=0.115,<1.0      # API server framework
 uvicorn[standard]>=0.30  # server that runs FastAPI
 pydantic>=2.7,<3.0       # request/response data shapes
 python-dotenv>=1.0       # read environment variables from .env
+httpx>=0.27              # call Supabase REST API and the mail web app (app/mail); also used by TestClient
 
 # For tests (run `pytest` in the backend folder)
 pytest>=8.0              # test runner
-httpx>=0.27              # used internally by FastAPI TestClient
 
 # To be added later (not installed yet)
 # supabase      # DB + pgvector

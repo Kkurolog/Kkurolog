@@ -1,8 +1,10 @@
 """
 멘토 데이터를 읽고 다루는 곳.
 
-지금은 가짜(demo) 멘토가 담긴 JSON 파일(app/data/mentors_demo.json)을 읽는다.
-나중에 Supabase 같은 DB로 옮기면 `_load_all_mentors` 함수 안쪽만 바꾸면 된다.
+- MAIL_ENABLED=true: Supabase 의 mentors 테이블을 읽는다 (supabase/migrations/0002_mail_tables.sql).
+  관리자 페이지에서 고친 내용이 바로 반영된다.
+- 꺼져 있으면(기본): 가짜(demo) 멘토가 담긴 JSON 파일(app/data/mentors_demo.json)을 읽는다.
+두 경우 모두 같은 모양(dict)으로 바꿔서 아래 함수들은 그대로 쓴다.
 
 중요한 규칙 (docs/DATA.md):
   - 멘토 참여에 동의(consent=true)한 졸업생만 밖으로 내보낸다.
@@ -10,17 +12,45 @@
 """
 
 import json
+import logging
 from pathlib import Path
 
+from fastapi import HTTPException
+
+from app.mail import store as mail_store
+from app.mail.config import MailNotConfigured, mail_enabled
 from app.schemas import Mentor, MentorRecommendation, RecommendResponse
+
+logger = logging.getLogger("uvicorn.error")
 
 MAX_RECOMMENDATIONS = 3
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "mentors_demo.json"
 
 
+# Supabase mentors 테이블의 칸 → 이 파일이 쓰는 이름 (JSON 과 같음)
+_DB_FIELDS = ("id", "name", "exit_year", "career_paths", "path_summary", "summary", "tags", "topics",
+              "consent", "available", "email")
+
+
+def _from_db(row: dict) -> dict | None:
+    """DB 한 줄을 JSON 과 같은 모양으로. 화면에 꼭 필요한 값(엑시트 연도)이 비어 있으면 건너뛴다."""
+    mentor = {field: row.get(field) for field in _DB_FIELDS}
+    if mentor["exit_year"] is None:
+        logger.warning("mentors 테이블의 %s 에 exit_year 가 없어 목록에서 뺌", mentor["id"])
+        return None
+    return mentor
+
+
 def _load_all_mentors() -> list[dict]:
-    """JSON 파일의 멘토를 전부 읽는다. (동의하지 않은 멘토, 이메일 포함 = 내부 전용)"""
+    """멘토를 전부 읽는다. (동의하지 않은 멘토, 이메일 포함 = 내부 전용)"""
+    if mail_enabled():
+        try:
+            rows = mail_store.get_store().list_mentors()
+        except (mail_store.StoreError, MailNotConfigured) as err:
+            logger.error("멘토 목록 읽기 실패: %s", err)
+            raise HTTPException(status_code=502, detail="멘토 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.") from None
+        return [m for m in (_from_db(row) for row in rows) if m is not None]
     with DATA_FILE.open(encoding="utf-8") as f:
         return json.load(f)
 
