@@ -49,6 +49,7 @@ function useChatState() {
         aboutAspect: result.about_aspect ?? null,
         followUps: result.follow_ups ?? [],
         hasEnoughEvidence: result.has_enough_evidence,
+        temporaryError: result.temporary_error ?? false,
         mentors: recommend.recommendations,
       };
     } catch (err) {

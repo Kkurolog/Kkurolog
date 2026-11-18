@@ -49,6 +49,9 @@ export type AskResponse = {
   sources: Source[];
   has_enough_evidence: boolean; // no_evidence 일 때만 false
   answer_type?: AnswerType; // [추가]
+  // [추가] 서버 쪽 문제로 답하지 못했는지. true 면 has_enough_evidence 는 false 지만
+  // "자료가 없어요"가 아니라 "잠깐 문제가 생겼어요"로 안내한다
+  temporary_error?: boolean;
   intent?: Intent | null; // [추가] 학생의 말을 어떻게 이해했는지. 분석하지 않았으면 null
   user_context?: string | null; // [추가] 학생이 질문에서 스스로 밝힌 상황 (예: "18세, 창업 준비 중"). 없으면 null
   // [추가] 꾸로록 자신에 대한 질문(왜·누가 만들었는지, 자료, 신뢰, 질문 저장)에 고정 문구로 답했을 때 어느 측면인지.

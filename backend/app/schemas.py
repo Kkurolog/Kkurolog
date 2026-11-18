@@ -137,6 +137,13 @@ class AskResponse(BaseModel):
         ),
     )
     answer_type: AnswerType = Field("answer", description="답변 종류 (새 필드, 선택)")
+    temporary_error: bool = Field(
+        False,
+        description=(
+            "서버 쪽 문제(검색·AI 호출 실패 등)로 답하지 못했는지. true 면 answer_type 은 no_evidence 이지만 "
+            "'자료가 없다'가 아니라 '잠깐 문제가 생겼다'로 안내해야 한다. 원인은 서버 로그에 남는다"
+        ),
+    )
     intent: Intent | None = Field(
         None,
         description=(

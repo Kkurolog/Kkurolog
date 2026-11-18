@@ -372,6 +372,14 @@ def test_rag_build_failure_returns_temporary_message(monkeypatch):
     data = res.json()
     assert data["answer_type"] == "no_evidence" and data["has_enough_evidence"] is False
     assert data["answer"] == answer_service.TEMPORARY_ERROR_MESSAGE
+    # 화면이 "자료가 없어요"가 아니라 "잠깐 문제가 생겼어요"로 안내할 수 있게 표시한다
+    assert data["temporary_error"] is True
+
+
+def test_real_no_evidence_is_not_marked_as_temporary_error():
+    """진짜 근거 부족은 오류 표시가 붙지 않는다 (demo 의 근거 부족 답변)."""
+    data = ask("근거없음 질문").json()
+    assert data["answer_type"] == "no_evidence" and data["temporary_error"] is False
 
 
 # ---------------------------------------------------------------------------

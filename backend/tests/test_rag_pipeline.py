@@ -271,7 +271,13 @@ def test_claude_failure_becomes_temporary_no_evidence():
     result = p.answer("창업 대학")
     assert result.answer_type == "no_evidence" and result.failed is True
     assert result.answer == TEMPORARY_ERROR_MESSAGE and result.sources == []
-    assert to_ask_response(result).has_enough_evidence is False
+    res = to_ask_response(result)
+    assert res.has_enough_evidence is False and res.temporary_error is True  # 근거 부족과 구분되는 표시
+    # 정상 답변과 진짜 근거 부족에는 표시가 붙지 않는다
+    ok, _ = pipeline(answer_output(["p1-02"]))
+    assert to_ask_response(ok.answer("창업 대학")).temporary_error is False
+    none, _ = pipeline(GeneratorOutput(answer_type="no_evidence"))
+    assert to_ask_response(none.answer("창업 대학")).temporary_error is False
 
 
 def test_embedding_failure_becomes_temporary_no_evidence():

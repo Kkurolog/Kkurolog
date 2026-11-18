@@ -72,16 +72,24 @@ export default function ChatMessageView({
     );
   }
 
-  // 근거 부족: 지어내지 않고, 선배에게 직접 묻도록 안내한다
+  // 근거 부족: 지어내지 않고, 선배에게 직접 묻도록 안내한다.
+  // 서버 쪽 문제(temporaryError)로 답하지 못한 경우는 "자료가 없다"고 하지 않는다. 자료는 있는데 잠깐 못 찾은 것이다.
   if (!message.hasEnoughEvidence) {
     return (
       <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
         <p>
           <span className="bg-[linear-gradient(transparent_55%,var(--color-butter)_55%)] font-bold">
-            지금 자료만으로는 답하기 어려워요.
+            {message.temporaryError ? "지금 잠깐 문제가 생겼어요." : "지금 자료만으로는 답하기 어려워요."}
           </span>
         </p>
-        <p>이 경험을 가진 선배에게 직접 물어볼 수 있어요. 첫 연락은 꾸로록이 대신 전달해요.</p>
+        {message.temporaryError ? (
+          <p>
+            잠시 후 같은 질문을 다시 보내 주세요. 기다리는 동안 비슷한 경험을 가진 선배에게 직접 물어볼 수도 있어요. 첫
+            연락은 꾸로록이 대신 전달해요.
+          </p>
+        ) : (
+          <p>이 경험을 가진 선배에게 직접 물어볼 수 있어요. 첫 연락은 꾸로록이 대신 전달해요.</p>
+        )}
         {message.mentors.length > 0 && (
           <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
             {message.mentors.map((rec) => (

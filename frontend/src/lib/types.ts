@@ -20,6 +20,7 @@ export type AssistantMessage = {
   aboutAspect?: AboutAspect | null; // 꾸로록 자신에 대한 설명일 때 (왜·누가 만들었는지 등). 있으면 '설명 블록'으로 그린다
   followUps?: string[]; // 다음에 물어볼 예시 질문. 있으면 답변 아래에 버튼으로 그린다
   hasEnoughEvidence: boolean; // 근거가 충분한지
+  temporaryError?: boolean; // 서버 쪽 문제로 답하지 못했는지 (근거 부족과 구분해서 안내한다)
   mentors: MentorRecommendation[]; // 관련 경험을 가진 추천 멘토 (0~3명)
   isError?: boolean; // backend 호출이 실패했는지
 };

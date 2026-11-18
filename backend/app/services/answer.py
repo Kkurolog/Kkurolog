@@ -148,7 +148,9 @@ def _rag_answer(question: str) -> AskResponse:
         pipeline = get_rag_pipeline()
     except Exception:
         logger.exception("RAG 파이프라인을 만들지 못했어요 (requirements-rag.txt 설치, API 키를 확인하세요)")
-        return _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
+        answer = _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
+        answer.temporary_error = True  # '자료가 없다'가 아니라 '잠깐 문제가 생겼다'로 화면에 보이게 한다
+        return answer
     return to_ask_response(pipeline.answer(question))  # pipeline.answer 는 스스로 오류를 처리한다
 
 
