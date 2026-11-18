@@ -26,3 +26,10 @@ def test_mentors_hides_email_and_consent():
 def test_mentors_excludes_not_consented():
     ids = [m["id"] for m in client.get("/mentors").json()]
     assert "mt-10" not in ids  # mt-10 은 참여 동의 false
+
+
+def test_mentors_have_stable_avatar():
+    first = {m["id"]: m["avatar_id"] for m in client.get("/mentors").json()}
+    again = {m["id"]: m["avatar_id"] for m in client.get("/mentors").json()}
+    assert first == again  # 같은 멘토는 매번 같은 그림
+    assert set(first.values()) <= {f"avatar-{n}" for n in range(1, 8)}
