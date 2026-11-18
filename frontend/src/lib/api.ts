@@ -31,7 +31,7 @@ export type AnswerCard = {
   one_liner: string | null; // 그 선배가 지금 무엇을 하고 있나 (예: "지금은 여행 스타트업을 운영해요"). 글에 없으면 null
   body: string[]; // 본문 조각 2~4개 (주어 없이 쓴 문장)
   sources: Source[]; // 이 카드가 인용한 글 (카드별 출처, 보통 1개)
-  avatar_id: string; // "avatar-1"~"avatar-8". 같은 선배는 항상 같은 값. 그림이 없는 동안은 순번 배지를 쓴다
+  avatar_id: string; // "avatar-1"~"avatar-7". 같은 선배는 항상 같은 값. 그림은 lib/avatar.ts 가 고른다
 };
 
 // [추가] 카드형 답변. components/AnswerCards.tsx 가 그린다
@@ -124,6 +124,7 @@ export type Mentor = {
   tags: string[]; // 경험 태그
   topics: string[]; // 답변 가능 주제
   available: boolean; // 지금 연락 가능한지
+  avatar_id?: string; // [추가] "avatar-1"~"avatar-7". 답변 카드의 같은 선배와 같은 그림 (lib/avatar.ts)
 };
 
 // 멘토 목록을 받아온다 (참여에 동의한 멘토만 온다).

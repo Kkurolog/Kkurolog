@@ -136,7 +136,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between gap-4 px-8 pt-7 pb-6">
               <div className="flex min-w-0 items-center gap-3">
-                <MentorPhoto name={mentor.name} size="md" />
+                <MentorPhoto name={mentor.name} avatarId={mentor.avatar_id} size="md" />
                 <h2 id="contact-title" className="shrink-0 text-xl font-bold text-ink">
                   {mentor.name}
                 </h2>

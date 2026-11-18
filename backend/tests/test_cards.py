@@ -187,7 +187,7 @@ def test_avatar_is_stable_per_person_and_hides_internal_id():
     first = run([card("창업 뒤 대학에 간 길", ("창업을 먼저 했대요.", ["p1-02"]))]).structured.cards[0]
     again = run([card("다른 제목", ("나중에 대학에 갔대요.", ["p1-03"]))]).structured.cards[0]
     assert first.avatar_id == again.avatar_id  # 같은 선배는 어느 답변에서든 같은 아바타
-    assert first.avatar_id in {f"avatar-{n}" for n in range(1, 9)}
+    assert first.avatar_id in {f"avatar-{n}" for n in range(1, 8)}
     # 사람 정보가 없으면 글번호로 정한다
     orphan = make_chunk("p7", 1, "창업 이야기").model_copy(update={"person_id": ""})
-    assert avatar_id_for(orphan) in {f"avatar-{n}" for n in range(1, 9)}
+    assert avatar_id_for(orphan) in {f"avatar-{n}" for n in range(1, 8)}
