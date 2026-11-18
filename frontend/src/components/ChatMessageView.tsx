@@ -114,16 +114,17 @@ export default function ChatMessageView({
       {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
       {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
 
-      {/* 2) 꾸로록 자신에 대한 설명: 한 덩어리 블록. 선배 글이 아니라서 출처 대신 안내 한 줄을 붙인다 */}
+      {/* 2) 꾸로록 자신에 대한 설명: 다른 답변처럼 바탕 없이 글로 그린다 (흰 상자를 두지 않는다. 노트 줄 바탕을 가린다).
+             선배 글이 아니라서 출처 대신 작은 안내 한 줄을 붙인다 */}
       {!cards && isAbout && (
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5">
+        <>
           {aboutParagraphs(message.content, followUps).map((paragraph, i) => (
-            <p key={i} className="leading-[1.7] whitespace-pre-wrap">
+            <p key={i} className="whitespace-pre-wrap">
               {paragraph}
             </p>
           ))}
-          <p className="mt-1 border-t border-line pt-3 text-xs leading-5 text-muted">{ABOUT_NOTICE}</p>
-        </section>
+          <p className="text-xs leading-5 text-muted">{ABOUT_NOTICE}</p>
+        </>
       )}
 
       {/* 3) 그 외(근거 부족이 아닌 안내 문구·demo·예전 backend): 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
@@ -144,7 +145,7 @@ export default function ChatMessageView({
                 type="button"
                 onClick={() => onAsk(question)}
                 disabled={askDisabled}
-                className="max-w-full rounded-full border-2 border-brand bg-surface px-4 py-1.5 text-left text-sm leading-6 font-bold text-brand hover:bg-sky focus-visible:bg-sky disabled:cursor-not-allowed disabled:opacity-50"
+                className="max-w-full rounded-full border-2 border-brand px-4 py-1.5 text-left text-sm leading-6 font-bold text-brand hover:bg-sky focus-visible:bg-sky disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {question}
               </button>
