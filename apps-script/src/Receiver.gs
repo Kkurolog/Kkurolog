@@ -5,13 +5,13 @@
  * - 중계 Gmail에서 최근 메일을 찾아, 다른 파일이 쓰기 쉬운 모양으로 바꿔 줍니다.
  * - 메일 스레드에 라벨을 붙입니다. (사람이 메일함에서 처리 상태를 보기 위한 것)
  * - 나중에 메일 발송 전문 서비스(수신 웹훅 등)로 바꿀 때는 이 파일 안쪽만 바꾸면 됩니다.
- *   (Replies.gs는 Receiver.findMessagesSince(...), Receiver.addLabel(...), Receiver.removeLabel(...) 만 부릅니다)
+ *   (Inbound.gs는 Receiver.findMessagesSince(...), Receiver.addLabel(...), Receiver.removeLabel(...) 만 부릅니다)
  */
 const Receiver = {
   /**
    * since 이후에 받은 메일을 오래된 순서로 돌려줍니다. (보낸편지함·임시보관함·스팸·휴지통 제외)
    * @param {Date} since
-   * @return {{id: string, date: Date, fromAddress: string, recipients: string[],
+   * @return {{id: string, date: Date, fromAddress: string, subject: string, recipients: string[],
    *           plainBody: string, raw: GoogleAppsScript.Gmail.GmailMessage}[]}
    */
   findMessagesSince: function (since) {
@@ -25,6 +25,7 @@ const Receiver = {
           id: m.getId(),
           date: m.getDate(),
           fromAddress: extractAddress_(m.getFrom()),
+          subject: m.getSubject() || '',
           recipients: [
             m.getTo(),
             m.getCc(),

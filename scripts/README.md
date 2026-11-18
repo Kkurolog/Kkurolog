@@ -111,3 +111,19 @@ python embed_chunks.py --all       # 전부 다시 만들기
 - 모델은 `backend/app/rag/config.py`의 `embedding_model`과 **같아야 한다** (질문도 같은 모델로 벡터로 바꿔야 비교가 된다).
 - ⚠️ `load_to_supabase.py`로 `embed_text`가 바뀐 조각을 다시 올려도 예전 벡터는 남는다.
   진로 요약·기관·질문·답변을 고쳤다면 `--all`로 다시 만든다. 태그만 고쳤다면 필요 없다 (태그는 `embed_text`에 들어가지 않음).
+
+## load_mentors.py — 멘토 프로필 넣기 (메일 자동화)
+
+`backend/app/data/mentors_demo.json`의 멘토 프로필을 Supabase `mentors` 테이블에 넣는다. 테이블은 `0002_mail_tables.sql`로 먼저 만든다.
+설계: [apps-script/docs/SUPABASE_PLAN.md](../apps-script/docs/SUPABASE_PLAN.md)
+
+```bash
+python load_mentors.py --dry-run          # 무엇을 넣을지 보기만 (DB 변경 없음)
+python load_mentors.py                    # 없는 멘토만 새로 넣기 (있는 멘토는 그대로)
+python load_mentors.py --update-profiles  # (주의) 있는 멘토의 프로필도 JSON 으로 덮어쓰기
+```
+
+- 처음 넣는 멘토는 **메일 주소 없이, 연락 가능(available)=false**로 들어간다. 실제 메일 주소와 연락 가능은 Supabase 대시보드 Table Editor에서 직접 채운다 (메일 주소가 파일·git에 남지 않게).
+- 기본으로는 **이미 있는 멘토를 건드리지 않는다.** 처음 넣은 뒤로는 Supabase(대시보드·관리자 페이지)가 기준이라, 대시보드에서 고친 이름·메일·연락 가능이 되돌아가지 않는다.
+- `--update-profiles`는 있는 멘토의 프로필 칸(이름·연도·진로·요약·태그·주제·참여 동의)을 JSON으로 덮어쓴다. `email`·`available`·`person_id`는 그대로지만 **대시보드에서 고친 이름은 JSON 이름으로 돌아간다.**
+- `SUPABASE_DB_URL`(run_sql.py와 같음)로 접속하고, 한 트랜잭션으로 실행한다. 메일 주소는 화면에 출력하지 않는다 (있음/없음만).

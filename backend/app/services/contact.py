@@ -1,8 +1,9 @@
 """
 학생 → 꾸로록 → 멘토 로 첫 연락을 전달하는 곳.
 
-지금은 **실제 메일을 보내지 않는다.** 서버 로그에만 남기고 "전달 완료"라고 답한다.
-나중에 실제 이메일 발송(예: Resend 무료 플랜)을 붙일 때는 `deliver_contact_request` 안쪽만 바꾸면 된다.
+- MAIL_ENABLED=true: app/mail/contact_flow.py 가 Supabase 에 기록하고 메일 웹앱(Apps Script)으로 보낸다.
+  실패하면 HTTPException(429 너무 자주 / 503 발송 실패 / 502 연결 문제)을 던지고, 프론트는 detail 문구를 보여 준다.
+- 꺼져 있으면(기본): **실제 메일을 보내지 않는다.** 서버 로그에만 남기고 "전달 완료"라고 답한다 (demo).
 (main.py, schemas.py, 프론트는 그대로 둔다)
 
 개인정보 주의:
@@ -12,6 +13,7 @@
 
 import logging
 
+from app.mail.config import mail_enabled
 from app.schemas import ContactRequest, Mentor
 
 # uvicorn 이 화면에 출력해 주는 로거를 같이 쓴다 (따로 설정하지 않아도 터미널에 보인다)
@@ -25,13 +27,14 @@ def _mask_email(email: str) -> str:
 
 
 def deliver_contact_request(request: ContactRequest, mentor: Mentor) -> None:
-    """연락 요청을 멘토에게 전달한다. (지금은 로그만 남김)"""
+    """연락 요청을 멘토에게 전달한다."""
+    if mail_enabled():
+        # 순환 import 를 피하려고 여기서 불러온다 (mentors.py 도 app.mail 을 쓴다)
+        from app.mail.contact_flow import submit_inquiry
+        from app.services.mentors import get_mentor_email
 
-    # TODO(실제 이메일 발송): 여기서 Resend 같은 서비스로 메일을 보낸다.
-    #   - 받는 사람: services.mentors.get_mentor_email(mentor.id) (학생에게는 절대 보여주지 않는다)
-    #   - 답장 주소(reply-to): request.reply_email → 멘토가 답장하면 학생에게 바로 간다
-    #   - 제목/본문: request.subject, request.sender_name, request.message
-    #   - API 키는 .env 의 RESEND_API_KEY 같은 환경변수로 읽는다 (코드에 넣지 않는다)
+        submit_inquiry(request, mentor, get_mentor_email(mentor.id))
+        return
 
     logger.info(
         "[demo] 연락 요청 (실제 메일은 보내지 않음) mentor=%s from=%s reply=%s subject=%r message_len=%d",
