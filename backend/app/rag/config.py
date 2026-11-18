@@ -15,7 +15,10 @@ from dataclasses import dataclass, fields
 class RagSettings:
     # ---- 검색 ----
     top_k: int = 8  # 처음에 몇 개 chunk 를 찾을지
-    similarity_floor: float = 0.3  # 이보다 유사도가 낮은 chunk 는 버린다 (측정 후 조정)
+    # 이보다 유사도가 낮은 chunk 는 버린다. 2026-11-18 측정(docs/proposals/answer-quality-audit.md 0장)으로 0.3 → 0.2:
+    # 0.3 은 무관한 질문이 아니라 '짧은 질문'을 걸러서, 메인 화면 추천 질문까지 근거 부족으로 떨어졌다.
+    # 근거가 충분한지는 이 숫자가 아니라 Claude 가 판단한다 (근거 부족 질문도 0.35~0.44 가 나온다).
+    similarity_floor: float = 0.2
     neighbor_window: int = 1  # 검색된 chunk 앞뒤로 몇 개씩 붙일지
     max_posts: int = 3  # Claude 에게 넘길 글 최대 개수
     classify_when_no_hits: bool = True  # 검색 결과가 없어도 Claude 로 위기·무관 질문인지 분류할지

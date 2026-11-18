@@ -65,9 +65,22 @@ def test_template_for_each_intent():
     assert template_for(IntentResult(intent="career_question")) is None
 
 
-def test_low_confidence_asks_back_but_career_question_still_goes_on():
-    assert template_for(IntentResult(intent="smalltalk", confidence="low")) == UNCLEAR_MESSAGE
+def test_low_confidence_does_not_change_the_reply():
+    """
+    확신이 낮아도 제 갈래의 문구로 답한다. 되묻기 문구는 unclear 일 때만.
+    (예전에는 "너 gpt야?"·"ㅋㅋㅋ" 가 확신이 낮다는 이유로 "아직 방향이 잡히지 않아도 괜찮아요" 를 받았다)
+    """
+    assert template_for(IntentResult(intent="smalltalk", confidence="low")) == SMALLTALK_MESSAGE
+    assert template_for(IntentResult(intent="greeting", confidence="low")) == INTRO_MESSAGE
+    about = fixed_reply_for(IntentResult(intent="about_service", about_aspect="what", confidence="low"))
+    assert about.text == ABOUT_SERVICE_MESSAGE and about.about_aspect == "what"
+    assert template_for(IntentResult(intent="unclear", confidence="low")) == UNCLEAR_MESSAGE
     assert template_for(IntentResult(intent="career_question", confidence="low")) is None
+
+
+def test_about_what_says_answers_are_written_by_ai():
+    """ "이거 AI 가 쓰는 거야?" 같은 질문이 what 으로 오므로, 소개 문구가 그 답을 담고 있어야 한다."""
+    assert "AI가" in ABOUT["what"].body
 
 
 # ---- 파이프라인 분기 ----
