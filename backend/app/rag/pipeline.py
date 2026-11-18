@@ -5,7 +5,9 @@ RAG 본체: 질문 하나 → RagAnswer.
   1-1. 의도 분석 (app/rag/intent.py): 인사·서비스 소개·잡담·막연한 고민이면 고정 문구로 끝낸다.
        진로 질문이거나 분석에 실패하면 아래로 계속 간다
   2. 질문 임베딩 → Top-K 검색 → 유사도 하한 미만 버림
+     의도 분석이 경로·분야 태그를 뽑았으면(예: 창업), 그 태그가 있는 선배의 chunk 를 한 번 더 찾아 합친다
   3. 남은 chunk 의 앞뒤 chunk 를 붙이고, 같은 글끼리 묶어 최대 max_posts 개 글로 정리
+     (태그가 맞는 선배의 글에 자리를 먼저 준다 → pick_posts)
   4. Claude 구조화 출력 → answer_type + 선배별 카드 (조각마다 근거 chunk id)
   5. 카드 조립 (app/rag/cards.py): 근거 없는 조각·카드는 버리고, 카드마다 그 카드의 출처를 붙인다
      남은 카드가 없으면 '근거 부족'으로 바꾼다 (출처 없는 답변은 내보내지 않는다)
@@ -16,6 +18,8 @@ RAG 본체: 질문 하나 → RagAnswer.
 """
 
 import logging
+import re
+from dataclasses import dataclass, field
 
 from app.rag.cards import assemble_cards, compose_text
 from app.rag.config import RagSettings
@@ -35,13 +39,31 @@ from app.rag.store import PUBLIC_VISIBILITY, VectorStore
 logger = logging.getLogger("uvicorn.error")
 
 
+# 글 제목 끝에 붙은 글쓴이 표기: "제목 - 실명 [별명]", "제목 - 별명 실명"
+_AUTHOR_TAIL = re.compile(r"\s+-\s+(?P<tail>[^-]{1,30})$")
+
+
+def strip_author(title: str, nickname: str) -> str:
+    """
+    제목 끝의 글쓴이 표기를 지운다. 예: "나의 길 찾기 - 홍길동 [새벽]" → "나의 길 찾기"
+    실명은 어떤 응답에도 넣지 않는 것이 규칙인데, gschool.kr 글 39개 중 20개는 제목 끝에 실명이 붙어 있다.
+    실명은 backend 가 알지 못하므로(검색 함수가 내보내지 않는다), '끝 부분에 그 글의 별명이 들어 있으면
+    그 끝 부분 전체를 글쓴이 표기로 보고' 지운다. "…하는 [새벽] 이야기"처럼 별명만 있는 제목은 그대로 둔다.
+    ⚠️ 새 글을 넣으면 실명이 남는 제목이 없는지 다시 확인한다 (제목 모양이 다르면 이 규칙이 못 잡는다).
+    """
+    match = _AUTHOR_TAIL.search(title)
+    if match and nickname and nickname in match["tail"]:
+        return title[: match.start()].rstrip()
+    return title
+
+
 def public_title(chunk: Chunk) -> str:
     """
-    글 제목. L3 만 그대로 쓰고 L1·L2 는 빈 문자열.
+    글 제목. L3 만 쓰고(글쓴이 표기는 지운다) L1·L2 는 빈 문자열.
     인터뷰 제목에 졸업생 이름이 들어 있는 경우가 많아, 익명 글의 제목을 쓰면 누구인지 드러난다.
     (Claude 에게 넘기는 근거와 출처 모두에 적용)
     """
-    return chunk.title if chunk.visibility == "L3" else ""
+    return strip_author(chunk.title, chunk.nickname) if chunk.visibility == "L3" else ""
 
 
 def to_source(chunk: Chunk) -> RagSource:
@@ -56,6 +78,32 @@ def to_source(chunk: Chunk) -> RagSource:
         published_at=chunk.published_at,
         url=chunk.url if chunk.visibility == "L3" else None,
     )
+
+
+@dataclass
+class Retrieval:
+    """검색 결과."""
+
+    hits: list[ScoredChunk] = field(default_factory=list)  # 유사도 높은 순, chunk 중복 없음
+    # 질문이 찾는 경로·분야 태그가 있는 선배의 글 (태그 검색을 하지 않았으면 비어 있다)
+    tagged_sources: set[str] = field(default_factory=set)
+
+
+def pick_posts(
+    hits: list[ScoredChunk], max_posts: int, tagged_sources: set[str] | frozenset = frozenset(), reserved: int = 0
+) -> list[str]:
+    """
+    Claude 에게 넘길 글을 고른다 (글번호 목록, 앞에 있을수록 먼저 보여 준다).
+    글의 점수 = 그 글에서 가장 점수 높은 chunk. 태그가 맞는 선배의 글에 reserved 개 자리를 먼저 주고,
+    남은 자리는 태그와 상관없이 점수 순으로 채운다.
+    """
+    best: dict[str, float] = {}
+    for h in hits:
+        best[h.chunk.source_id] = max(best.get(h.chunk.source_id, 0.0), h.score)
+    ranked = sorted(best, key=best.get, reverse=True)
+    first = [s for s in ranked if s in tagged_sources][:reserved]
+    rest = [s for s in ranked if s not in first]
+    return (first + rest)[:max_posts]
 
 
 class RagPipeline:
@@ -85,23 +133,48 @@ class RagPipeline:
             return None
 
     # ---- 2. 검색 ----
-    def retrieve(self, question: str) -> list[ScoredChunk]:
+    def retrieve(self, question: str, intent: IntentResult | None = None) -> Retrieval:
+        """
+        질문과 비슷한 chunk 를 찾는다.
+        의도 분석이 질문에서 경로·분야 태그를 뽑았으면(intent.career_paths·career_fields),
+        그 태그가 있는 선배의 chunk 만 한 번 더 찾아서 합친다 → build_context 가 그 선배들의 글을 먼저 고른다.
+        """
+        s = self.settings
         vector = self.embedder.embed([question])[0]
-        hits = self.store.search(vector, self.settings.top_k)
-        return [h for h in hits if h.score >= self.settings.similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY]
+        hits = [
+            h
+            for h in self.store.search(vector, s.top_k)
+            if h.score >= s.similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY
+        ]
+        paths = intent.career_paths if intent else []
+        fields = intent.career_fields if intent else []
+        if s.tag_reserved_posts <= 0 or not (paths or fields):
+            return Retrieval(hits=hits)
+
+        tagged = [
+            h
+            for h in self.store.search(vector, s.tag_top_k, career_paths=paths or None, career_fields=fields or None)
+            if h.score >= s.tag_similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY
+        ]
+        merged = {h.chunk.chunk_id: h for h in [*tagged, *hits]}  # 같은 chunk 는 한 번만
+        return Retrieval(
+            hits=sorted(merged.values(), key=lambda h: h.score, reverse=True),
+            tagged_sources={h.chunk.source_id for h in tagged},
+        )
 
     # ---- 3. 앞뒤 chunk 붙이고 글 단위로 묶기 ----
-    def build_context(self, hits: list[ScoredChunk]) -> list[ContextDoc]:
-        best_score: dict[str, float] = {}
+    def build_context(self, found: Retrieval | list[ScoredChunk]) -> list[ContextDoc]:
+        if not isinstance(found, Retrieval):
+            found = Retrieval(hits=list(found))
+        hits = found.hits
         hit_indices: dict[str, set[int]] = {}
         first_chunk: dict[str, Chunk] = {}
         for h in hits:
             pid = h.chunk.source_id
-            best_score[pid] = max(best_score.get(pid, 0.0), h.score)
             hit_indices.setdefault(pid, set()).add(h.chunk.chunk_index)
             first_chunk.setdefault(pid, h.chunk)
 
-        top_posts = sorted(best_score, key=best_score.get, reverse=True)[: self.settings.max_posts]
+        top_posts = pick_posts(hits, self.settings.max_posts, found.tagged_sources, self.settings.tag_reserved_posts)
         window = self.settings.neighbor_window
         docs = []
         for pid in top_posts:
@@ -143,10 +216,10 @@ class RagPipeline:
                 )
 
         try:
-            hits = self.retrieve(question)
-            if not hits and not self.settings.classify_when_no_hits:
+            found = self.retrieve(question, intent)
+            if not found.hits and not self.settings.classify_when_no_hits:
                 return RagAnswer(answer_type="no_evidence", answer=NO_EVIDENCE_MESSAGE, **meta)
-            docs = self.build_context(hits)
+            docs = self.build_context(found)
             if intent is None:
                 output = self.generator.generate(question, docs)
             else:

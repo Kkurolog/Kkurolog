@@ -23,6 +23,14 @@ class RagSettings:
     max_posts: int = 3  # Claude 에게 넘길 글 최대 개수
     classify_when_no_hits: bool = True  # 검색 결과가 없어도 Claude 로 위기·무관 질문인지 분류할지
 
+    # ---- 태그 우선 검색 ----
+    # "창업한 선배 있어?" 처럼 '어떤 길을 간 선배'를 찾는 질문은, 글자가 비슷한 글보다 그 길을 실제로 간 선배의 글이
+    # 먼저 나와야 한다. 의도 분석이 질문에서 경로·분야 태그를 뽑으면, 그 태그가 있는 선배의 chunk 만 따로 한 번 더
+    # 찾아서 글 자리 중 tag_reserved_posts 개를 먼저 채운다. (왜: docs/proposals/answer-quality-audit.md 0-3)
+    tag_reserved_posts: int = 2  # 태그가 맞는 선배의 글에 먼저 주는 자리 수. 0 이면 태그 검색을 하지 않는다
+    tag_top_k: int = 8  # 태그가 맞는 chunk 를 몇 개 찾을지
+    tag_similarity_floor: float = 0.0  # 태그가 맞는 chunk 에 쓰는 유사도 하한 (태그가 이미 관련성의 근거라 낮게 둔다)
+
     # ---- 모델 ---- (팀 논의 항목: 모델 선택과 비용)
     embedding_model: str = "text-embedding-3-small"  # 1536차원. 바꾸면 supabase/migrations 의 vector(1536)도 바꾼다
     claude_model: str = "claude-opus-5-5"

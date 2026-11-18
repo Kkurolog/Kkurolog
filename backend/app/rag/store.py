@@ -22,7 +22,18 @@ PUBLIC_VISIBILITY = ["L1", "L2", "L3"]  # L0 은 허용 목록에 없으니 절�
 
 
 class VectorStore(Protocol):
-    def search(self, vector: list[float], top_k: int) -> list[ScoredChunk]: ...
+    def search(
+        self,
+        vector: list[float],
+        top_k: int,
+        career_paths: list[str] | None = None,
+        career_fields: list[str] | None = None,
+    ) -> list[ScoredChunk]:
+        """
+        질문 벡터와 비슷한 chunk 를 top_k 개. career_paths·career_fields(TAGS.md 의 code)를 주면
+        그 태그가 있는 선배의 chunk 만 찾는다 (종류 안에서는 하나라도 겹치면 통과, 두 종류를 다 주면 둘 다 만족).
+        """
+        ...
 
     def get_chunks(self, source_id: str, indices: list[int]) -> list[Chunk]: ...
 
@@ -45,8 +56,20 @@ class InMemoryVectorStore:
         with Path(path).open(encoding="utf-8") as f:
             return cls([Chunk.model_validate(json.loads(line)) for line in f if line.strip()])
 
-    def search(self, vector: list[float], top_k: int) -> list[ScoredChunk]:
-        scored = [ScoredChunk(chunk=c, score=cosine(vector, c.embedding)) for c in self._chunks]
+    def search(
+        self,
+        vector: list[float],
+        top_k: int,
+        career_paths: list[str] | None = None,
+        career_fields: list[str] | None = None,
+    ) -> list[ScoredChunk]:
+        pool = [
+            c
+            for c in self._chunks
+            if (not career_paths or set(c.career_paths) & set(career_paths))
+            and (not career_fields or set(c.career_fields) & set(career_fields))
+        ]
+        scored = [ScoredChunk(chunk=c, score=cosine(vector, c.embedding)) for c in pool]
         scored.sort(key=lambda s: s.score, reverse=True)
         return scored[:top_k]
 
@@ -75,8 +98,19 @@ class SupabaseVectorStore:
 
         self._client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
-    def search(self, vector: list[float], top_k: int) -> list[ScoredChunk]:
-        rows = self._client.rpc(MATCH_FUNCTION, {"query_embedding": vector, "match_count": top_k}).execute().data
+    def search(
+        self,
+        vector: list[float],
+        top_k: int,
+        career_paths: list[str] | None = None,
+        career_fields: list[str] | None = None,
+    ) -> list[ScoredChunk]:
+        params: dict = {"query_embedding": vector, "match_count": top_k}
+        if career_paths:  # match_chunks 의 태그 필터 (supabase/migrations/0001_experience_tables.sql)
+            params["filter_career_paths"] = career_paths
+        if career_fields:
+            params["filter_career_fields"] = career_fields
+        rows = self._client.rpc(MATCH_FUNCTION, params).execute().data
         return [ScoredChunk(chunk=Chunk.model_validate(row), score=row["similarity"]) for row in rows or []]
 
     def get_chunks(self, source_id: str, indices: list[int]) -> list[Chunk]:

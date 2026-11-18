@@ -37,8 +37,38 @@ Intent = Literal["greeting", "about_service", "career_question", "smalltalk", "u
 AboutAspect = Literal["what", "why", "who", "data", "trust", "privacy"]
 
 
+# 질문이 '어떤 길을 간 선배'를 찾을 때 검색에 쓰는 태그 (docs/TAGS.md 의 code → 한글 이름).
+# 검색은 글자가 비슷한 조각을 찾기 때문에, "창업"이라는 낱말만 나오는 글이 실제로 창업한 선배의 글보다 앞에 온다.
+# 그래서 질문에서 태그를 뽑아, 그 태그가 있는 선배의 글을 먼저 고른다 (pipeline.retrieve, pick_posts).
+# 'etc' 는 넣지 않는다 (뜻이 정해져 있지 않아 찾는 데 쓸 수 없다). TAGS.md 에 태그가 추가되면 여기도 추가한다.
+CAREER_PATH_TAGS = {
+    "domestic_university": "국내 대학",
+    "overseas_university": "해외 대학",
+    "alternative_university": "대안 대학",
+    "exam_prep": "입시 준비",
+    "employment": "취업",
+    "internship": "인턴십",
+    "startup": "창업",
+    "freelance": "프리랜서",
+    "gap_year": "갭이어",
+    "military_service": "군 복무",
+    "training_program": "교육 프로그램",
+}
+CAREER_FIELD_TAGS = {
+    "dev_it": "개발·IT",
+    "design_art": "디자인·예술",
+    "media_content": "미디어·콘텐츠",
+    "business_social_innovation": "경영·사회혁신",
+    "humanities_social": "인문·사회",
+    "science_engineering": "자연·공학",
+    "education": "교육",
+}
+
+
 class IntentResult(BaseModel):
     intent: Intent
+    career_paths: list[str] = Field(default_factory=list, description="질문이 찾는 선배의 경로 태그 code. 없으면 빈 목록")
+    career_fields: list[str] = Field(default_factory=list, description="질문이 찾는 선배의 분야 태그 code. 없으면 빈 목록")
     about_aspect: AboutAspect | None = Field(None, description="intent 가 about_service 일 때만. 애매하면 what")
     has_greeting: bool = Field(False, description="인사말이 섞여 있는지. intent 와 별개다")
     user_context: str | None = Field(None, description="학생이 스스로 밝힌 상황 요약 (예: '18세, 창업 준비 중')")
@@ -116,13 +146,16 @@ ABOUT: dict[str, AboutEntry] = {
                 "저는 꾸로록이에요. 거꾸로캠퍼스 졸업생 선배들의 인터뷰를 바탕으로 답하는 챗봇이에요.\n"
                 "답변은 AI가 선배들의 글을 읽고 정리해서 써요. 사람이 직접 쓰는 게 아니에요.",
                 "제가 할 수 있는 것은 이런 거예요.\n"
-                "선배들이 왜 그 길을 골랐는지, 어떤 고민과 시행착오가 있었는지 전해 드려요.\n"
-                "답변마다 어느 글에서 온 이야기인지 출처를 함께 보여 드려요.\n"
-                "자료가 부족하면 비슷한 경험을 가진 선배를 찾아 첫 연락을 대신 전해 드려요.",
+                "선배들의 여정 속에서 지금 내 고민과 닮은 이야기를 찾아 드려요.\n"
+                "왜 그 길을 골랐는지, 어떤 시행착오가 있었는지 출처와 함께 전해 드려요.\n"
+                "자료가 부족하면 비슷한 경험을 가진 선배에게 첫 연락을 대신 이어 드려요.",
                 "제가 할 수 없는 것도 있어요.\n"
                 "합격 점수나 등급 같은 정확한 숫자는 알려 드리기 어려워요.\n"
                 "선배들의 글에 없는 내용은 지어내지 않아요.\n"
                 "숙제를 대신 하거나 진로와 관계없는 질문에는 답하지 않아요.",
+                "선배들도 처음엔 헤맸고, 그 시간이 모여 자기만의 여정이 되었어요.\n"
+                "꾸로록과의 대화가 여러분의 여정에 작은 힘이 되었으면 좋겠어요.\n"
+                "오늘은 어떤 고민부터 이야기해 볼까요?",
             ]
         ),
         follow_ups=[Q_JOB, Q_TRIAL],
@@ -297,6 +330,29 @@ about_aspect
 has_greeting
 - 문장 어디에든 인사말이 섞여 있으면 true. intent 와 독립이다. career_question 이면서 true 일 수 있다.
 
+career_paths, career_fields
+- intent 가 "career_question" 이고, 학생이 '어떤 길을 간 선배' 또는 '어떤 분야의 선배'의 이야기를 찾을 때만 고른다.
+  그 외에는 둘 다 빈 목록.
+- 질문에 분명히 드러난 것만 아래 code 로 적는다. 넓게 추측해서 더하지 않는다. 보통 0~2개다.
+  career_paths (그 선배가 간 길)
+    "domestic_university" 국내 대학에 감 / "overseas_university" 해외 대학·유학 / "alternative_university" 대안 대학
+    "exam_prep" 검정고시·수능 등 입시 준비 / "employment" 회사에 취업 / "internship" 인턴
+    "startup" 창업 (회사·브랜드·가게·협동조합·개인사업을 직접 세움) / "freelance" 프리랜서
+    "gap_year" 쉬어 가는 시간·여행 / "military_service" 군 복무 / "training_program" 학위 없는 교육 과정
+  career_fields (그 선배의 분야)
+    "dev_it" 개발·IT / "design_art" 디자인·미술·음악·공연 / "media_content" 영상·콘텐츠·글쓰기
+    "business_social_innovation" 경영·사회문제를 사업으로 푸는 일 / "humanities_social" 인문·사회과학
+    "science_engineering" 자연과학·공학·의학 계열 / "education" 교육
+- 예:
+  "창업한 선배 있어?" → career_paths ["startup"], career_fields []
+  "직접 브랜드를 만든 선배는 어떻게 시작했어?" → ["startup"], []
+  "개발자로 취업한 선배 있어?" → ["employment"], ["dev_it"]
+  "검정고시 보고 수능 준비하는 거 힘들지 않았어?" → ["exam_prep"], []
+  "디자인을 진로로 정한 계기가 뭐야?" → [], ["design_art"]
+  "팀 프로젝트하면서 힘들었던 점이 있어?" → [], []  (특정한 길을 찾는 질문이 아니다)
+  "자존감이 떨어졌을 때 어떻게 극복했어?" → [], []
+- 학생 자신의 상황("나는 창업을 준비해")만 있고 찾는 선배가 드러나지 않으면 빈 목록이다.
+
 user_context
 - 학생이 스스로 밝힌 정보만 20자 이내로 요약한다. 나이·학년·관심 분야·현재 상황만.
   예: "안녕 나는 18살이고 창업을 준비하려고 해" → "18세, 창업 준비 중"
@@ -321,11 +377,13 @@ INTENT_SCHEMA = {
                 {"type": "null"},
             ]
         },
+        "career_paths": {"type": "array", "items": {"type": "string", "enum": list(CAREER_PATH_TAGS)}},
+        "career_fields": {"type": "array", "items": {"type": "string", "enum": list(CAREER_FIELD_TAGS)}},
         "has_greeting": {"type": "boolean"},
         "user_context": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "confidence": {"type": "string", "enum": ["high", "low"]},
     },
-    "required": ["intent", "about_aspect", "has_greeting", "user_context", "confidence"],
+    "required": ["intent", "about_aspect", "career_paths", "career_fields", "has_greeting", "user_context", "confidence"],
     "additionalProperties": False,
 }
 
@@ -376,4 +434,8 @@ class ClaudeIntentAnalyzer:
         result.user_context = context[:USER_CONTEXT_MAX_CHARS] or None
         if result.intent != "about_service":
             result.about_aspect = None
+        # 태그는 진로 질문일 때만, 아는 code 만, 겹치지 않게 남긴다
+        is_career = result.intent == "career_question"
+        result.career_paths = [t for t in dict.fromkeys(result.career_paths) if t in CAREER_PATH_TAGS] if is_career else []
+        result.career_fields = [t for t in dict.fromkeys(result.career_fields) if t in CAREER_FIELD_TAGS] if is_career else []
         return result

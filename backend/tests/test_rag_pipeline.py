@@ -341,3 +341,25 @@ def test_neighbors_never_ask_for_index_zero():
     store = SpyStore(CHUNKS)
     RagPipeline(FakeEmbedder(), store, gen, RagSettings(similarity_floor=0.5)).answer("갭이어")
     assert store.asked and all(i >= 1 for idx in store.asked for i in idx)
+
+
+# ---- 글 제목 끝의 글쓴이 표기(실명)는 지운다 ----
+
+
+def test_strip_author_removes_real_name_tail():
+    from app.rag.pipeline import strip_author
+
+    assert strip_author("나의 길 찾기 - 홍길동 [새벽]", "새벽") == "나의 길 찾기"
+    assert strip_author("‘나’를 찾아서 - 새벽 홍길동", "새벽") == "‘나’를 찾아서"
+    # 별명만 들어 있는 제목은 그대로 둔다 (별명은 L3 에서 공개하는 이름이다)
+    assert strip_author("길을 찾아가는 [새벽] 이야기", "새벽") == "길을 찾아가는 [새벽] 이야기"
+    # 끝 부분에 그 글의 별명이 없으면 글쓴이 표기로 보지 않는다 (제목 안의 ' - ' 를 함부로 자르지 않는다)
+    assert strip_author("도망이 아니라 도전 - 두 번째 이야기", "새벽") == "도망이 아니라 도전 - 두 번째 이야기"
+    assert strip_author("나의 길 찾기 - 홍길동 [새벽]", "") == "나의 길 찾기 - 홍길동 [새벽]"
+
+
+def test_l3_title_goes_out_without_author_tail():
+    chunk = make_chunk("p9", 1, "창업 이야기").model_copy(update={"title": "나의 길 찾기 - 홍길동 [새벽]"})
+    assert to_source(chunk).title == "나의 길 찾기"
+    assert "홍길동" not in to_source(chunk).model_dump_json()
+    assert to_source(chunk.model_copy(update={"visibility": "L1"})).title == ""  # 익명 글은 제목 자체를 안 내보낸다
