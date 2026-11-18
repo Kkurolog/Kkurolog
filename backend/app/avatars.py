@@ -20,3 +20,23 @@ def avatar_id_for_key(key: str) -> str:
     """사람마다 고정된 값(key)으로 아바타 번호를 정한다. 예: 'avatar-3'"""
     digest = hashlib.sha256(key.encode("utf-8")).digest()
     return f"avatar-{digest[0] % AVATAR_COUNT + 1}"
+
+
+def avatar_ids_without_repeats(keys: list[str]) -> list[str]:
+    """
+    한 답변의 카드 순서대로 사람 key 를 받아 아바타 번호를 정한다.
+    - 같은 key(같은 선배)는 같은 번호
+    - 다른 key 끼리는 번호가 겹치지 않게, 이미 쓴 번호면 다음 번호로 (7 다음은 1)
+    - 서로 다른 선배가 그림 수(7)보다 많으면 그때부터는 겹칠 수밖에 없어서 원래 번호를 쓴다
+    """
+    chosen: dict[str, int] = {}  # key → 번호
+    for key in keys:
+        if key in chosen:
+            continue
+        n = int(avatar_id_for_key(key).removeprefix("avatar-"))
+        used = set(chosen.values())
+        if len(used) < AVATAR_COUNT:
+            while n in used:
+                n = n % AVATAR_COUNT + 1
+        chosen[key] = n
+    return [f"avatar-{chosen[key]}" for key in keys]

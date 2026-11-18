@@ -1,5 +1,6 @@
 """카드형 답변 조립 (app/rag/cards.py): 조각별 근거 검증, 카드별 출처, 별명 규칙, 글로 풀어 쓰기."""
 
+from app.avatars import avatar_id_for_key, avatar_ids_without_repeats
 from app.rag.adapter import to_ask_response
 from app.rag.cards import MAX_CARDS, avatar_id_for, compose_text, fill_headline, format_when
 from app.rag.config import RagSettings
@@ -199,3 +200,33 @@ def test_card_keeps_at_most_two_paragraphs_and_only_their_sources():
     only = to_ask_response(result).structured.cards[0]
     assert only.body == ["첫 문단", "둘째 문단"]
     assert [s.interview_id for s in only.sources] == ["p1"]
+
+
+def test_avatars_do_not_repeat_for_different_people_in_one_answer():
+    """한 답변 안에서 서로 다른 선배끼리 같은 그림이 나오지 않는다. 같은 선배는 같은 그림."""
+    base = avatar_id_for_key("p-saebyeok")
+    # 새벽 선배와 원래 번호가 겹치는 다른 사람을 만든다
+    clash = next(f"p-other-{i}" for i in range(1000) if avatar_id_for_key(f"p-other-{i}") == base)
+    other = make_chunk("p4", 1, "갭이어 이야기").model_copy(update={"person_id": clash})
+    cards = run(
+        [
+            card("창업 뒤 대학에 간 길", ("창업을 먼저 했대요.", ["p1-02"])),
+            card("쉬어 가며 찾은 길", ("갭이어를 보냈대요.", ["p4-01"])),
+        ],
+        chunks=[*CHUNKS[:3], other],
+    ).structured.cards
+    assert cards[0].avatar_id == base  # 앞 카드 선배는 평소 그림
+    assert cards[1].avatar_id != cards[0].avatar_id  # 뒤 카드의 다른 선배는 다른 그림
+
+
+def test_avatar_ids_without_repeats_rules():
+    a, b = "p-a", next(f"p-b{i}" for i in range(1000) if avatar_id_for_key(f"p-b{i}") == avatar_id_for_key("p-a"))
+    result = avatar_ids_without_repeats([a, b, a])
+    assert result[0] == result[2] == avatar_id_for_key(a)  # 같은 선배는 같은 그림
+    assert result[1] != result[0]  # 다른 선배는 다른 그림
+    # 서로 다른 선배가 7명까지는 모두 다른 그림
+    seven = avatar_ids_without_repeats([f"person-{i}" for i in range(7)])
+    assert len(set(seven)) == 7
+    # 8명째부터는 겹칠 수밖에 없지만 범위 안의 값이다
+    eight = avatar_ids_without_repeats([f"person-{i}" for i in range(8)])
+    assert set(eight) <= {f"avatar-{n}" for n in range(1, 8)}
