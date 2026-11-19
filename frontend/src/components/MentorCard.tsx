@@ -1,9 +1,10 @@
 // 멘토 카드 하나. (와이어프레임 03-1 Mentor Card)
-// 사진 자리 / 이름 + 메일 쓰기 버튼 / 한 줄 소개 / 키워드 pill 2~3개를 가운데 정렬로 쌓는다.
+// 아바타 / 이름 + 메일 쓰기 버튼 / 한 줄 소개 / 키워드 pill 2~3개를 가운데 정렬로 쌓는다.
 // 멘토 리스트 화면과, 채팅에서 근거가 부족할 때 추천 멘토로 함께 쓴다.
 // - reason: 추천 이유 한 줄 (채팅 추천에서만 넘긴다)
 // 연락이 불가능한 멘토(available=false)는 메일 버튼이 흐리게 보이고 누를 수 없다.
 import type { Mentor } from "@/lib/api";
+import { avatarSrc } from "@/lib/avatar";
 import { MailIcon } from "./icons";
 
 type Props = {
@@ -17,13 +18,22 @@ function toKeyword(path: string) {
   return `#${path.replace(/\s*진학$/, "")}`;
 }
 
-// 사진이 아직 없어서, 이름 첫 글자를 동그라미 안에 보여준다
-export function MentorPhoto({ name, size = "lg" }: { name: string; size?: "lg" | "md" }) {
+// 멘토 아바타. avatarId("avatar-1"~"avatar-7")에 맞는 그림(public/avatars)을 보여준다.
+// 답변 카드에 나온 같은 선배와 같은 그림이다 (번호는 backend 가 정한다).
+// 번호를 모르면 예전처럼 이름 첫 글자를 동그라미 안에 보여준다.
+export function MentorPhoto({ name, avatarId, size = "lg" }: { name: string; avatarId?: string | null; size?: "lg" | "md" }) {
+  const src = avatarSrc(avatarId);
+  const box = size === "lg" ? "size-[72px]" : "size-14";
+  if (src) {
+    // 작은 SVG 파일이라 next/image 의 최적화가 필요 없다 → 일반 img 를 쓴다
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" aria-hidden="true" width={72} height={72} className={`${box} shrink-0 rounded-full`} />;
+  }
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border-2 border-brand bg-sky font-display text-brand ${
-        size === "lg" ? "size-[72px] text-[28px]" : "size-14 text-2xl"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border-2 border-brand bg-sky font-display text-brand ${box} ${
+        size === "lg" ? "text-[28px]" : "text-2xl"
       }`}
     >
       {name.charAt(0)}
@@ -36,7 +46,7 @@ export default function MentorCard({ mentor, onContact, reason }: Props) {
 
   return (
     <article className="flex w-full flex-col items-center gap-4 text-center">
-      <MentorPhoto name={mentor.name} />
+      <MentorPhoto name={mentor.name} avatarId={mentor.avatar_id} />
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-2">
           <h3 className="text-lg font-bold text-ink">{mentor.name}</h3>

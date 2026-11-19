@@ -106,7 +106,7 @@ class AnswerCard(BaseModel):
     body: list[str] = Field(..., description="본문 조각 2~4개. 근거가 확인된 것만 남는다. 주어 없이 쓴 문장이다")
     sources: list[Source] = Field(..., description="이 카드가 인용한 글 (카드별 출처, 보통 1개)")
     avatar_id: str = Field(
-        ..., description="'avatar-1'~'avatar-8'. 같은 선배는 어느 답변에서든 같은 값. 그림이 없으면 순번 배지를 쓴다"
+        ..., description="'avatar-1'~'avatar-7'. 같은 선배는 어느 답변에서든 같은 값 (그림: frontend/public/avatars)"
     )
 
 
@@ -188,6 +188,13 @@ class Mentor(BaseModel):
     tags: list[str] = Field(default_factory=list, description="주요 경험 태그")
     topics: list[str] = Field(default_factory=list, description="답변 가능 주제")
     available: bool = Field(..., description="지금 연락을 받을 수 있는지")
+    avatar_id: str = Field(
+        ...,
+        description=(
+            "'avatar-1'~'avatar-7'. person_id(인터뷰 인물과 연결된 멘토)로 정해서 답변 카드의 같은 선배와 같은 그림이 나온다. "
+            "연결이 없으면 멘토 ID 로 정한다"
+        ),
+    )
 
 
 class RecommendRequest(BaseModel):

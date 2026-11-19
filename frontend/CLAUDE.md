@@ -19,12 +19,13 @@ frontend/src/
 │  ├─ ChatMessageView.tsx # 채팅 메시지 하나 (질문 말풍선 / 답변 글 + 출처 링크 / 근거 부족 시 추천 멘토)
 │  ├─ GuidePage.tsx       # 메인 화면 오른쪽 아래 접힌 귀퉁이 → 넘기면 나오는 사용 가이드
 │  ├─ SourcePanel.tsx     # 출처 링크를 누르면 오른쪽에 열리는 인터뷰 출처 패널
-│  ├─ MentorCard.tsx      # 멘토 카드 하나 (사진 자리·이름·메일 버튼·소개·키워드)
+│  ├─ MentorCard.tsx      # 멘토 카드 하나 (아바타·이름·메일 버튼·소개·키워드)
 │  ├─ ContactModal.tsx    # 멘토에게 메일 쓰기 창 (작성 → 전송 중 → 완료, 닫기 확인)
 │  ├─ ConfirmDialog.tsx   # 확인 창 ("새 채팅을 시작할까요?", "작성을 그만둘까요?")
 │  └─ icons.tsx           # 선 아이콘 모음 (이모지 대신 사용)
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
+   ├─ avatar.ts           # 선배 아바타 번호(avatar-1~7) → 그림 주소 (public/avatars/avatar-01~07.svg)
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
    └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 자기소개 질문은 온보딩 답변으로 바로 답한다
 ```

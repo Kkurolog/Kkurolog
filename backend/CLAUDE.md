@@ -6,6 +6,7 @@ backend/
 ├─ app/
 │  ├─ main.py            # 앱 시작점: CORS 설정, 모든 라우트
 │  ├─ schemas.py         # 요청/응답 형식 (Pydantic). 프론트 lib/api.ts 타입과 맞춘다
+│  ├─ avatars.py         # 선배 아바타 번호(avatar-1~7). 답변 카드·멘토 카드가 같이 쓴다
 │  ├─ data/
 │  │  └─ mentors_demo.json  # 가짜 멘토 10명 (이메일 포함 = 내부 전용, mt-10은 동의 안 함)
 │  ├─ services/

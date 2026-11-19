@@ -10,14 +10,15 @@
      - 별명은 식별자가 아니다. 같은 별명을 쓰는 다른 사람이 있을 수 있다 (내부 식별은 person_id)
      - 서로 다른 사람이 같은 별명으로 함께 나오면, 구분할 기수 정보가 아직 없어서 둘 다 None 으로 둔다
   4. 선배 수·인사: headline 의 {n} 을 실제 카드 수로 바꾸고, 학생이 인사했으면 인사 한마디를 앞에 붙인다
-  5. 아바타: 선배마다 고정된 번호(avatar-1~8)를 붙인다. 그림이 준비되기 전에는 화면이 순번 배지를 보여 준다
+  5. 아바타: 선배마다 고정된 번호(avatar-1~7)를 붙인다 (app/avatars.py). 화면이 번호에 맞는 그림을 보여 준다
+     - 한 답변 안에서 서로 다른 선배끼리 그림이 겹치면 뒤쪽 선배를 다음 번호로 바꾼다
   6. 글로 풀어 쓰기: 카드를 그리지 못하는 화면도 읽을 수 있게 answer 문자열을 만든다
 """
 
-import hashlib
 import logging
 import re
 
+from app.avatars import avatar_id_for_key, avatar_ids_without_repeats
 from app.rag.models import Chunk, GeneratedCard, GeneratorOutput, RagCard, RagSource, RagStructured
 
 logger = logging.getLogger("uvicorn.error")
@@ -25,19 +26,21 @@ logger = logging.getLogger("uvicorn.error")
 MAX_CARDS = 4
 
 
-AVATAR_COUNT = 8
 GREETING_PREFIX = "안녕하세요! "
+
+
+def _avatar_key(chunk: Chunk) -> str:
+    """아바타를 정할 때 쓰는 사람 key: person_id, 없으면 글번호. 밖으로 내보내지 않는다."""
+    return chunk.person_id or chunk.source_id
 
 
 def avatar_id_for(chunk: Chunk) -> str:
     """
-    선배마다 고정된 아바타 번호 ('avatar-1'~'avatar-8'). 같은 선배는 어느 답변에서든 같은 값이 나온다.
-    내부 ID(person_id, 없으면 글번호)를 해시해서 정한다. 내부 ID 자체는 내보내지 않는다.
-    (파이썬 내장 hash() 는 서버를 켤 때마다 값이 달라져서 쓰지 않는다)
+    선배마다 고정된 아바타 번호 ('avatar-1'~'avatar-7'). 같은 선배는 어느 답변에서든 같은 값이 나온다.
+    내부 ID(person_id, 없으면 글번호)로 정한다. 내부 ID 자체는 내보내지 않는다. (계산은 app/avatars.py)
+    한 답변 안의 겹침 피하기는 compose 에서 avatar_ids_without_repeats 로 한다.
     """
-    key = chunk.person_id or chunk.source_id
-    digest = hashlib.sha256(key.encode("utf-8")).digest()
-    return f"avatar-{digest[0] % AVATAR_COUNT + 1}"
+    return avatar_id_for_key(_avatar_key(chunk))
 
 
 def fill_headline(headline: str, count: int, greeted: bool) -> str:
@@ -79,6 +82,8 @@ def assemble_cards(
         return None
 
     people = [_public_person(ids, given) for _, _, ids in kept]
+    # 한 답변 안에서 서로 다른 선배끼리 같은 그림이 나오지 않게 한다 (같은 선배는 같은 그림)
+    avatars = avatar_ids_without_repeats([_avatar_key(given[ids[0]]) for _, _, ids in kept])
     cards = [
         RagCard(
             nickname=_nickname(person, people),
@@ -86,9 +91,9 @@ def assemble_cards(
             one_liner=(card.one_liner or "").strip() or None,
             body=pieces,
             sources=[to_source(given[i]) for i in ids],
-            avatar_id=avatar_id_for(given[ids[0]]),
+            avatar_id=avatar,
         )
-        for (card, pieces, ids), person in zip(kept, people)
+        for (card, pieces, ids), person, avatar in zip(kept, people, avatars)
     ]
     return RagStructured(
         headline=fill_headline(output.headline, len(cards), greeted),

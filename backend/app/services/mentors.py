@@ -17,6 +17,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
+from app.avatars import avatar_id_for_key
 from app.mail import store as mail_store
 from app.mail.config import MailNotConfigured, mail_enabled
 from app.schemas import Mentor, MentorRecommendation, RecommendResponse
@@ -30,7 +31,7 @@ DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "mentors_demo.json
 
 # Supabase mentors 테이블의 칸 → 이 파일이 쓰는 이름 (JSON 과 같음)
 _DB_FIELDS = ("id", "name", "exit_year", "career_paths", "path_summary", "summary", "tags", "topics",
-              "consent", "available", "email")
+              "consent", "available", "email", "person_id")
 
 
 def _from_db(row: dict) -> dict | None:
@@ -61,8 +62,10 @@ def _consented_mentors() -> list[dict]:
 
 
 def _to_public(raw: dict) -> Mentor:
-    """내부 데이터를 공개용 형태로 바꾼다. Mentor 에 없는 필드(email 등)는 버려진다."""
-    return Mentor.model_validate(raw)
+    """내부 데이터를 공개용 형태로 바꾼다. Mentor 에 없는 필드(email, person_id 등)는 버려진다."""
+    # 아바타: 인터뷰 인물과 연결된 멘토면 person_id 로 정한다 → 답변 카드에 나온 같은 선배와 같은 그림
+    avatar_id = avatar_id_for_key(raw.get("person_id") or raw["id"])
+    return Mentor.model_validate({**raw, "avatar_id": avatar_id})
 
 
 def list_mentors() -> list[Mentor]:

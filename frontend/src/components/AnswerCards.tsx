@@ -1,7 +1,7 @@
 // 선배별 답변: 선배 한 명당 묶음 하나. (backend 응답의 structured 를 그린다)
 //   headline  — 맨 위, 큰 글씨 (질문에 대한 한 문장 답)
 //   compare   — 그 아래 회색 한 줄 (선배들이 무엇에서 갈리는지)
-//   선배 묶음  — 바탕·상자 없이 글로. 묶음 사이는 구분선 하나 + 번호 배지로 구분한다
+//   선배 묶음  — 바탕·상자 없이 글로. 묶음 사이는 구분선 하나 + 선배 아바타로 구분한다
 //               (구분선은 노트 바탕의 줄 하나를 굵게 만든 것처럼, 바탕 줄과 같은 자리에 놓인다 → RuledDivider)
 //   closing   — 맨 아래 (다음에 해 볼 것)
 // 흰 상자나 색 바탕을 두지 않는다. 다른 답변처럼 노트 줄 바탕 위에 글만 올린다 (디자인 통일).
@@ -10,6 +10,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 import type { AnswerCard, Source, StructuredAnswer } from "@/lib/api";
+import { avatarSrc } from "@/lib/avatar";
 
 type Props = {
   answer: StructuredAnswer;
@@ -30,14 +31,21 @@ function cardSourceLabel(source: Source) {
   return source.title ? `${when} · “${source.title}”` : when;
 }
 
-// 아바타 자리. 선배 그림(card.avatar_id = "avatar-1"~"avatar-8")이 준비되기 전까지는 카드 순번을 동그란 배지로 보여준다.
-// 나중에 그림이 생기면 이 안만 바꾸면 된다 (자리 크기 40px 는 그대로).
+// 선배 아바타. card.avatar_id("avatar-1"~"avatar-7")에 맞는 그림(public/avatars)을 48px 동그라미로 보여준다.
+// 같은 선배는 어느 답변에서든 같은 그림이다 (번호는 backend 가 정한다).
+// 번호를 모르면(그림이 없으면) 예전처럼 카드 순번을 동그란 배지로 보여준다.
+// 바로 옆 제목에 내용이 있으니 화면 읽기 프로그램에는 읽히지 않게 한다 (alt="", aria-hidden).
 function CardAvatar({ card, order }: { card: AnswerCard; order: number }) {
+  const src = avatarSrc(card.avatar_id);
+  if (src) {
+    // 작은 SVG 파일이라 next/image 의 최적화가 필요 없다 → 일반 img 를 쓴다
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" aria-hidden="true" width={48} height={48} className="size-12 shrink-0 rounded-full" />;
+  }
   return (
     <span
       aria-hidden="true"
-      data-avatar={card.avatar_id}
-      className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-brand bg-sky font-display text-lg text-brand"
+      className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border-2 border-brand bg-sky font-display text-lg text-brand"
     >
       {order}
     </span>
@@ -93,7 +101,7 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
     <li className="flex flex-col gap-5">
       {order > 1 && <RuledDivider />}
       <article>
-        <header className="flex items-start gap-3">
+        <header className="flex items-center gap-3.5">
           <CardAvatar card={card} order={order} />
           <div className="min-w-0">
             <h3 className="text-lg leading-7 font-bold break-keep text-ink">{title}</h3>
