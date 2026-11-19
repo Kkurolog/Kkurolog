@@ -127,3 +127,36 @@ python load_mentors.py --update-profiles  # (주의) 있는 멘토의 프로필�
 - 기본으로는 **이미 있는 멘토를 건드리지 않는다.** 처음 넣은 뒤로는 Supabase(대시보드·관리자 페이지)가 기준이라, 대시보드에서 고친 이름·메일·연락 가능이 되돌아가지 않는다.
 - `--update-profiles`는 있는 멘토의 프로필 칸(이름·연도·진로·요약·태그·주제·참여 동의)을 JSON으로 덮어쓴다. `email`·`available`·`person_id`는 그대로지만 **대시보드에서 고친 이름은 JSON 이름으로 돌아간다.**
 - `SUPABASE_DB_URL`(run_sql.py와 같음)로 접속하고, 한 트랜잭션으로 실행한다. 메일 주소는 화면에 출력하지 않는다 (있음/없음만).
+
+## eval_ask.py — 답변 품질 측정
+
+검색 설정·지시문·검색 방법을 바꿀 때마다 돌려서 **전후를 숫자로 비교**한다. 왜 필요한지와 처음 측정한 결과는 [docs/proposals/answer-quality-audit.md](../docs/proposals/answer-quality-audit.md).
+
+다른 스크립트와 달리 **backend 폴더에서, backend 가상환경으로** 실행한다 (`backend/.env`의 키를 쓴다).
+
+```bash
+cd backend   # backend 가상환경을 켠 상태에서
+
+# 1) 검색만: 답변 모델을 부르지 않는다. 비용이 거의 없다
+python ../scripts/eval_ask.py ../scripts/eval/questions.json ../scripts/eval/probes.json --retrieval-only
+python ../scripts/eval_ask.py ../scripts/eval/questions.json ../scripts/eval/probes.json --retrieval-only --sweep      # 설정 조합 비교
+python ../scripts/eval_ask.py ../scripts/eval/questions.json ../scripts/eval/probes.json --retrieval-only --no-intent  # 태그 우선 검색 없이
+
+# 2) 의도 분류만: 작은 분류 모델만 부른다
+python ../scripts/eval_ask.py --intent ../scripts/eval/intent_cases.json
+
+# 3) 전체: ⚠️ 질문마다 답변 모델을 부른다. 실제 비용이 나간다 (--confirm-cost 가 없으면 실행되지 않는다)
+python ../scripts/eval_ask.py ../scripts/eval/questions.json --confirm-cost
+```
+
+| 파일 | 내용 |
+|---|---|
+| `eval/questions.json` | 평가 질문 29개와 정답 글번호 (정답표는 초안, 데이터 담당 검수 중) |
+| `eval/probes.json` | 확인용 질문 34개: 꾸로록이 권하는 질문, 창업 질문 9가지 표현, 경로·분야별 질문, 짧은 질문. `expected_tags`에 "이 태그가 있는 선배의 글이 나와야 한다"를 적는다 |
+| `eval/intent_cases.json` | 의도 분류 시험 문장 69개와 기대하는 갈래·측면·태그 |
+
+- 지표: **하나라도 전달**(정답 글 중 하나라도 답변 모델에게 전달된 질문 수), **전달률**(정답 글이 들어갈 자리 중 실제로 들어간 비율), **태그 일치율**(전달된 글 중 기대 태그가 있는 선배의 글의 비율).
+- 질문 임베딩과 의도 분석 결과는 `data/eval/cache/`에 저장해 두고 다시 쓴다. 같은 질문을 여러 번 돌려도 유료 호출은 처음 한 번뿐이다 (분류 지시문을 고치면 의도 분석만 새로 부른다).
+- 결과는 `data/eval/`에 저장된다 (git에 올라가지 않는다). 전체 모드는 답변 문장도 저장하니 밖에 올리지 않는다.
+- **꾸로록이 권하는 질문을 바꿀 때는**(`backend/app/rag/intent.py`의 `Q_*`, `frontend/src/app/page.tsx`의 추천 질문) `probes.json`에도 넣고 검색만 측정으로 맞는 글이 전달되는지 확인한다.
+- 분류 지시문(`intent.py`)을 고친 뒤에는 2)를 돌린다. 예시 하나를 더하면 옆 문장의 분류가 바뀌는 일이 실제로 있었다.

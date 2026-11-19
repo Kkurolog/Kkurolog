@@ -86,6 +86,16 @@ def test_source_l3_keeps_url():
     assert source.url == "https://example.com"
 
 
+def test_source_title_only_for_l3():
+    """글 제목에는 졸업생 이름이 들어 있을 수 있어서, 원문 링크처럼 L3 일 때만 내보낸다."""
+    common = dict(alumni="졸업생", excerpt="원문", interview_id="p-1", title="새벽의 창업 이야기")
+    assert Source(**common, visibility="L3").title == "새벽의 창업 이야기"
+    assert Source(**common, visibility="L2").title is None
+    assert Source(**common, visibility="L1").title is None
+    assert Source(**common).title is None  # 공개 등급을 모르면 숨긴다
+    assert Source(**{**common, "title": ""}, visibility="L3").title is None  # 빈 제목은 null
+
+
 def test_source_without_visibility_hides_url():
     """공개 등급을 모르면 링크는 보수적으로 숨긴다 (excerpt 는 예전처럼 유지)."""
     source = Source(alumni="졸업생", excerpt="원문", interview_id="p-1", url="https://example.com")
@@ -362,6 +372,14 @@ def test_rag_build_failure_returns_temporary_message(monkeypatch):
     data = res.json()
     assert data["answer_type"] == "no_evidence" and data["has_enough_evidence"] is False
     assert data["answer"] == answer_service.TEMPORARY_ERROR_MESSAGE
+    # 화면이 "자료가 없어요"가 아니라 "잠깐 문제가 생겼어요"로 안내할 수 있게 표시한다
+    assert data["temporary_error"] is True
+
+
+def test_real_no_evidence_is_not_marked_as_temporary_error():
+    """진짜 근거 부족은 오류 표시가 붙지 않는다 (demo 의 근거 부족 답변)."""
+    data = ask("근거없음 질문").json()
+    assert data["answer_type"] == "no_evidence" and data["temporary_error"] is False
 
 
 # ---------------------------------------------------------------------------

@@ -32,8 +32,8 @@ class Source(BaseModel):
       - L0: 사용 불가 → 출처로 만들 수 없다 (만들려고 하면 오류)
       - L1: 익명으로 답변 근거만 → excerpt 를 자동으로 비운다 (원문 비공개)
       - L2: 익명 원문 구간 노출 → excerpt 는 채운다
-      - L3: 실명·멘토 연결 가능 → excerpt 를 채우고 url 도 보여준다
-    url(원문 글 주소)은 L3 일 때만 남긴다. gschool.kr 원문에는 작성자 이름이 있어서,
+      - L3: 실명·멘토 연결 가능 → excerpt 를 채우고 url·title 도 보여준다
+    url(원문 글 주소)과 title(글 제목)은 L3 일 때만 남긴다. gschool.kr 원문에는 작성자 이름이 있어서,
     L1·L2(익명) 글의 링크를 주면 누구인지 드러나기 때문이다.
     visibility 를 안 주면(None) 예전처럼 excerpt 를 그대로 보여준다. (demo·하위 호환, url 은 비움)
     """
@@ -47,6 +47,9 @@ class Source(BaseModel):
     visibility: Literal["L1", "L2", "L3"] | None = Field(None, description="공개 등급. 없으면 demo 데이터")
     date: str | None = Field(None, description="글·인터뷰 날짜 (예: '2021-05'). 오래된 정보인지 알려주는 용도")
     url: str | None = Field(None, description="원문 글 주소. L3 일 때만 채우고, 그 외에는 null (익명 보호)")
+    title: str | None = Field(
+        None, description="원문 글 제목. 제목에 졸업생 이름이 들어 있을 수 있어 L3 일 때만 채운다 (url 과 같은 규칙)"
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -59,7 +62,9 @@ class Source(BaseModel):
             if visibility == "L1":
                 data = {**data, "excerpt": None}
             if visibility != "L3":
-                data = {**data, "url": None}
+                data = {**data, "url": None, "title": None}
+            elif not data.get("title"):
+                data = {**data, "title": None}  # 빈 문자열은 null 로 통일
         return data
 
 
@@ -70,11 +75,59 @@ class Source(BaseModel):
 #   safety      : 위기 신호(자해·학대 등) → 상담 안내. 멘토 추천을 띄우지 않는 게 좋다
 AnswerType = Literal["answer", "no_evidence", "off_topic", "safety"]
 
+# 1차 의도 분석 결과 (app/rag/intent.py 의 Intent 와 같아야 한다)
+#   greeting        : 인사만
+#   about_service   : 꾸로록이 뭔지·뭘 할 수 있는지·어떻게 쓰는지
+#   career_question : 진로·거캠 생활 질문 (검색 + 답변 생성)
+#   smalltalk       : 잡담·감사·무관한 말
+#   unclear         : 막연해서 분야를 못 잡음 → 되묻기
+Intent = Literal["greeting", "about_service", "career_question", "smalltalk", "unclear"]
+
+# about_service 안에서 무엇을 묻는지 (app/rag/intent.py 의 AboutAspect 와 같아야 한다)
+#   what: 뭘 할 수 있어 / why: 왜 만들었어 / who: 누가 만들었어
+#   data: 자료가 어디서 났어 / trust: 믿어도 돼 / privacy: 내 질문 저장돼
+AboutAspect = Literal["what", "why", "who", "data", "trust", "privacy"]
+
+
+class AnswerCard(BaseModel):
+    """
+    카드형 답변의 카드 한 장 = 선배 한 명의 이야기.
+    실명과 내부 ID 는 넣지 않는다. 별명도 공개 등급 L3 인 선배만 넣는다.
+    """
+
+    id: str = Field(..., description="카드 ID (예: 'card-1'). 화면에서 목록 key 와 순번으로 쓴다")
+    nickname: str | None = Field(
+        None, description="선배 별명 (예: '꿍이'). 공개 등급 L3 일 때만. null 이면 label 을 제목으로 쓴다"
+    )
+    label: str = Field(..., description="그 선배가 택한 길 = 어떻게 갔나 (예: '작게 바로 시작한 길')")
+    one_liner: str | None = Field(
+        None, description="그 선배가 지금 무엇을 하고 있나 (예: '지금은 여행 스타트업을 운영해요'). 글에 없으면 null"
+    )
+    body: list[str] = Field(..., description="본문 조각 2~4개. 근거가 확인된 것만 남는다. 주어 없이 쓴 문장이다")
+    sources: list[Source] = Field(..., description="이 카드가 인용한 글 (카드별 출처, 보통 1개)")
+    avatar_id: str = Field(
+        ..., description="'avatar-1'~'avatar-8'. 같은 선배는 어느 답변에서든 같은 값. 그림이 없으면 순번 배지를 쓴다"
+    )
+
+
+class StructuredAnswer(BaseModel):
+    """카드형 답변. 제목만 읽어도 선배들의 길이 어떻게 다른지 보이게 한다."""
+
+    headline: str = Field(..., description="질문에 대한 한 문장 답")
+    compare: str | None = Field(None, description="선배들의 길이 어떻게 다른지 한 줄. 카드가 2장 이상일 때만")
+    cards: list[AnswerCard] = Field(..., description="선배별 카드 (1~4장)")
+    closing: str | None = Field(None, description="다음에 해 볼 만한 것 한 문장")
+
 
 class AskResponse(BaseModel):
     """질문에 대한 답변."""
 
-    answer: str = Field(..., description="학생에게 보여줄 답변")
+    answer: str = Field(
+        ..., description="학생에게 보여줄 답변 (글). structured 가 있으면 같은 내용을 글로 풀어 쓴 것이다"
+    )
+    structured: StructuredAnswer | None = Field(
+        None, description="카드형 답변. answer_type 이 answer 이고 실제 RAG 일 때만 온다 (demo·안내 문구는 null)"
+    )
     sources: list[Source] = Field(default_factory=list, description="답변에 사용한 출처 목록")
     has_enough_evidence: bool = Field(
         ...,
@@ -84,6 +137,33 @@ class AskResponse(BaseModel):
         ),
     )
     answer_type: AnswerType = Field("answer", description="답변 종류 (새 필드, 선택)")
+    temporary_error: bool = Field(
+        False,
+        description=(
+            "서버 쪽 문제(검색·AI 호출 실패 등)로 답하지 못했는지. true 면 answer_type 은 no_evidence 이지만 "
+            "'자료가 없다'가 아니라 '잠깐 문제가 생겼다'로 안내해야 한다. 원인은 서버 로그에 남는다"
+        ),
+    )
+    intent: Intent | None = Field(
+        None,
+        description=(
+            "학생의 말을 어떻게 이해했는지 (1차 의도 분석). 분석하지 않았으면 null. "
+            "greeting·about_service·smalltalk·unclear 는 고정 안내 문구로 답하며 answer_type 은 off_topic 이다"
+        ),
+    )
+    user_context: str | None = Field(
+        None, description="학생이 질문에서 스스로 밝힌 상황 요약 (예: '18세, 창업 준비 중'). 없으면 null. 저장하지 않는다"
+    )
+    about_aspect: AboutAspect | None = Field(
+        None,
+        description=(
+            "꾸로록 자신에 대한 질문(intent=about_service)에 고정 문구로 답했을 때 어느 측면인지. 그 외에는 null. "
+            "선배 글이 아니라 꾸로록이 직접 하는 설명이므로 sources 는 비어 있다"
+        ),
+    )
+    follow_ups: list[str] = Field(
+        default_factory=list, description="다음에 물어볼 만한 예시 질문 (about_service 일 때 2개). answer 글에도 들어 있다"
+    )
 
 
 # ---------------------------------------------------------------------------

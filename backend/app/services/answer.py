@@ -27,6 +27,7 @@ import logging
 import re
 
 from app import config
+from app.rag.intent import INTRO_MESSAGE, fast_path_intent
 from app.schemas import AnswerType, AskResponse, Source
 
 logger = logging.getLogger("uvicorn.error")
@@ -147,7 +148,9 @@ def _rag_answer(question: str) -> AskResponse:
         pipeline = get_rag_pipeline()
     except Exception:
         logger.exception("RAG 파이프라인을 만들지 못했어요 (requirements-rag.txt 설치, API 키를 확인하세요)")
-        return _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
+        answer = _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
+        answer.temporary_error = True  # '자료가 없다'가 아니라 '잠깐 문제가 생겼다'로 화면에 보이게 한다
+        return answer
     return to_ask_response(pipeline.answer(question))  # pipeline.answer 는 스스로 오류를 처리한다
 
 
@@ -161,6 +164,12 @@ def make_answer(question: str) -> AskResponse:
         return _rag_answer(question)
 
     # ---- 아래는 demo 답변 ----
+    # 인사만 온 경우: demo 에서도 꾸로록 소개로 답한다 (LLM 없이 빠른 경로만. 자세한 건 app/rag/intent.py)
+    if fast_path_intent(question) is not None:
+        return AskResponse(
+            answer=INTRO_MESSAGE, sources=[], has_enough_evidence=True, answer_type="off_topic", intent="greeting"
+        )
+
     if any(word in question for word in OFF_TOPIC_KEYWORDS):
         return _special_answer("off_topic", OFF_TOPIC_MESSAGE)
 

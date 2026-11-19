@@ -7,7 +7,7 @@ from app.rag.adapter import to_ask_response
 from app.rag.config import RagSettings
 from app.rag.generator import ClaudeGenerator, build_user_message
 from app.rag.messages import NO_EVIDENCE_MESSAGE, OFF_TOPIC_MESSAGE, SAFETY_MESSAGE, TEMPORARY_ERROR_MESSAGE
-from app.rag.models import Chunk, GeneratorOutput
+from app.rag.models import CardPiece, Chunk, GeneratedCard, GeneratorOutput
 from app.rag.pipeline import RagPipeline, to_source
 from app.rag.store import InMemoryVectorStore, _flatten_row
 
@@ -24,9 +24,11 @@ class FakeGenerator:
     def __init__(self, output: GeneratorOutput):
         self.output = output
         self.calls = []
+        self.intents = []  # 호출마다 넘어온 1차 의도 분석 결과
 
-    def generate(self, question, docs):
+    def generate(self, question, docs, intent=None):
         self.calls.append((question, docs))
+        self.intents.append(intent)
         return self.output
 
 
@@ -64,8 +66,18 @@ def pipeline(output, **settings):
     return RagPipeline(FakeEmbedder(), InMemoryVectorStore(CHUNKS), gen, s), gen
 
 
+def card(label, *pieces):
+    """카드 한 장. pieces 는 (글, [근거 chunk id]) 묶음."""
+    return GeneratedCard(label=label, one_liner=f"{label} 한 줄", body=[CardPiece(text=t, chunk_ids=i) for t, i in pieces])
+
+
 def answer_output(ids):
-    return GeneratorOutput(answer_type="answer", answer="선배는 이렇게 선택했어요.", used_chunk_ids=ids)
+    """ids 를 근거로 든 카드 한 장짜리 답변."""
+    return GeneratorOutput(
+        answer_type="answer",
+        headline="선배는 이렇게 선택했어요.",
+        cards=[card("먼저 해 본 길", ("직접 해 보며 배웠대요.", ids))],
+    )
 
 
 def test_answer_uses_only_cited_chunks_and_adds_neighbors():
@@ -111,7 +123,7 @@ def test_safety_keyword_skips_search_and_claude():
 
 
 def test_no_hits_still_classified_by_claude():
-    p, gen = pipeline(GeneratorOutput(answer_type="off_topic", answer="", used_chunk_ids=[]))
+    p, gen = pipeline(GeneratorOutput(answer_type="off_topic"))
     result = p.answer("오늘 저녁 메뉴 추천")
     assert gen.calls and gen.calls[0][1] == []  # 근거 없이 분류만
     assert result.answer_type == "off_topic" and result.answer == OFF_TOPIC_MESSAGE
@@ -129,7 +141,8 @@ def test_no_hits_without_classification_skips_claude():
 
 
 def test_claude_safety_overrides_answer_text():
-    p, _ = pipeline(GeneratorOutput(answer_type="safety", answer="무언가", used_chunk_ids=["p1-02"]))
+    output = answer_output(["p1-02"]).model_copy(update={"answer_type": "safety"})
+    p, _ = pipeline(output)
     result = p.answer("창업 하다가 너무 지쳤어")
     assert result.answer == SAFETY_MESSAGE and result.sources == []
 
@@ -160,7 +173,9 @@ def test_adapter_uses_new_fields_and_keeps_l1_without_excerpt():
     p1, p2 = res["sources"]
     assert "창업 후 대학" in p1["excerpt"] and "마무리 이야기" in p1["excerpt"]
     assert p1["visibility"] == "L3" and p1["url"] == "https://example.com/p1" and p1["date"] == "2023-05-10"
+    assert p1["title"] == "p1 제목"  # L3 는 글 제목도 나간다
     assert p2["visibility"] == "L1" and p2["excerpt"] is None and p2["url"] is None
+    assert p2["title"] is None  # 익명 글은 제목을 내보내지 않는다
     assert "새벽" not in p2["alumni"]
 
 
@@ -212,10 +227,16 @@ def text_response(payload, stop_reason="end_turn"):
 
 
 def test_claude_generator_parses_structured_output():
-    payload = {"answer_type": "answer", "answer": "답", "used_chunk_ids": ["p1-02"]}
+    payload = {
+        "answer_type": "answer",
+        "headline": "답",
+        "compare": None,
+        "cards": [{"label": "길", "one_liner": "한 줄", "body": [{"text": "조각", "chunk_ids": ["p1-02"]}]}],
+        "closing": None,
+    }
     client, messages = fake_client(text_response(payload))
     out = ClaudeGenerator("claude-opus-5-5", "medium", 16000, client=client).generate("질문", [])
-    assert out.used_chunk_ids == ["p1-02"]
+    assert out.cards[0].body[0].chunk_ids == ["p1-02"]
     assert messages.kwargs["output_config"]["format"]["type"] == "json_schema"
     assert messages.kwargs["fallbacks"] == "default"
 
@@ -236,7 +257,7 @@ def test_user_message_escapes_injection_tags():
 
 
 class BrokenGenerator:
-    def generate(self, question, docs):
+    def generate(self, question, docs, intent=None):
         raise TimeoutError("Claude 응답 시간 초과")
 
 
@@ -250,7 +271,13 @@ def test_claude_failure_becomes_temporary_no_evidence():
     result = p.answer("창업 대학")
     assert result.answer_type == "no_evidence" and result.failed is True
     assert result.answer == TEMPORARY_ERROR_MESSAGE and result.sources == []
-    assert to_ask_response(result).has_enough_evidence is False
+    res = to_ask_response(result)
+    assert res.has_enough_evidence is False and res.temporary_error is True  # 근거 부족과 구분되는 표시
+    # 정상 답변과 진짜 근거 부족에는 표시가 붙지 않는다
+    ok, _ = pipeline(answer_output(["p1-02"]))
+    assert to_ask_response(ok.answer("창업 대학")).temporary_error is False
+    none, _ = pipeline(GeneratorOutput(answer_type="no_evidence"))
+    assert to_ask_response(none.answer("창업 대학")).temporary_error is False
 
 
 def test_embedding_failure_becomes_temporary_no_evidence():
@@ -320,3 +347,25 @@ def test_neighbors_never_ask_for_index_zero():
     store = SpyStore(CHUNKS)
     RagPipeline(FakeEmbedder(), store, gen, RagSettings(similarity_floor=0.5)).answer("갭이어")
     assert store.asked and all(i >= 1 for idx in store.asked for i in idx)
+
+
+# ---- 글 제목 끝의 글쓴이 표기(실명)는 지운다 ----
+
+
+def test_strip_author_removes_real_name_tail():
+    from app.rag.pipeline import strip_author
+
+    assert strip_author("나의 길 찾기 - 홍길동 [새벽]", "새벽") == "나의 길 찾기"
+    assert strip_author("‘나’를 찾아서 - 새벽 홍길동", "새벽") == "‘나’를 찾아서"
+    # 별명만 들어 있는 제목은 그대로 둔다 (별명은 L3 에서 공개하는 이름이다)
+    assert strip_author("길을 찾아가는 [새벽] 이야기", "새벽") == "길을 찾아가는 [새벽] 이야기"
+    # 끝 부분에 그 글의 별명이 없으면 글쓴이 표기로 보지 않는다 (제목 안의 ' - ' 를 함부로 자르지 않는다)
+    assert strip_author("도망이 아니라 도전 - 두 번째 이야기", "새벽") == "도망이 아니라 도전 - 두 번째 이야기"
+    assert strip_author("나의 길 찾기 - 홍길동 [새벽]", "") == "나의 길 찾기 - 홍길동 [새벽]"
+
+
+def test_l3_title_goes_out_without_author_tail():
+    chunk = make_chunk("p9", 1, "창업 이야기").model_copy(update={"title": "나의 길 찾기 - 홍길동 [새벽]"})
+    assert to_source(chunk).title == "나의 길 찾기"
+    assert "홍길동" not in to_source(chunk).model_dump_json()
+    assert to_source(chunk.model_copy(update={"visibility": "L1"})).title == ""  # 익명 글은 제목 자체를 안 내보낸다

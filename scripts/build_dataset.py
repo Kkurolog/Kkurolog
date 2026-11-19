@@ -30,7 +30,9 @@ from check_tags import load_tags
 ROOT = Path(__file__).resolve().parent.parent
 PROCESSED = ROOT / "data" / "processed"
 BASE = PROCESSED / "base"
-VISIBILITY = "L1"  # 학교 사용 허락 전: 익명으로 답변 근거만 (docs/DATA.md 공개 등급)
+# 공개 등급 (docs/DATA.md). 2026-11-18 교장선생님 허락으로 L1(익명, 근거로만) → L3(별명·제목·원문 링크 공개).
+# 근거와 실행 순서: docs/proposals/visibility-l3.md. 실명은 L3 에서도 내보내지 않는다.
+VISIBILITY = "L3"
 SITE = "gschool.kr"
 
 
