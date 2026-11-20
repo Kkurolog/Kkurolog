@@ -17,9 +17,11 @@
 |---|---|
 | **질문하기** (`/`) | 채팅 형태로 질문 → demo 답변 + 출처 카드 + **관련 경험을 가진 멘토 1~3명** 추천. 근거가 부족하면(질문에 `근거없음` 포함) 추천 멘토를 크게 강조 |
 | **멘토 찾기** (`/mentors`) | 멘토 카드 목록. 진로 경로 탭 + 이름·태그·주제 검색 |
-| **연락하기** 팝업 | 멘토 카드의 "연락하기" → 이름·답장 이메일·제목·질문 입력 → 꾸로록이 전달 (**지금은 실제 메일을 보내지 않고 서버 로그에만 남김**) |
+| **연락하기** 팝업 | 멘토 카드의 "연락하기" → 이름·답장 이메일·제목·질문 입력 → 꾸로록이 중계 메일로 멘토에게 전달, 멘토가 답장하면 학생에게 자동 전달 (운영 서버에서만. 로컬 기본값은 서버 로그에만 남김) |
 
-아직 없는 것: 실제 인터뷰 데이터, RAG(임베딩·Claude), 실제 이메일 발송, 대화 내역 저장(새로고침하면 사라짐).
+아직 없는 것: 실제 인터뷰 데이터, RAG(임베딩·Claude), 대화 내역 저장(새로고침하면 사라짐), 관리자 화면(관리자 기능은 API로 먼저 있음).
+
+멘토 문의 메일 자동화(Supabase + 중계 Gmail): [apps-script/README.md](apps-script/README.md), 운영·인수인계: [apps-script/docs/HANDOVER.md](apps-script/docs/HANDOVER.md)
 
 ### backend API
 | 주소 | 하는 일 |
@@ -28,17 +30,20 @@
 | `POST /ask` | 질문 → 답변 + 출처 + 근거 충분 여부 (demo) |
 | `GET /mentors` | 멘토 목록 (참여 동의한 멘토만, 이메일 제외) |
 | `POST /mentors/recommend` | 질문 → 추천 멘토 최대 3명 + 추천 이유 |
-| `POST /contact-requests` | 멘토에게 첫 연락 전달 (지금은 로그만) |
+| `POST /contact-requests` | 멘토에게 첫 연락 전달 (`MAIL_ENABLED=true`면 실제 메일, 아니면 로그만) |
+| `/admin/*` | 관리자: 문의 기록·멘토·메일 문구 (공용 비밀번호 로그인, [ADMIN_API.md](apps-script/docs/ADMIN_API.md)) |
 
 자세한 요청·응답 형식은 backend를 켠 뒤 http://localhost:8000/docs 에서 볼 수 있다.
 
 ## 폴더 구조
 ```
 Kkurolog/
-├─ frontend/   # Next.js + TypeScript + Tailwind (화면)
-├─ backend/    # Python + FastAPI (API)
-├─ docs/       # 프로젝트 문서
-└─ scripts/    # 나중에 데이터 정제·적재 스크립트
+├─ frontend/    # Next.js + TypeScript + Tailwind (화면)
+├─ backend/     # Python + FastAPI (API)
+├─ apps-script/ # 멘토 문의 메일 자동화 (중계 Gmail 쪽 코드 + 문서)
+├─ supabase/    # Supabase 테이블 SQL
+├─ docs/        # 프로젝트 문서
+└─ scripts/     # 나중에 데이터 정제·적재 스크립트
 ```
 
 ## 로컬 실행 방법
@@ -70,6 +75,7 @@ uvicorn app.main:app --reload
 - http://localhost:8000/health 에서 `{"status":"ok"}`가 나오면 성공
 - http://localhost:8000/docs 에서 API를 직접 눌러볼 수 있다
 - 테스트: `pytest` (backend 폴더, venv 켠 상태)
+- `uvicorn` 실행이 보안 정책으로 막히면 `python -m uvicorn app.main:app --reload`로 켠다
 
 ### 2. frontend 실행 (터미널 2)
 ```bash
