@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <!-- 꾸로록 로고 (src/components/Logo.tsx와 같은 그림). 색은 globals.css의 accent·brand 값 -->
+  <circle cx="18" cy="18" r="16.5" fill="#f7de5f" stroke="#0056c7" stroke-width="2.2" />
+  <ellipse cx="13" cy="16" rx="3.4" ry="4.6" fill="#fff" stroke="#0056c7" stroke-width="1.6" />
+  <ellipse cx="23" cy="16" rx="3.4" ry="4.6" fill="#fff" stroke="#0056c7" stroke-width="1.6" />
+  <circle cx="13.4" cy="14.6" r="1.7" fill="#0056c7" />
+  <circle cx="23.4" cy="14.6" r="1.7" fill="#0056c7" />
+</svg>
