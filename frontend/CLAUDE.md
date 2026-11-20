@@ -12,7 +12,7 @@ frontend/src/
 │  ├─ mentors/page.tsx    # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
-│  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴). 새 채팅 확인 창
+│  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴 + 최근 대화 기록, 대화 지우기)
 │  ├─ Logo.tsx            # 꾸로록 로고 (노란 얼굴 + 눈)
 │  ├─ Kkuro.tsx           # 꾸로록 캐릭터 '빼꼼 꾸로록' 눈·작은 돔. 표정: 기본/듣는 중/생각 중/찾았다!/거꾸로
 │  ├─ QuestionForm.tsx    # 질문 입력창 + 보내기 (Enter 보내기, Shift+Enter 줄바꿈)
@@ -26,7 +26,7 @@ frontend/src/
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
-   └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 자기소개 질문은 온보딩 답변으로 바로 답한다
+   └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 대화 기록은 이 브라우저 localStorage 에만 저장(최대 30개). 자기소개·인사는 온보딩 답변
 ```
 - 새 페이지는 `app/폴더명/page.tsx`로 만든다 (예: `app/mentors/page.tsx` → `/mentors`).
 - 스타일은 `className`에 Tailwind 클래스로 쓴다.

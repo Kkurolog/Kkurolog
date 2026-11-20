@@ -1,16 +1,46 @@
 // 채팅 대화 상태를 한 곳에서 관리한다.
 // layout.tsx 가 <ChatProvider>로 모든 페이지를 감싸고, 화면에서는 useChat() 으로 꺼내 쓴다.
-// 이렇게 하면 멘토 리스트에 갔다가 돌아와도 대화가 그대로 남아 있고,
-// 왼쪽 메뉴의 '새 채팅'에서도 대화가 있는지 확인하고(→ 확인 창) 지울 수 있다.
 //
-// 지금: 대화 내역은 메모리에만 있어서 새로고침하면 사라진다.
-//       backend 는 질문마다 따로 답한다 (이전 대화 맥락은 보내지 않음).
-// 나중 계획: 대화 내역을 브라우저 localStorage 에 저장 → 이 파일 안에서만 고치면 된다.
+// 대화 기록(히스토리):
+// - 대화는 여러 개(conversations)를 갖고, 지금 보고 있는 대화(currentId)가 하나 있다.
+// - 대화 기록은 이 브라우저의 localStorage 에만 저장한다. 서버에는 올리지 않는다.
+//   (학생 상당수가 미성년자라 질문 내용을 서버에 쌓지 않는다. 같은 기기를 쓰는 사람에겐 보이니
+//    사이드바에서 대화마다 지울 수 있게 했다)
+// - '새 채팅'은 지금 대화를 기록에 남겨 두고 빈 화면으로 간다. 사이드바의 '최근 대화'에서 다시 열 수 있다.
+// - backend 는 질문마다 따로 답한다 (이전 대화 맥락은 보내지 않음).
 "use client";
 
-import { createContext, createElement, useContext, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
 import { askQuestion, recommendMentors } from "./api";
-import type { AssistantMessage, ChatMessage } from "./types";
+import type { AssistantMessage, ChatMessage, Conversation } from "./types";
+
+const STORAGE_KEY = "kkurolog-chats-v1"; // 대화 기록을 저장하는 브라우저 저장소 이름 (형식이 바뀌면 v2 로)
+const MAX_CONVERSATIONS = 30; // 이보다 많으면 오래된 대화부터 지운다
+
+// 브라우저 저장소는 막혀 있거나(시크릿 모드 등) 내용이 망가져 있을 수 있어서, 실패해도 화면이 멈추지 않게 감싼다
+function loadConversations(): Conversation[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as Conversation[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveConversations(conversations: Conversation[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  } catch {
+    // 저장소가 가득 찼거나 막혀 있으면 이번 방문 동안만 기억한다
+  }
+}
+
+// 대화 제목: 첫 질문을 30자까지 자른다
+function titleFrom(question: string) {
+  const text = question.replace(/\s+/g, " ").trim();
+  return text.length > 30 ? `${text.slice(0, 30)}…` : text;
+}
 
 // 메시지마다 붙이는 고유 ID (화면에서 목록을 그릴 때 key 로 쓴다)
 function newId() {
@@ -40,74 +70,130 @@ function isOnboardingQuestion(question: string) {
   return /자기\s*소개|너는\s*누구|넌\s*누구|누구야/.test(question) || isGreetingOnly(question);
 }
 
+// 질문 하나에 대한 답변 메시지를 만든다 (온보딩이면 고정 답변, 아니면 backend)
+async function buildReply(question: string): Promise<AssistantMessage> {
+  if (isOnboardingQuestion(question)) {
+    await new Promise((resolve) => setTimeout(resolve, 700)); // '답변 준비 중' 화면이 잠깐 보이게
+    return {
+      id: newId(),
+      role: "assistant",
+      content: ONBOARDING_ANSWER,
+      question,
+      sources: [],
+      hasEnoughEvidence: true,
+      mentors: [],
+    };
+  }
+  try {
+    // 답변과 멘토 추천을 동시에 요청한다.
+    // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
+    const [result, recommend] = await Promise.all([
+      askQuestion(question),
+      recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
+    ]);
+    return {
+      id: newId(),
+      role: "assistant",
+      content: result.answer,
+      question,
+      sources: result.sources,
+      hasEnoughEvidence: result.has_enough_evidence,
+      mentors: recommend.recommendations,
+    };
+  } catch (err) {
+    return {
+      id: newId(),
+      role: "assistant",
+      content:
+        err instanceof Error && !err.message.startsWith("서버 오류")
+          ? err.message // 429(질문 횟수 초과) 같은 안내 문구
+          : "답변을 가져오지 못했어요. backend 서버가 켜져 있는지 확인해 주세요.",
+      question,
+      sources: [],
+      hasEnoughEvidence: true,
+      mentors: [],
+      isError: true,
+    };
+  }
+}
+
 function useChatState() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false); // 답변을 기다리는 중인지
+  const [conversations, setConversations] = useState<Conversation[]>([]); // 최근 대화가 앞쪽
+  const [currentId, setCurrentId] = useState<string | null>(null); // 지금 보고 있는 대화 (null 이면 새 채팅 화면)
+  const [pendingIds, setPendingIds] = useState<string[]>([]); // 답변을 기다리는 대화들
+  const loaded = useRef(false); // 저장된 기록을 다 불러오기 전에는 저장하지 않는다 (빈 목록으로 덮어쓰지 않게)
+
+  // 처음 열 때 저장된 대화 기록을 불러온다 (localStorage 는 브라우저에서만 읽을 수 있어서 화면이 뜬 뒤에 읽는다)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setConversations(loadConversations());
+      loaded.current = true;
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 대화가 바뀔 때마다 저장한다
+  useEffect(() => {
+    if (loaded.current) saveConversations(conversations);
+  }, [conversations]);
+
+  const current = conversations.find((c) => c.id === currentId) ?? null;
+  const messages = current?.messages ?? [];
+  const loading = currentId !== null && pendingIds.includes(currentId);
+
+  // 대화 하나에 메시지를 붙이고, 그 대화를 목록 맨 앞으로 올린다
+  function append(conversationId: string, message: ChatMessage) {
+    setConversations((prev) => {
+      const target = prev.find((c) => c.id === conversationId);
+      if (!target) return prev; // 기다리는 사이 지워진 대화면 버린다
+      const updated = { ...target, messages: [...target.messages, message], updatedAt: Date.now() };
+      return [updated, ...prev.filter((c) => c.id !== conversationId)];
+    });
+  }
 
   async function ask(question: string) {
-    // 1. 학생 질문을 먼저 화면에 쌓는다
-    setMessages((prev) => [...prev, { id: newId(), role: "user", content: question }]);
-    setLoading(true);
-
-    // 2. 답변 메시지를 만든다
-    let reply: AssistantMessage;
-    if (isOnboardingQuestion(question)) {
-      await new Promise((resolve) => setTimeout(resolve, 700)); // '답변 준비 중' 화면이 잠깐 보이게
-      reply = {
+    // 1. 새 채팅 화면이면 대화를 새로 만들고, 학생 질문을 먼저 쌓는다
+    let conversationId = currentId;
+    const userMessage: ChatMessage = { id: newId(), role: "user", content: question };
+    if (conversationId === null) {
+      const created: Conversation = {
         id: newId(),
-        role: "assistant",
-        content: ONBOARDING_ANSWER,
-        question,
-        sources: [],
-        hasEnoughEvidence: true,
-        mentors: [],
+        title: titleFrom(question),
+        updatedAt: Date.now(),
+        messages: [userMessage],
       };
+      conversationId = created.id;
+      setConversations((prev) => [created, ...prev].slice(0, MAX_CONVERSATIONS));
+      setCurrentId(created.id);
     } else {
-      try {
-        // 답변과 멘토 추천을 동시에 요청한다.
-        // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
-        const [result, recommend] = await Promise.all([
-          askQuestion(question),
-          recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
-        ]);
-        reply = {
-          id: newId(),
-          role: "assistant",
-          content: result.answer,
-          question,
-          sources: result.sources,
-          hasEnoughEvidence: result.has_enough_evidence,
-          mentors: recommend.recommendations,
-        };
-      } catch (err) {
-        reply = {
-          id: newId(),
-          role: "assistant",
-          content:
-            err instanceof Error && !err.message.startsWith("서버 오류")
-              ? err.message // 429(질문 횟수 초과) 같은 안내 문구
-              : "답변을 가져오지 못했어요. backend 서버가 켜져 있는지 확인해 주세요.",
-          question,
-          sources: [],
-          hasEnoughEvidence: true,
-          mentors: [],
-          isError: true,
-        };
-      }
+      append(conversationId, userMessage);
     }
+    const id = conversationId;
+    setPendingIds((prev) => [...prev, id]);
 
-    // 3. 답변을 화면에 쌓는다
-    setMessages((prev) => [...prev, reply]);
-    setLoading(false);
+    // 2. 답변을 받아 '질문했던 그 대화'에 붙인다 (기다리는 사이 다른 대화를 열어도 섞이지 않는다)
+    const reply = await buildReply(question);
+    append(id, reply);
+    setPendingIds((prev) => prev.filter((p) => p !== id));
   }
 
-  // 새 채팅: 대화를 모두 지운다
-  function reset() {
-    setMessages([]);
-    setLoading(false);
+  // 새 채팅: 지금 대화는 기록에 남겨 두고 빈 화면으로
+  function startNew() {
+    setCurrentId(null);
   }
 
-  return { messages, loading, ask, reset };
+  // 최근 대화 하나 열기
+  function open(conversationId: string) {
+    setCurrentId(conversationId);
+  }
+
+  // 대화 하나 지우기 (지금 보던 대화면 새 채팅 화면으로)
+  function remove(conversationId: string) {
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    if (conversationId === currentId) setCurrentId(null);
+  }
+
+  return { conversations, currentId, messages, loading, ask, startNew, open, remove };
 }
 
 type ChatState = ReturnType<typeof useChatState>;

@@ -2,7 +2,8 @@
 // - 닫힘(기본, 와이어프레임 01): 72px 레일. 로고 + 아이콘(새 채팅 / 멘토 리스트). 마우스를 올리면 툴팁.
 //   로고에 마우스를 올리면 '사이드바 열기' 아이콘으로 바뀌고, 누르면 사이드바가 열린다. (01-1)
 // - 열림(01-4): 280px. 아이콘 + 메뉴 이름. 지금 위치한 메뉴는 연한 블루 배경. 오른쪽 위 버튼으로 닫는다.
-// '새 채팅'은 진행 중인 대화가 있으면 확인 창을 먼저 띄운다. (01-6)
+// '새 채팅'은 지금 대화를 기록에 남겨 두고 빈 화면으로 간다. 열린 사이드바의 '최근 대화'에서 다시 열 수 있고,
+// 대화마다 지울 수 있다 (지우기 전에 확인 창). 레일의 시계 아이콘을 누르면 사이드바가 열려 기록이 보인다.
 // 좁은 화면(lg 미만)에서는 열린 사이드바가 화면 위에 겹쳐 뜬다.
 "use client";
 
@@ -12,7 +13,7 @@ import { useState } from "react";
 import { useChat } from "@/lib/useChat";
 import ConfirmDialog from "./ConfirmDialog";
 import Logo from "./Logo";
-import { NewChatIcon, SidebarIcon, UserIcon } from "./icons";
+import { CloseIcon, HistoryIcon, NewChatIcon, SidebarIcon, UserIcon } from "./icons";
 
 // 마우스를 올리거나 키보드로 초점이 가면 보이는 작은 말풍선
 function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "bottom" }) {
@@ -33,28 +34,26 @@ const iconButton =
 export default function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { messages, reset } = useChat();
+  const { conversations, currentId, startNew, open: openConversation, remove } = useChat();
   const [open, setOpen] = useState(false);
-  const [confirmNewChat, setConfirmNewChat] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // 지울 대화 id
 
-  // '새 채팅': 대화가 있으면 확인 창, 없으면 바로 메인으로
+  // '새 채팅': 지금 대화는 기록에 남기고 빈 화면으로
   function handleNewChat() {
-    if (messages.length > 0) {
-      setConfirmNewChat(true);
-    } else {
-      router.push("/");
-      setOpen(false);
-    }
-  }
-
-  function startNewChat() {
-    reset();
-    setConfirmNewChat(false);
+    startNew();
     setOpen(false);
     router.push("/");
   }
 
+  // 최근 대화 하나 열기 (좁은 화면에서는 사이드바를 닫는다)
+  function handleOpenConversation(id: string) {
+    openConversation(id);
+    router.push("/");
+    if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
+  }
+
   const onChat = pathname === "/";
+  const onNewChat = onChat && currentId === null;
   const onMentors = pathname.startsWith("/mentors");
 
   const menuItem = (active: boolean) =>
@@ -79,8 +78,8 @@ export default function NavBar() {
             type="button"
             onClick={handleNewChat}
             aria-label="새 채팅"
-            aria-current={onChat ? "page" : undefined}
-            className={`${iconButton} ${onChat ? "bg-surface" : ""}`}
+            aria-current={onNewChat ? "page" : undefined}
+            className={`${iconButton} ${onNewChat ? "bg-surface" : ""}`}
           >
             <NewChatIcon className="size-6" />
             <Tooltip label="새 채팅" />
@@ -94,6 +93,15 @@ export default function NavBar() {
             <UserIcon className="size-6" />
             <Tooltip label="멘토 리스트" />
           </Link>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="최근 대화 보기"
+            className={`${iconButton} ${onChat && currentId !== null ? "bg-surface" : ""}`}
+          >
+            <HistoryIcon className="size-6" />
+            <Tooltip label="최근 대화" />
+          </button>
         </nav>
       </header>
 
@@ -120,8 +128,8 @@ export default function NavBar() {
               <button
                 type="button"
                 onClick={handleNewChat}
-                aria-current={onChat ? "page" : undefined}
-                className={menuItem(onChat)}
+                aria-current={onNewChat ? "page" : undefined}
+                className={menuItem(onNewChat)}
               >
                 <NewChatIcon className="size-6 text-brand" />새 채팅
               </button>
@@ -136,21 +144,71 @@ export default function NavBar() {
               </Link>
             </nav>
 
-            <p className="mx-3 mt-auto mb-5 rounded-[14px] bg-butter p-3 text-xs leading-relaxed text-body">
+            {/* 최근 대화 기록 (이 브라우저에만 저장) */}
+            <section aria-labelledby="history-title" className="mt-6 flex min-h-0 flex-1 flex-col">
+              <h2 id="history-title" className="px-[18px] pb-2 text-[13px] font-bold text-brand">
+                최근 대화
+              </h2>
+              {conversations.length === 0 ? (
+                <p className="px-[18px] text-[13px] leading-relaxed text-muted">
+                  아직 대화가 없어요. 질문을 보내면 여기에 남아요.
+                </p>
+              ) : (
+                <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-2">
+                  {conversations.map((c) => {
+                    const active = onChat && c.id === currentId;
+                    return (
+                      <li key={c.id} className="group/item relative">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenConversation(c.id)}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex w-full flex-col rounded-xl py-2 pr-10 pl-3 text-left ${
+                            active ? "bg-surface" : "hover:bg-surface/70"
+                          }`}
+                        >
+                          <span className={`truncate text-sm ${active ? "font-bold text-brand" : "text-ink"}`}>
+                            {c.title}
+                          </span>
+                          <span className="text-xs text-muted">
+                            {new Date(c.updatedAt).toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(c.id)}
+                          aria-label={`'${c.title}' 대화 지우기`}
+                          className="absolute top-1/2 right-1.5 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted opacity-0 group-hover/item:opacity-100 hover:bg-sky hover:text-brand focus-visible:opacity-100"
+                        >
+                          <CloseIcon className="size-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <p className="mx-3 mt-3 mb-5 rounded-[14px] bg-butter p-3 text-xs leading-relaxed text-body">
+              대화 기록은 이 브라우저에만 저장돼요. 같이 쓰는 컴퓨터라면 다 쓴 뒤 지워 주세요.
+              <br />
               지금 보이는 답변·멘토는 모두 가짜(demo) 데이터이며 실존 인물이 아니에요.
             </p>
           </aside>
         </>
       )}
 
-      {confirmNewChat && (
+      {confirmDelete && (
         <ConfirmDialog
-          title="새 채팅을 시작할까요?"
-          body="지금까지의 대화는 저장되지 않고 사라져요."
+          title="이 대화를 지울까요?"
+          body="지운 대화는 다시 볼 수 없어요."
           cancelLabel="취소"
-          confirmLabel="새 채팅"
-          onCancel={() => setConfirmNewChat(false)}
-          onConfirm={startNewChat}
+          confirmLabel="지우기"
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => {
+            remove(confirmDelete);
+            setConfirmDelete(null);
+          }}
         />
       )}
     </>

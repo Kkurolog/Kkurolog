@@ -17,8 +17,10 @@ type EyesProps = {
   className?: string;
 };
 
-// 4갈래 반짝이 (찾았다! 표정의 눈동자)
-const SPARKLE = "M0 -1C.12-.33.33-.12 1 0 .33.12.12.33 0 1-.12.33-.33.12-1 0-.33-.12-.12-.33 0-1z";
+// 4갈래 반짝이 (찾았다! 표정의 눈동자). (0,0)을 가운데로 반지름 32 크기로 그려 두어,
+// 반짝일 때 크기가 '제자리(가운데)'에서 커졌다 작아진다
+const SPARKLE =
+  "M0 -32C3.8 -10.6 10.6 -3.8 32 0 10.6 3.8 3.8 10.6 0 32 -3.8 10.6 -10.6 3.8 -32 0 -10.6 -3.8 -3.8 -10.6 0 -32z";
 
 // 눈 두 개. 232x140 비율로 그려서 어떤 크기로든 늘려 쓴다.
 export function KkuroEyes({ mood = "default", lookX = 0, className }: EyesProps) {
@@ -49,13 +51,14 @@ export function KkuroEyes({ mood = "default", lookX = 0, className }: EyesProps)
             <g className={blinks ? "origin-center [transform-box:fill-box] motion-safe:animate-blink" : undefined}>
               <ellipse cx={cx} cy={70} rx={48} ry={66} fill="var(--color-surface)" stroke="var(--color-brand)" strokeWidth="8" />
               {mood === "found" ? (
-                <path
-                  d={SPARKLE}
-                  fill="var(--color-brand)"
-                  transform={`translate(${cx} 70) scale(30)`}
-                  className="origin-center [transform-box:fill-box] motion-safe:animate-twinkle"
-                  style={{ animationDelay: `${i * -0.4}s` }}
-                />
+                <g transform={`translate(${cx} 70)`}>
+                  <path
+                    d={SPARKLE}
+                    fill="var(--color-brand)"
+                    className="origin-center [transform-box:fill-box] motion-safe:animate-sparkle"
+                    style={{ animationDelay: `${i * -0.35}s` }}
+                  />
+                </g>
               ) : (
                 <circle
                   cx={cx}

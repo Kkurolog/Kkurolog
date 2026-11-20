@@ -69,7 +69,7 @@ export default function ChatMessageView({ message, onOpenSource, onContact, isLa
       {/* 방금 도착한 답변: 꾸로록이 눈을 반짝이며 빼꼼 (지난 답변은 기본 표정) */}
       <div className="flex items-end gap-2">
         <MiniKkuro mood={isLatest ? "found" : "default"} className="w-[72px] motion-safe:animate-pop-in" />
-        <span className="pb-0.5 text-[13px] font-bold text-brand">꾸로록</span>
+        <span className="pb-0.5 font-display text-xl text-brand">꾸로록</span>
       </div>
       {/* 빈 줄로 나뉜 덩어리마다 문단 하나 (문단 사이 14px) */}
       {message.content.split(/\n\s*\n/).map((paragraph, i) => (
