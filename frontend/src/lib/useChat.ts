@@ -17,14 +17,15 @@ import type { AssistantMessage, ChatMessage, Conversation } from "./types";
 const STORAGE_KEY = "kkurolog-chats-v1"; // 대화 기록을 저장하는 브라우저 저장소 이름 (형식이 바뀌면 v2 로)
 const MAX_CONVERSATIONS = 30; // 이보다 많으면 오래된 대화부터 지운다
 
-// 브라우저 저장소는 막혀 있거나(시크릿 모드 등) 내용이 망가져 있을 수 있어서, 실패해도 화면이 멈추지 않게 감싼다
-function loadConversations(): Conversation[] {
+// 브라우저 저장소는 막혀 있거나(시크릿 모드 등) 내용이 망가져 있을 수 있어서, 실패해도 화면이 멈추지 않게 감싼다.
+// 저장소를 읽을 수 없으면 null 을 돌려준다 (그때는 화면이 들고 있는 목록을 그대로 쓴다)
+function loadConversations(): Conversation[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? (parsed as Conversation[]) : [];
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -121,21 +122,35 @@ function useChatState() {
   const [conversations, setConversations] = useState<Conversation[]>([]); // 최근 대화가 앞쪽
   const [currentId, setCurrentId] = useState<string | null>(null); // 지금 보고 있는 대화 (null 이면 새 채팅 화면)
   const [pendingIds, setPendingIds] = useState<string[]>([]); // 답변을 기다리는 대화들
-  const loaded = useRef(false); // 저장된 기록을 다 불러오기 전에는 저장하지 않는다 (빈 목록으로 덮어쓰지 않게)
+  const memory = useRef<Conversation[]>([]); // 저장소를 못 쓸 때를 대비해 화면이 들고 있는 목록
 
-  // 처음 열 때 저장된 대화 기록을 불러온다 (localStorage 는 브라우저에서만 읽을 수 있어서 화면이 뜬 뒤에 읽는다)
+  // 대화 목록 바꾸기: 항상 '저장소의 최신 목록'을 읽어서 고친 뒤 저장한다.
+  // (탭을 여러 개 열어 둬도, 한 탭이 들고 있던 옛 목록으로 덮어써서 지운 대화가 되살아나지 않게)
+  function mutate(change: (list: Conversation[]) => Conversation[]) {
+    const next = change(loadConversations() ?? memory.current);
+    memory.current = next;
+    saveConversations(next);
+    setConversations(next);
+  }
+
   useEffect(() => {
+    // 처음 열 때 저장된 대화 기록을 불러온다 (localStorage 는 브라우저에서만 읽을 수 있어서 화면이 뜬 뒤에 읽는다)
     const timer = setTimeout(() => {
-      setConversations(loadConversations());
-      loaded.current = true;
+      memory.current = loadConversations() ?? [];
+      setConversations(memory.current);
     }, 0);
-    return () => clearTimeout(timer);
+    // 다른 탭에서 대화를 보내거나 지우면 이 탭의 목록도 맞춘다
+    function handleStorage(e: StorageEvent) {
+      if (e.key !== STORAGE_KEY && e.key !== null) return;
+      memory.current = loadConversations() ?? memory.current;
+      setConversations(memory.current);
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
-
-  // 대화가 바뀔 때마다 저장한다
-  useEffect(() => {
-    if (loaded.current) saveConversations(conversations);
-  }, [conversations]);
 
   const current = conversations.find((c) => c.id === currentId) ?? null;
   const messages = current?.messages ?? [];
@@ -143,11 +158,11 @@ function useChatState() {
 
   // 대화 하나에 메시지를 붙이고, 그 대화를 목록 맨 앞으로 올린다
   function append(conversationId: string, message: ChatMessage) {
-    setConversations((prev) => {
-      const target = prev.find((c) => c.id === conversationId);
-      if (!target) return prev; // 기다리는 사이 지워진 대화면 버린다
+    mutate((list) => {
+      const target = list.find((c) => c.id === conversationId);
+      if (!target) return list; // 기다리는 사이 지워진 대화면 버린다 (되살리지 않는다)
       const updated = { ...target, messages: [...target.messages, message], updatedAt: Date.now() };
-      return [updated, ...prev.filter((c) => c.id !== conversationId)];
+      return [updated, ...list.filter((c) => c.id !== conversationId)];
     });
   }
 
@@ -163,7 +178,7 @@ function useChatState() {
         messages: [userMessage],
       };
       conversationId = created.id;
-      setConversations((prev) => [created, ...prev].slice(0, MAX_CONVERSATIONS));
+      mutate((list) => [created, ...list].slice(0, MAX_CONVERSATIONS));
       setCurrentId(created.id);
     } else {
       append(conversationId, userMessage);
@@ -189,7 +204,7 @@ function useChatState() {
 
   // 대화 하나 지우기 (지금 보던 대화면 새 채팅 화면으로)
   function remove(conversationId: string) {
-    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    mutate((list) => list.filter((c) => c.id !== conversationId));
     if (conversationId === currentId) setCurrentId(null);
   }
 
