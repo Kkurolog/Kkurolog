@@ -200,10 +200,13 @@ export default function NavBar() {
 
       {confirmDelete && (
         <ConfirmDialog
+          tone="danger"
           title="이 대화를 지울까요?"
-          body="지운 대화는 다시 볼 수 없어요."
+          detail={conversations.find((c) => c.id === confirmDelete)?.title}
+          body="질문과 꾸로록의 답변, 출처가 모두 지워져요."
+          warning="지운 대화는 되돌릴 수 없고, 다시 볼 수 없어요."
           cancelLabel="취소"
-          confirmLabel="지우기"
+          confirmLabel="대화 지우기"
           onCancel={() => setConfirmDelete(null)}
           onConfirm={() => {
             remove(confirmDelete);

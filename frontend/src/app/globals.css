@@ -25,7 +25,8 @@
   --color-body: #2f4470; /* 본문 보조 글자 */
   --color-muted: #5b6b8c; /* 작은 안내 글자 */
   --color-placeholder: #8c96ad; /* 입력창 안내 문구 */
-  --color-danger: #f0562e; /* 토마토: 오류 표시 1곳에만 */
+  --color-danger: #f0562e; /* 토마토: 오류·경고 표시에만 */
+  --color-danger-dark: #c43d1b; /* 진한 토마토: 지우기 같은 위험한 버튼 (흰 글자가 잘 읽히게) */
 
   --font-sans: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-display: "Jua", "Noto Sans KR", sans-serif; /* 큰 제목용 둥근 글꼴 */
