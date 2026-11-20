@@ -74,7 +74,8 @@ export default async function Image() {
                     borderRadius: 8,
                   }}
                 />
-                <span style={{ color: C.brand }}>선택지</span>
+                {/* position: relative: 글자를 형광펜보다 위에 그린다 (안 그러면 형광펜이 글자를 가림) */}
+                <span style={{ color: C.brand, position: "relative" }}>선택지</span>
               </span>
               <span>가 되도록</span>
             </div>
