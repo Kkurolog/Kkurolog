@@ -9,6 +9,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "꾸로록",
   description: "거꾸로캠퍼스 선배들의 이야기로 답하는 진로 상담 챗봇",
+  // 링크 미리보기. 그림은 app/opengraph-image.tsx 가 만든다.
+  // 그림 주소의 앞부분(도메인)은 Vercel에서 배포 주소로 자동으로 채워진다. (로컬에선 localhost)
+  openGraph: { siteName: "꾸로록", locale: "ko_KR", type: "website" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
