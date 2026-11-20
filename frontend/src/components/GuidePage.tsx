@@ -1,7 +1,7 @@
 // 메인 화면 오른쪽 아래의 '접힌 종이 귀퉁이' + 그 뒤에 숨어 있는 꾸로록 사용 가이드.
 // - 평소: 귀퉁이가 살짝 접혀 있다 (흰 접힌 면 + 뒷장의 블루와 '?'). 마우스를 올리면 조금 더 들린다.
 // - 귀퉁이를 왼쪽 위로 끌면 종이가 넘어가듯 뒷장(가이드)이 드러난다. 충분히 끌고 놓으면 끝까지 넘어가고,
-//   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이나 '넘겨서 사용 가이드 보기'를 눌러도 넘어간다.
+//   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이(흰 접힌 면이나 블루 '?' 어디든)를 눌러도 넘어간다.
 // - 가이드에서 '시작하기'를 누르면 종이가 다시 덮이고 바로 질문을 쓸 수 있게 입력창에 커서가 간다.
 //   Esc 를 누르면 종이만 다시 덮인다.
 //
@@ -130,7 +130,7 @@ export default function GuidePage() {
   }
 
   const covering = open; // 가이드가 화면을 다 덮었는지
-  const peekOpacity = Math.max(0, 1 - (peel - HOVER) / 120); // 넘길수록 '?'·안내 버튼이 사라진다
+  const peekOpacity = Math.max(0, 1 - (peel - HOVER) / 120); // 넘길수록 '?'가 사라진다
   const clip = covering
     ? "none"
     : `polygon(100% calc(100% - ${peel}px), 100% 100%, calc(100% - ${peel}px) 100%)`;
@@ -233,7 +233,7 @@ export default function GuidePage() {
             />
           </svg>
 
-          {/* 귀퉁이 손잡이: 끌거나 누르면 넘어간다 */}
+          {/* 귀퉁이 손잡이: 흰 접힌 면 + 블루 삼각형 전체. 끌거나 누르면 넘어간다 */}
           <button
             ref={cornerRef}
             type="button"
@@ -250,7 +250,7 @@ export default function GuidePage() {
                 openGuide();
               }
             }}
-            className="pointer-events-auto absolute right-0 bottom-0 cursor-grab touch-none [clip-path:polygon(100%_0,100%_100%,0_100%)] focus-visible:outline-none active:cursor-grabbing"
+            className="pointer-events-auto absolute right-0 bottom-0 cursor-grab touch-none focus-visible:outline-none active:cursor-grabbing"
             style={{ width: Math.max(peel, REST), height: Math.max(peel, REST) }}
           >
             <span
@@ -260,16 +260,6 @@ export default function GuidePage() {
             >
               ?
             </span>
-          </button>
-
-          {/* 안내 버튼 (넓은 화면) */}
-          <button
-            type="button"
-            onClick={openGuide}
-            className="pointer-events-auto absolute right-[116px] bottom-6 hidden rounded-full border-2 border-brand bg-surface px-4 py-1.5 text-sm font-bold text-brand transition-opacity hover:bg-sky sm:block"
-            style={{ opacity: peekOpacity, visibility: peekOpacity === 0 ? "hidden" : "visible" }}
-          >
-            넘겨서 사용 가이드 보기
           </button>
         </>
       )}

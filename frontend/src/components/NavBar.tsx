@@ -1,4 +1,4 @@
-// 왼쪽 사이드바. 두 가지 모양이 있다.
+// 왼쪽 사이드바. 본문(크림)과 구분되게 연한 블루(sky) 바탕, 선택·hover 는 흰색. 두 가지 모양이 있다.
 // - 닫힘(기본, 와이어프레임 01): 72px 레일. 로고 + 아이콘(새 채팅 / 멘토 리스트). 마우스를 올리면 툴팁.
 //   로고에 마우스를 올리면 '사이드바 열기' 아이콘으로 바뀌고, 누르면 사이드바가 열린다. (01-1)
 // - 열림(01-4): 280px. 아이콘 + 메뉴 이름. 지금 위치한 메뉴는 연한 블루 배경. 오른쪽 위 버튼으로 닫는다.
@@ -28,7 +28,7 @@ function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "b
 }
 
 const iconButton =
-  "group relative inline-flex size-9 items-center justify-center rounded-xl text-brand hover:bg-sky focus-visible:bg-sky focus-visible:outline-none";
+  "group relative inline-flex size-9 items-center justify-center rounded-xl text-brand hover:bg-surface focus-visible:bg-surface focus-visible:outline-none";
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -59,13 +59,13 @@ export default function NavBar() {
 
   const menuItem = (active: boolean) =>
     `flex h-11 w-full items-center gap-3 rounded-[14px] px-3 text-[15px] ${
-      active ? "bg-sky font-bold text-brand" : "text-ink hover:bg-sky/60"
+      active ? "bg-surface font-bold text-brand" : "text-ink hover:bg-surface/70"
     }`;
 
   return (
     <>
       {/* 닫힌 레일 (항상 자리를 차지한다) */}
-      <header className="sticky top-0 z-20 flex h-screen w-[72px] shrink-0 flex-col items-center gap-7 border-r-2 border-brand bg-canvas pt-5">
+      <header className="sticky top-0 z-20 flex h-screen w-[72px] shrink-0 flex-col items-center gap-7 border-r-2 border-brand bg-sky pt-5">
         <button type="button" onClick={() => setOpen(true)} aria-label="사이드바 열기" className={iconButton}>
           <span className="group-hover:hidden group-focus-visible:hidden">
             <Logo />
@@ -80,7 +80,7 @@ export default function NavBar() {
             onClick={handleNewChat}
             aria-label="새 채팅"
             aria-current={onChat ? "page" : undefined}
-            className={`${iconButton} ${onChat ? "bg-sky" : ""}`}
+            className={`${iconButton} ${onChat ? "bg-surface" : ""}`}
           >
             <NewChatIcon className="size-6" />
             <Tooltip label="새 채팅" />
@@ -89,7 +89,7 @@ export default function NavBar() {
             href="/mentors"
             aria-label="멘토 리스트"
             aria-current={onMentors ? "page" : undefined}
-            className={`${iconButton} ${onMentors ? "bg-sky" : ""}`}
+            className={`${iconButton} ${onMentors ? "bg-surface" : ""}`}
           >
             <UserIcon className="size-6" />
             <Tooltip label="멘토 리스트" />
@@ -103,7 +103,7 @@ export default function NavBar() {
           <div className="fixed inset-0 z-30 bg-ink/30 lg:hidden motion-safe:animate-fade-in" onClick={() => setOpen(false)} aria-hidden="true" />
           <aside
             aria-label="사이드바"
-            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r-2 border-brand bg-canvas lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
+            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r-2 border-brand bg-sky lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
           >
             <div className="flex items-center justify-between px-[18px] pt-5">
               <Link href="/" aria-label="꾸로록 메인으로" className="flex items-center gap-2.5">
