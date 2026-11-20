@@ -25,7 +25,8 @@
   --color-body: #2f4470; /* 본문 보조 글자 */
   --color-muted: #5b6b8c; /* 작은 안내 글자 */
   --color-placeholder: #8c96ad; /* 입력창 안내 문구 */
-  --color-danger: #f0562e; /* 토마토: 오류 표시 1곳에만 */
+  --color-danger: #f0562e; /* 토마토: 오류·경고 표시에만 */
+  --color-danger-dark: #c43d1b; /* 진한 토마토: 지우기 같은 위험한 버튼 (흰 글자가 잘 읽히게) */
 
   --font-sans: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-display: "Jua", "Noto Sans KR", sans-serif; /* 큰 제목용 둥근 글꼴 */
@@ -42,6 +43,7 @@
   --animate-slide-right: slide-right 0.25s ease-out both; /* 오른쪽 출처 패널 열기 */
   --animate-float: float 4s ease-in-out infinite; /* 스티커가 둥실둥실 */
   --animate-twinkle: twinkle 2.4s ease-in-out infinite; /* 반짝이 */
+  --animate-sparkle: sparkle 1.6s ease-in-out infinite; /* 찾았다! 눈동자: 제자리에서 커졌다 작아지며 반짝 */
   --animate-blink: blink 4.5s ease-in-out infinite; /* 꾸로록 눈 깜빡임 */
   --animate-fly: fly 1.4s ease-in-out infinite; /* 메일 보내는 중: 종이비행기 날기 */
   --animate-fly-away: fly-away 0.7s ease-in 0.15s both; /* 전송 완료: 비행기가 날아갔다 돌아오기 */
@@ -93,6 +95,17 @@
     50% {
       opacity: 0.4;
       scale: 0.7;
+    }
+  }
+  @keyframes sparkle {
+    0%,
+    100% {
+      scale: 1;
+      opacity: 1;
+    }
+    50% {
+      scale: 0.75;
+      opacity: 0.75;
     }
   }
   @keyframes blink {
@@ -147,6 +160,17 @@
       transform: translateY(-4px);
       opacity: 1;
     }
+  }
+}
+
+/*
+  한국어 줄바꿈: 단어 중간에서 끊지 않고 띄어쓰기에서 줄을 바꾼다 (word-break: keep-all).
+  띄어쓰기 없이 아주 긴 글자(링크 등)는 칸을 넘치지 않게 그 안에서 끊는다 (overflow-wrap: break-word).
+*/
+@layer base {
+  body {
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
 }
 

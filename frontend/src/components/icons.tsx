@@ -40,6 +40,17 @@ export function UserIcon({ className }: IconProps) {
   );
 }
 
+// 최근 대화 (시계)
+export function HistoryIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+      <path d="M3 3.5V8h4.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Svg>
+  );
+}
+
 // 사이드바 열기·닫기 (왼쪽 칸이 나뉜 네모)
 export function SidebarIcon({ className }: IconProps) {
   return (

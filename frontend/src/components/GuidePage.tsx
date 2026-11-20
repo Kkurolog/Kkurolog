@@ -196,7 +196,7 @@ export default function GuidePage() {
             <h3 className="font-bold text-ink">꾸로록이 지키는 약속</h3>
             <ul className="mt-3 flex flex-col gap-2 text-[15px] leading-relaxed text-body">
               <li>• 인터뷰에 없는 내용은 지어내지 않아요. 자료가 부족하면 솔직하게 말하고 선배를 추천해요.</li>
-              <li>• 대화는 저장되지 않아요. &apos;새 채팅&apos;을 누르거나 새로고침하면 사라져요.</li>
+              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바의 &apos;최근 대화&apos;에서 다시 보거나 지울 수 있어요.</li>
               <li>• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
             </ul>
           </div>
