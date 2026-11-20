@@ -205,6 +205,17 @@ def test_inquiry_detail_with_replies(env, headers):
     assert client.get("/admin/inquiries/abc", headers=headers).status_code == 422
 
 
+def test_times_are_shown_in_kst(env, headers):
+    """Supabase 는 시각을 UTC(Z)로 돌려준다. 관리자 응답은 한국 시간(+09:00)으로 바꿔 보여 준다."""
+    [inquiry_id] = add_inquiries(env, 1)
+    env["store"].inquiries[inquiry_id].update(
+        created_at="2026-11-20T13:15:01.123456Z", replied=True, replied_at="2026-11-20T15:00:00+00:00")
+    item = client.get(f"/admin/inquiries/{inquiry_id}", headers=headers).json()["item"]
+    assert item["created_at"] == "2026-11-20T22:15:01+09:00"
+    assert item["replied_at"] == "2026-11-21T00:00:00+09:00"
+    assert login().json()["expires_at"].endswith("+09:00")
+
+
 # ---------------------------------------------------------------- 멘토
 def test_mentors_list_includes_email_for_admin_only(env, headers):
     admin = client.get("/admin/mentors", headers=headers).json()

@@ -74,7 +74,7 @@
 
 ---
 
-## 2. Apps Script → 백엔드 (백엔드가 B-3에서 구현)
+## 2. Apps Script → 백엔드
 
 ### 공통 규칙
 - 주소: 웹앱 스크립트 속성 `BACKEND_URL` + 경로. 예: `https://YOUR_BACKEND.onrender.com/internal/mail/inbound`
@@ -106,7 +106,7 @@ Apps Script는 중계 Gmail에 새로 온 메일 중 **답장 후보만** 보냅
 | `recipients` | To, Cc, Delivered-To, X-Original-To (원문 그대로) |
 | `plainBody` | 글자 본문. 20000자에서 자름 |
 
-백엔드가 할 일 (B-3): 문의번호 찾기(받는 주소의 `+문의번호` → 본문의 `문의번호:` 줄) → 문의 확인 → 보낸 사람 = 그 문의 멘토의 메일인지 확인 → 인용문·안내 문구·문의번호 줄 지우기 → 학생에게 `sendMail`(Reply-To 없음) → `inquiries.replied/replied_at`(첫 답장만), `mail_replies` 기록.
+백엔드가 하는 일: 문의번호 찾기(받는 주소의 `+문의번호` → 본문의 `문의번호:` 줄) → 문의 확인 → 보낸 사람 = 그 문의 멘토의 메일인지 확인 → 인용문·안내 문구·문의번호 줄 지우기 → 학생에게 `sendMail`(Reply-To 없음) → `inquiries.replied/replied_at`(첫 답장만), `mail_replies` 기록.
 
 | `result` | 뜻 | Apps Script가 하는 일 |
 |---|---|---|
@@ -125,5 +125,5 @@ Apps Script는 중계 Gmail에 새로 온 메일 중 **답장 후보만** 보냅
 ```json
 { "summary": "리마인드 2건 보냄, 비활성 멘토 1건 건너뜀" }
 ```
-백엔드가 할 일 (B-3): `mail_settings.reminderDays`(0이면 안 함) 기준으로, 답장 없음 + 리마인드 안 함 + 보낸 날짜로부터 그 일수째(한국 날짜)가 된 문의를 찾아, 멘토가 활성이면 리마인드 메일을 `sendMail`(Reply-To = 그 문의번호)로 보내고 `inquiries.reminded_at`을 기록.
+백엔드가 하는 일: `mail_settings.reminderDays`(0이면 안 함) 기준으로, 답장 없음 + 리마인드 안 함 + 보낸 날짜로부터 그 일수째(한국 날짜)가 된 문의를 찾아, 멘토가 활성이면 리마인드 메일을 `sendMail`(Reply-To = 그 문의번호)로 보내고 `inquiries.reminded_at`을 기록.
 - `summary`는 Apps Script 실행 로그에만 남습니다. 개인정보를 넣지 않습니다.

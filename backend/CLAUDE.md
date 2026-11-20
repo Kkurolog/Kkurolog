@@ -64,6 +64,8 @@ pytest                           # 테스트
 - 테스트는 `tests/conftest.py`가 메일 관련 환경변수를 지워서 항상 demo로 돈다. 메일 테스트(`test_mail_*.py`)는 가짜 저장소·가짜 메일을 끼운다. 진짜 메일·DB는 부르지 않는다.
 - 멘토 이메일·학생 이메일은 로그에 그대로 남기지 않는다 (`mask_email`).
 - 관리자 API(`/admin/*`)는 `MAIL_ENABLED=true`와 `ADMIN_PASSWORD`(12자 이상)가 있어야 동작한다. 응답에 학생·멘토 메일이 들어 있으니 학생용 API 에 섞지 않는다.
+- 관리자 응답의 시각은 모두 한국 시간(`+09:00`)이다 (`admin/models.py`의 `KstDatetime`). 새 시각 필드도 이 타입을 쓴다.
+- 운영 구조·인수인계: `apps-script/README.md`, `apps-script/docs/HANDOVER.md`
 
 ## 규칙
 - 응답 형식(`schemas.py`)을 바꾸면 `frontend/src/lib/api.ts`도 같이 바꾼다.
