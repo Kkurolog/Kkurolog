@@ -2,7 +2,8 @@
 // - 평소: 귀퉁이가 살짝 접혀 있다 (흰 접힌 면 + 뒷장의 블루와 '?'). 마우스를 올리면 조금 더 들린다.
 // - 귀퉁이를 왼쪽 위로 끌면 종이가 넘어가듯 뒷장(가이드)이 드러난다. 충분히 끌고 놓으면 끝까지 넘어가고,
 //   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이나 '넘겨서 사용 가이드 보기'를 눌러도 넘어간다.
-// - 가이드에서 '시작하기'·'처음 화면으로'·Esc 를 누르면 종이가 다시 덮인다.
+// - 가이드에서 '시작하기'를 누르면 종이가 다시 덮이고 바로 질문을 쓸 수 있게 입력창에 커서가 간다.
+//   Esc 를 누르면 종이만 다시 덮인다.
 //
 // 넘김 크기(peel): 오른쪽 아래 꼭짓점에서 접힌 선까지의 거리(px).
 // 귀퉁이 꼭짓점이 (가로-peel, 세로-peel) 로 접혀 올라간다고 보고,
@@ -70,9 +71,13 @@ export default function GuidePage() {
     animateTo(w + h, 650, () => setOpen(true));
   }
 
-  function closeGuide() {
+  // 가이드 닫기. startTyping 이면 다 덮인 뒤 질문 입력창으로 커서를 옮긴다 ('시작하기')
+  function closeGuide(startTyping = false) {
     setOpen(false);
-    animateTo(REST, 650, () => cornerRef.current?.focus());
+    animateTo(REST, 650, () => {
+      if (startTyping) document.getElementById("question")?.focus();
+      else cornerRef.current?.focus();
+    });
   }
 
   // 다 넘어가면 가이드 제목으로 초점을 옮긴다 (화면 읽기 프로그램이 가이드부터 읽게)
@@ -199,17 +204,10 @@ export default function GuidePage() {
           <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
             <button
               type="button"
-              onClick={closeGuide}
+              onClick={() => closeGuide(true)}
               className="min-h-12 rounded-full bg-accent px-7 font-bold text-brand hover:brightness-95"
             >
               시작하기
-            </button>
-            <button
-              type="button"
-              onClick={closeGuide}
-              className="min-h-12 rounded-full border-2 border-white/70 px-6 font-bold text-white hover:bg-white/10"
-            >
-              처음 화면으로
             </button>
           </div>
         </div>
