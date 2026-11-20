@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { sendContactRequest, type Mentor } from "@/lib/api";
 import ConfirmDialog from "./ConfirmDialog";
 import { MentorPhoto } from "./MentorCard";
-import { CloseIcon, PlaneIcon, SpinnerIcon } from "./icons";
+import { CloseIcon, PlaneIcon } from "./icons";
 
 type Props = {
   mentor: Mentor;
@@ -94,12 +94,9 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
       >
         {status === "sending" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8" role="status">
-            {/* 노란 동그라미 안에서 종이비행기가 계속 날아가고, 바깥 고리가 돈다 */}
-            <span className="relative inline-flex size-28 items-center justify-center">
-              <SpinnerIcon className="absolute inset-0 size-28 text-brand" />
-              <span className="inline-flex size-[88px] items-center justify-center overflow-hidden rounded-full bg-accent">
-                <PlaneIcon className="size-12 text-brand motion-safe:animate-fly" />
-              </span>
+            {/* 노란 동그라미는 가만히 있고, 그 안에서 종이비행기만 계속 날아간다 */}
+            <span className="inline-flex size-24 items-center justify-center overflow-hidden rounded-full bg-accent">
+              <PlaneIcon className="size-14 text-brand motion-safe:animate-fly" />
             </span>
             <p id="contact-title" className="text-2xl font-bold text-ink">
               메일을 보내는 중이에요
