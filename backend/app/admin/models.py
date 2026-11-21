@@ -5,12 +5,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import datetime, timezone
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+
+from app.mail.timeutil import KST
 
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+def _to_kst(moment: datetime) -> datetime:
+    """시각을 한국 시간(+09:00)으로. Supabase 는 UTC(Z)로 돌려주지만 관리자에게는 한국 시간으로 보여 준다.
+    시간대가 없는 값은 UTC 로 본다. 초 아래 자리는 버린다."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(KST).replace(microsecond=0)
+
+
+# 관리자 응답의 모든 시각에 쓴다. 예: 2026-11-20T22:15:01+09:00
+KstDatetime = Annotated[datetime, AfterValidator(_to_kst)]
 
 
 class LoginRequest(BaseModel):
@@ -19,7 +33,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str
-    expires_at: datetime
+    expires_at: KstDatetime
 
 
 # ---------------------------------------------------------------- 문의
@@ -27,7 +41,7 @@ class InquiryItem(BaseModel):
     """관리자 화면 8개 항목 + 문의번호·멘토 ID·리마인드 시각."""
 
     id: str
-    created_at: datetime            # 보낸 일시
+    created_at: KstDatetime            # 보낸 일시
     mentor_id: str
     mentor_name: str | None         # 멘토 이름 (멘토가 지워졌으면 null)
     student_name: str               # 학생 이름
@@ -35,8 +49,8 @@ class InquiryItem(BaseModel):
     title: str                      # 메일 제목
     body: str                       # 메일 내용
     replied: bool                   # 멘토 답변 여부
-    replied_at: datetime | None     # 멘토 답변 일시 (첫 답장)
-    reminded_at: datetime | None    # 리마인드 보낸 시각
+    replied_at: KstDatetime | None     # 멘토 답변 일시 (첫 답장)
+    reminded_at: KstDatetime | None    # 리마인드 보낸 시각
 
 
 class InquiryPage(BaseModel):
@@ -52,7 +66,7 @@ class ReplyItem(BaseModel):
     message_id: str
     inquiry_id: str | None
     from_email: str
-    received_at: datetime
+    received_at: KstDatetime
     status: Literal["forwarded", "needs_review", "failed"]
     reason: str | None              # sender_mismatch(보낸 사람이 멘토 아님), empty_body(내용 없음) 등
     reply_text: str | None          # 학생에게 전달한 본문

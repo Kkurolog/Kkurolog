@@ -158,7 +158,14 @@ def test_list_review_replies_filters_status():
     store, calls = make_store([(200, [], {"Content-Range": "*/0"})])
     store.list_review_replies(0, 20)
     assert ("status", "in.(needs_review,failed)") in query(calls[0])
+    assert ("followup", "is.false") in query(calls[0])  # 첫 왕복 이후 메일은 관리자에게 안 보임
     assert ("select", "*,inquiries(title,student_name,mentor_id)") in query(calls[0])
+
+
+def test_list_replies_first_round_only():
+    store, calls = make_store([(200, [])])
+    store.list_replies("q20261117-0001")
+    assert ("followup", "is.false") in query(calls[0]) and ("inquiry_id", "eq.q20261117-0001") in query(calls[0])
 
 
 def test_update_mentor_returns_row_or_none():
