@@ -68,8 +68,8 @@
     "received_at": "2026-11-17T15:20:00+09:00",
     "status": "forwarded", "reason": null, "reply_text": "학생에게 전달한 본문" } ] }
 ```
-- `replies`: 이 문의에 온 멘토 답장 처리 기록 (오래된 순). `status`: `forwarded` 학생에게 전달함 / `needs_review` 사람이 봐야 함
-- `reason`: `sender_mismatch` 등록된 멘토 메일이 아닌 주소에서 옴, `empty_body` 전달할 내용이 없음
+- `replies`: 이 문의의 **첫 왕복**(멘토 첫 답장까지) 답장 처리 기록 (오래된 순). 그 뒤 학생·멘토가 더 주고받은 메일은 나오지 않습니다 (내용도 저장 안 함). `status`: `forwarded` 학생에게 전달함 / `needs_review` 사람이 봐야 함
+- `reason`: `sender_mismatch` 그 문의의 멘토·학생 메일이 아닌 주소에서 옴, `empty_body` 전달할 내용이 없음
 - 형식이 틀리면 422, 없으면 404.
 
 ## 4. 확인필요 목록
@@ -80,7 +80,7 @@
                "received_at": "…", "status": "needs_review", "reason": "sender_mismatch", "reply_text": null,
                "inquiry_title": "진로 고민이 있어요", "student_name": "테스트학생", "mentor_id": "mt-01" } ] }
 ```
-- 학생에게 자동으로 전달하지 못한 답장입니다. 관리자가 중계 Gmail 메일함(라벨 `메일자동화/확인필요`)에서 원문을 보고 처리합니다.
+- 자동으로 전달하지 못한 답장입니다 (첫 왕복의 것만. 그 뒤 대화의 확인필요는 중계 Gmail 라벨로만 보임). 관리자가 중계 Gmail 메일함(라벨 `메일자동화/확인필요`)에서 원문을 보고 처리합니다.
   예: 멘토가 다른 주소로 답장했다면 멘토의 메일 주소를 고친 뒤 멘토에게 다시 '답장'을 부탁합니다.
 
 ## 5. 멘토
@@ -109,7 +109,7 @@
 - 학생 화면(사이트)에는 바로 반영됩니다: `consent: false`면 어디에도 안 보이고, `available: false`면 "지금 연락을 받지 않아요".
 
 ## 6. 메일 설정
-`GET /admin/settings` → 16개
+`GET /admin/settings` → 18개
 ```json
 [ { "key": "mentorFooter", "value": "답장을 보내실 때, …", "description": "멘토에게 가는 메일 맨 아래 안내 문구" } ]
 ```
@@ -128,6 +128,7 @@
 | mentorSubjectPrefix / mentorFooter | 멘토 메일 제목 말머리 / 맨 아래 안내 문구 |
 | mentorReminderSubjectPrefix / mentorReminderIntro | 리마인드 메일 말머리 / 맨 위 문구 |
 | studentSubjectPrefix / studentForwardIntro / studentForwardFooter | 학생에게 전달하는 답장 메일 |
+| mentorFollowupSubjectPrefix / mentorFollowupIntro | 학생이 다시 답장했을 때 멘토에게 가는 "추가 질문" 메일 말머리 / 맨 위 문구 |
 | studentCopySubjectPrefix / studentCopyIntro / studentCopyFooter | 학생에게 가는 "보낸 문의 사본" |
 | rateLimitMinutes / rateLimitPerWindow / rateLimitPerDay | 같은 학생 메일 횟수 제한 (기본 10분에 3건, 하루 5건, 0이면 제한 없음) |
 | reminderDays | 답장 없을 때 며칠째에 멘토에게 다시 보낼지 (기본 10, 0이면 안 보냄) |

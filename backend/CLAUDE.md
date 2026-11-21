@@ -18,9 +18,9 @@ backend/
 │     ├─ apps_script.py  # 메일 웹앱 호출 sendMail·getQuota (apps-script/docs/API.md v1.0)
 │     ├─ mail_settings.py # 메일 문구·숫자 설정 (Supabase mail_settings + 기본값)
 │     ├─ templates.py    # 메일 제목·본문 만들기
-│     ├─ reply_parser.py # 멘토 답장에서 문의번호 찾기·인용문 지우기
+│     ├─ reply_parser.py # 멘토·학생 답장에서 문의번호 찾기·인용문 지우기
 │     ├─ contact_flow.py # 문의 보내기 (횟수 제한 → 번호 → 저장 → 멘토 메일 → 학생 사본)
-│     ├─ inbound.py      # 멘토 답장 처리 (확인 → 학생에게 전달 → 기록)
+│     ├─ inbound.py      # 답장 처리: 멘토 → 학생, 학생 → 멘토 (여러 번 왕복). 관리자에겐 첫 왕복만
 │     ├─ reminders.py    # 10일째 리마인드
 │     ├─ models.py       # 내부 API 요청·응답 형식 (프론트와 무관)
 │     └─ router.py       # 내부 API /internal/mail/* (Apps Script 전용, 비밀 헤더 필요)
@@ -42,7 +42,7 @@ backend/
 | `GET /mentors` | - | `Mentor[]` (동의한 멘토만. `email`, `consent` 필드 없음) |
 | `POST /mentors/recommend` | `{question}` | `{recommendations: [{mentor, reason}], is_fallback}` 최대 3명, 연락 가능한 멘토만 |
 | `POST /contact-requests` | `{mentor_id, sender_name, reply_email, subject, message}` | 201 `{status: "delivered", message}` / 404 없는 멘토 / 409 연락 불가 / 422 입력 오류 / (MAIL_ENABLED) 429 너무 자주·503 발송 실패·502 연결 문제 (`detail`에 학생용 문구) |
-| `POST /internal/mail/inbound` | Apps Script 전용. 헤더 `X-Kkurolog-Mail-Secret` | 멘토 답장 후보 처리 결과 (apps-script/docs/API.md 2장) |
+| `POST /internal/mail/inbound` | Apps Script 전용. 헤더 `X-Kkurolog-Mail-Secret` | 멘토·학생 답장 후보 처리 결과 (apps-script/docs/API.md 2장) |
 | `POST /internal/mail/reminders` | Apps Script 전용. 헤더 `X-Kkurolog-Mail-Secret` | `{summary}` |
 | `POST /admin/login` 외 `/admin/*` | 관리자 페이지 전용. `Authorization: Bearer <token>` | apps-script/docs/ADMIN_API.md |
 

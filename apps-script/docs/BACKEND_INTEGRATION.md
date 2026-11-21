@@ -11,7 +11,8 @@
 ```
 학생 폼 → POST /contact-requests ─┬─ Supabase (mentors, inquiries, mail_settings, inquiry_counters)
                                   └─ Apps Script 웹앱 sendMail → 중계 Gmail → 멘토 / 학생 사본
-Apps Script 5분 트리거 → POST /internal/mail/inbound   → 판단·기록(mail_replies) → sendMail → 학생
+Apps Script 5분 트리거 → POST /internal/mail/inbound   → 판단·기록(mail_replies) → sendMail → 학생 (멘토 답장)
+                                                                                → 멘토 (학생 답장, 여러 번 왕복)
 Apps Script 매일 트리거 → POST /internal/mail/reminders → 대상 찾기 → sendMail → 멘토
 관리자 → /admin/* → Supabase
 ```
@@ -87,7 +88,7 @@ cd backend && pytest
 | 파일 | 내용 |
 |---|---|
 | `tests/test_mail_parser.py` | 답장에서 문의번호 찾기, 인용문 지우기 |
-| `tests/test_mail_flow.py` | 문의·횟수 제한·한도·실패 시 삭제·답장 전달·중복·확인필요·리마인드·내부 API (가짜 저장소 `FakeStore`, 가짜 웹앱 `FakeMail`) |
+| `tests/test_mail_flow.py` | 문의·횟수 제한·한도·실패 시 삭제·답장 전달·여러 번 왕복·중복·확인필요·리마인드·내부 API (가짜 저장소 `FakeStore`, 가짜 웹앱 `FakeMail`) |
 | `tests/test_mail_store.py` | Supabase REST 요청 모양 (`httpx.MockTransport`) |
 | `tests/test_admin.py` | 관리자 로그인·목록·상세·멘토·설정·한국 시간 |
 
