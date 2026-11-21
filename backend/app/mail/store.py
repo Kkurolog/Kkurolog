@@ -198,20 +198,22 @@ class SupabaseMailStore:
         return rows[0] if rows else None
 
     def list_replies(self, inquiry_id: str) -> list[dict]:
+        """첫 왕복(멘토 첫 답장까지)의 답장 기록만. 그 뒤 메일(followup)은 관리자에게 보여 주지 않는다."""
         return self._request(
             "GET",
             "mail_replies",
-            params={"select": "*", "inquiry_id": f"eq.{inquiry_id}", "order": "received_at"},
+            params={"select": "*", "inquiry_id": f"eq.{inquiry_id}", "followup": "is.false", "order": "received_at"},
         ) or []
 
     def list_review_replies(self, offset: int, limit: int) -> tuple[list[dict], int]:
-        """학생에게 전달하지 못해 사람이 봐야 하는 답장 (최신순) + 전체 건수."""
+        """학생에게 전달하지 못해 사람이 봐야 하는 답장 (최신순) + 전체 건수. 첫 왕복 이후 메일(followup)은 뺀다."""
         return self._request(
             "GET",
             "mail_replies",
             params=[
                 ("select", "*,inquiries(title,student_name,mentor_id)"),
                 ("status", "in.(needs_review,failed)"),
+                ("followup", "is.false"),
                 ("order", "received_at.desc"),
                 ("offset", str(offset)),
                 ("limit", str(limit)),
