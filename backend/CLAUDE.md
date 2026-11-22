@@ -38,7 +38,7 @@ backend/
 | 주소 | 요청 | 응답 |
 |---|---|---|
 | `GET /health` | - | `{"status": "ok"}` |
-| `POST /ask` | `{question}` | `{answer, sources[], has_enough_evidence}` (형식 고정) |
+| `POST /ask` | `{question, previous_question?, previous_answer?, seen_source_ids?, safety_notice_shown?, crisis_notice_shown?, more_hint_shown?}` (대화 맥락은 선택, 저장 안 함) | `{answer, sources[], has_enough_evidence}` (형식 고정) |
 | `GET /mentors` | - | `Mentor[]` (동의한 멘토만. `email`, `consent` 필드 없음) |
 | `POST /mentors/recommend` | `{question}` | `{recommendations: [{mentor, reason}], is_fallback}` 최대 3명, 연락 가능한 멘토만 |
 | `POST /contact-requests` | `{mentor_id, sender_name, reply_email, subject, message}` | 201 `{status: "delivered", message}` / 404 없는 멘토 / 409 연락 불가 / 422 입력 오류 / (MAIL_ENABLED) 429 너무 자주·503 발송 실패·502 연결 문제 (`detail`에 학생용 문구) |

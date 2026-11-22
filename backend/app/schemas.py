@@ -7,7 +7,7 @@ API에서 주고받는 데이터의 "모양"을 정의하는 파일.
   모양을 바꿔야 하면 프론트엔드 담당자와 먼저 이야기하자.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -22,6 +22,22 @@ class AskRequest(BaseModel):
         description="학생이 입력한 질문",
         examples=["대학을 바로 가지 않고 취업한 선배들은 왜 그렇게 선택했어?"],
     )
+    # [추가] 같은 대화에서 바로 앞에 한 질문. "더 자세히 알려줘" 같은 이어지는 질문을 이해하는 데만 쓴다.
+    # 서버에 저장하지 않는다. 안 보내도 된다 (그러면 질문을 따로따로 이해한다)
+    previous_question: str | None = Field(None, max_length=1000, description="바로 앞 질문 (없으면 null)")
+    # [추가] 그 앞 질문에 꾸로록이 한 답(글). 이어지는 질문에 같은 답을 되풀이하지 않게 하는 데만 쓴다. 저장하지 않는다
+    previous_answer: str | None = Field(None, max_length=6000, description="바로 앞 답변 (없으면 null)")
+    # [추가] 이 대화에서 이미 본 글 번호(Source.interview_id). "다른 선배 얘기도 들려줘"일 때 그 글을 빼고 찾는다. 저장하지 않는다
+    seen_source_ids: list[Annotated[str, Field(max_length=40)]] = Field(
+        default_factory=list, max_length=60, description="이 대화에서 이미 보여 준 글 번호"
+    )
+    # [추가] 이 대화에서 상담 번호 안내를 이미 받았는지. true 면 같은 긴 안내를 되풀이하지 않고 짧게 준다
+    safety_notice_shown: bool = Field(False, description="상담 번호 안내를 이미 보여 줬는지")
+    # [추가] 이 대화에서 '위기 안내 전체 문구'를 이미 받았는지. true 일 때만 위기 안내를 짧은 형태(번호만)로 준다.
+    # (가벼운 안내의 번호 한 줄만 본 학생에게는 처음 위기 안내를 전체로 보여 줘야 해서 따로 둔다)
+    crisis_notice_shown: bool = Field(False, description="위기 안내 전체 문구를 이미 보여 줬는지")
+    # [추가] 이 대화에서 "다른 선배 이야기도 더 있어요"를 이미 봤는지. true 면 다시 붙이지 않는다 (대화당 한 번)
+    more_hint_shown: bool = Field(False, description="'다른 선배 이야기도 더 있어요'를 이미 보여 줬는지")
 
 
 class Source(BaseModel):
@@ -86,7 +102,7 @@ Intent = Literal["greeting", "about_service", "career_question", "smalltalk", "u
 # about_service 안에서 무엇을 묻는지 (app/rag/intent.py 의 AboutAspect 와 같아야 한다)
 #   what: 뭘 할 수 있어 / why: 왜 만들었어 / who: 누가 만들었어
 #   data: 자료가 어디서 났어 / trust: 믿어도 돼 / privacy: 내 질문 저장돼
-AboutAspect = Literal["what", "why", "who", "data", "trust", "privacy"]
+AboutAspect = Literal["what", "name", "why", "story", "survey", "difference", "goal", "stage", "who", "data", "trust", "privacy"]
 
 
 class AnswerCard(BaseModel):
@@ -137,6 +153,18 @@ class AskResponse(BaseModel):
         ),
     )
     answer_type: AnswerType = Field("answer", description="답변 종류 (새 필드, 선택)")
+    # [추가] 이어지는 질문에 더 전할 이야기가 없을 때 true (answer_type 은 no_evidence).
+    # 화면은 "자료만으로는 답하기 어려워요" 대신 "여기까지예요"로 안내한다
+    # [추가] 상담 번호가 들어 있는 안내(위기 안내 등)를 이번 답에 보여 줬는지.
+    # 프론트는 이걸 받으면 같은 대화의 다음 요청부터 safety_notice_shown=true 를 보낸다
+    safety_notice: bool = Field(False, description="상담 번호 안내가 들어 있는 답인지")
+    # [추가] 위기 안내(answer_type safety)였는지. 받으면 다음 요청부터 crisis_notice_shown=true 를 보낸다
+    crisis_notice: bool = Field(False, description="위기 안내였는지")
+    # [추가] 맺음말에 "다른 선배 이야기도 더 있어요"를 붙였는지. 받으면 다음 요청부터 more_hint_shown=true 를 보낸다
+    more_hint: bool = Field(False, description="'다른 선배 이야기도 더 있어요'를 붙였는지")
+    # [추가] 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때 "막막한 게 당연해요. …"). 없으면 null
+    preface: str | None = Field(None, description="카드 답변 위에 붙이는 한 줄")
+    no_more: bool = Field(False, description="이어지는 질문에 더 전할 이야기가 없는지")
     temporary_error: bool = Field(
         False,
         description=(

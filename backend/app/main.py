@@ -68,9 +68,14 @@ def ask(request: AskRequest, http_request: Request) -> AskResponse:
       4. 답변 만들기
     """
     if looks_like_crisis(request.question):
-        return safety_answer()
+        return safety_answer(request.crisis_notice_shown)
     limit_ask(http_request)
-    return make_answer(request.question)
+    return make_answer(
+        request.question, request.previous_question, request.previous_answer, request.seen_source_ids,
+        request.safety_notice_shown,
+        request.crisis_notice_shown,
+        request.more_hint_shown,
+    )
 
 
 @app.get("/mentors", response_model=list[Mentor])

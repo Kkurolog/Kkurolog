@@ -93,7 +93,11 @@ export default function ChatMessageView({
       <div className="flex flex-col gap-3.5 text-[15px] leading-[26px] text-ink motion-safe:animate-rise-in">
         <p>
           <span className="bg-[linear-gradient(transparent_55%,var(--color-butter)_55%)] font-bold">
-            {message.temporaryError ? "지금 잠깐 문제가 생겼어요." : "지금 자료만으로는 답하기 어려워요."}
+            {message.temporaryError
+              ? "지금 잠깐 문제가 생겼어요."
+              : message.noMore
+                ? "지금 찾을 수 있는 선배 이야기는 여기까지예요."
+                : "지금 자료만으로는 답하기 어려워요."}
           </span>
         </p>
         {message.temporaryError ? (
@@ -102,7 +106,10 @@ export default function ChatMessageView({
             연락은 꾸로록이 대신 전달해요.
           </p>
         ) : (
-          <p>이 경험을 가진 선배에게 직접 물어볼 수 있어요. 첫 연락은 꾸로록이 대신 전달해요.</p>
+          <p>
+            {message.noMore ? "더 궁금한 점은 비슷한 경험을 가진" : "이 경험을 가진"} 선배에게 직접 물어볼 수 있어요. 첫
+            연락은 꾸로록이 대신 전달해요.
+          </p>
         )}
         {message.mentors.length > 0 && (
           <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
@@ -134,6 +141,8 @@ export default function ChatMessageView({
         <span className="pb-0.5 font-display text-xl text-brand">꾸로록</span>
       </div>
       {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
+      {/* 감정이 담긴 진로 고민이면 카드 위에 한 줄로 먼저 받아 준다 ("막막한 게 당연해요. …") */}
+      {cards && message.preface && <p>{message.preface}</p>}
       {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
 
       {/* 2) 꾸로록 자신에 대한 설명: 다른 답변처럼 바탕 없이 글로 그린다 (흰 상자를 두지 않는다. 노트 줄 바탕을 가린다).

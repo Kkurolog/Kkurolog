@@ -142,7 +142,7 @@ def test_compose_text_has_title_pieces_and_per_card_source():
         "두 길이 달라요.",
         "1. 새벽 선배 · 창업 뒤 대학에 간 길\n창업 뒤 대학에 간 길 한 줄\n창업을 먼저 했대요.\n(2023년 5월, 「p1 제목」)",
         "2. 쉬어 가며 찾은 길\n쉬어 가며 찾은 길 한 줄\n갭이어를 보냈대요.\n(2023년 5월 글)",
-        "궁금한 선배에게 더 물어봐요.",
+        "궁금한 선배에게 더 물어봐요.",  # 선배를 찾는 질문(태그)이 아니면 "더 있어요"를 붙이지 않는다
     ]
 
 
@@ -191,3 +191,11 @@ def test_avatar_is_stable_per_person_and_hides_internal_id():
     # 사람 정보가 없으면 글번호로 정한다
     orphan = make_chunk("p7", 1, "창업 이야기").model_copy(update={"person_id": ""})
     assert avatar_id_for(orphan) in {f"avatar-{n}" for n in range(1, 9)}
+
+
+def test_card_keeps_at_most_two_paragraphs_and_only_their_sources():
+    """문단은 카드당 2개까지. 넘친 문단은 버리고, 그 문단만 인용한 글은 출처에 붙이지 않는다."""
+    result = run([card("작게 바로 시작한 길", ("첫 문단", ["p1-02"]), ("둘째 문단", ["p1-03"]), ("셋째 문단", ["p2-01"]))])
+    only = to_ask_response(result).structured.cards[0]
+    assert only.body == ["첫 문단", "둘째 문단"]
+    assert [s.interview_id for s in only.sources] == ["p1"]

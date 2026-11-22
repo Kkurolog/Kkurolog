@@ -45,9 +45,13 @@ class RagSettings:
 
     # ---- 대기 시간 상한 (초) ----
     # SDK 기본값은 10분이라, 학생이 답을 너무 오래 기다리지 않게 줄인다.
-    # SDK 는 실패하면 기본 2번 다시 시도하므로 최악의 대기 시간은 이 값의 약 3배다.
+    # SDK 는 실패하면 기본 2번 다시 시도해서 최악의 대기 시간이 이 값의 약 3배가 된다.
+    # 그래서 다시 시도는 1번으로 줄였다 → 최악: 분석 10 + 임베딩 15×2 + 답변 60×2 = 약 160초
+    # (frontend/src/lib/api.ts 의 ASK_TIMEOUT_MS 는 이보다 길게 둔다)
     embedding_timeout_seconds: float = 15.0
     claude_timeout_seconds: float = 60.0
+    embedding_max_retries: int = 1
+    claude_max_retries: int = 1
 
     @classmethod
     def from_env(cls) -> "RagSettings":

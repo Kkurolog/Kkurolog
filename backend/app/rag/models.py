@@ -133,3 +133,9 @@ class RagAnswer(BaseModel):
     # 검색·Claude 호출이 실패해서 no_evidence 로 대신 답했는지. API 응답에는 나가지 않는다.
     # (성능 측정 때 '진짜 근거 부족'과 '오류'를 구분하려고 둔다)
     failed: bool = False
+    # 이어지는 질문("다른 선배 얘기도", "더 자세히")에 더 전할 이야기가 없어서 no_evidence 로 답했는지
+    no_more: bool = False
+    safety_notice: bool = False  # 상담 번호가 들어 있는 안내인지 (위기 안내, T1 안내)
+    crisis_notice: bool = False  # 위기 안내(T0)였는지
+    more_hint: bool = False  # 맺음말에 "다른 선배 이야기도 더 있어요"를 붙였는지 (대화당 한 번만 붙이려고 표시한다)
+    preface: str | None = None  # 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때)

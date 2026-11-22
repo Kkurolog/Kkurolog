@@ -52,6 +52,14 @@ export type AskResponse = {
   // [추가] 서버 쪽 문제로 답하지 못했는지. true 면 has_enough_evidence 는 false 지만
   // "자료가 없어요"가 아니라 "잠깐 문제가 생겼어요"로 안내한다
   temporary_error?: boolean;
+  // [추가] 이어지는 질문("다른 선배 얘기도 들려줘")에 더 전할 이야기가 없는지. true 면 "여기까지예요"로 안내한다
+  no_more?: boolean;
+  // [추가] 상담 번호가 들어 있는 안내(위기 안내 등)였는지. 받으면 같은 대화의 다음 요청부터 safety_notice_shown 을 보낸다
+  safety_notice?: boolean;
+  more_hint?: boolean; // [추가] 맺음말에 "다른 선배 이야기도 더 있어요"가 붙었는지. 받으면 다음 요청부터 more_hint_shown 을 보낸다
+  crisis_notice?: boolean; // [추가] 위기 안내였는지. 받으면 다음 요청부터 crisis_notice_shown 을 보낸다
+  // [추가] 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때 "막막한 게 당연해요. …"). 없으면 null
+  preface?: string | null;
   intent?: Intent | null; // [추가] 학생의 말을 어떻게 이해했는지. 분석하지 않았으면 null
   user_context?: string | null; // [추가] 학생이 질문에서 스스로 밝힌 상황 (예: "18세, 창업 준비 중"). 없으면 null
   // [추가] 꾸로록 자신에 대한 질문(왜·누가 만들었는지, 자료, 신뢰, 질문 저장)에 고정 문구로 답했을 때 어느 측면인지.
@@ -62,7 +70,19 @@ export type AskResponse = {
 };
 
 // [추가] backend/app/schemas.py 의 AboutAspect 와 같다
-export type AboutAspect = "what" | "why" | "who" | "data" | "trust" | "privacy";
+export type AboutAspect =
+  | "what"
+  | "name" // 이름의 뜻
+  | "why"
+  | "story" // 어떻게 시작됐는지
+  | "survey" // 학생들에게 물어본 것
+  | "difference" // 다른 AI 와 다른 점
+  | "goal" // 바라는 것
+  | "stage" // 지금 어느 단계인지
+  | "who"
+  | "data"
+  | "trust"
+  | "privacy";
 
 // [추가] 1차 의도 분석 결과 (backend/app/schemas.py 의 Intent 와 같다)
 // greeting·about_service·smalltalk·unclear 는 backend 가 고정 안내 문구로 답한다 (answer_type 은 off_topic)
@@ -88,8 +108,22 @@ function getClientId(): string | null {
   }
 }
 
+// [추가] 답변을 기다리는 최대 시간. backend 의 최악 대기 시간(약 160초, backend/app/rag/config.py)보다 조금 길게 둔다.
+// 이 시간이 지나면 기다리기를 그만두고 안내 문구를 보여준다 (화면이 끝없이 '찾는 중'으로 남지 않게)
+const ASK_TIMEOUT_MS = 180_000;
+
+// 질문과 함께 보내는 '이 대화의 맥락'. 모두 선택이고, backend 는 저장하지 않는다.
+export type AskContext = {
+  previousQuestion?: string | null; // 바로 앞 질문 ("더 자세히 알려줘" 같은 이어지는 질문을 이해하게)
+  previousAnswer?: string | null; // 그 질문에 꾸로록이 한 답 (같은 답을 되풀이하지 않게)
+  seenSourceIds?: string[]; // 이미 본 글 번호 ("다른 선배 얘기도 들려줘"일 때 그 글을 빼고 찾게)
+  safetyNoticeShown?: boolean; // 상담 번호를 이미 받았는지 (가벼운 안내의 번호 줄을 되풀이하지 않게)
+  moreHintShown?: boolean; // "다른 선배 이야기도 더 있어요"를 이미 봤는지 (대화당 한 번만 붙이게)
+  crisisNoticeShown?: boolean; // 위기 안내 전체 문구를 이미 받았는지 (받았을 때만 짧은 형태로 다시 준다)
+};
+
 // 질문을 backend로 보내고 답변을 받아온다.
-export async function askQuestion(question: string): Promise<AskResponse> {
+export async function askQuestion(question: string, context: AskContext = {}): Promise<AskResponse> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const clientId = getClientId(); // [추가]
   if (clientId) headers["X-Client-Id"] = clientId;
@@ -99,9 +133,21 @@ export async function askQuestion(question: string): Promise<AskResponse> {
     res = await fetch(`${API_URL}/ask`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({
+        question,
+        previous_question: context.previousQuestion ?? null,
+        previous_answer: context.previousAnswer ? context.previousAnswer.slice(0, 6000) : null, // backend 가 받는 최대 길이
+        seen_source_ids: (context.seenSourceIds ?? []).slice(-60), // backend 가 받는 최대 개수
+        safety_notice_shown: context.safetyNoticeShown ?? false,
+        crisis_notice_shown: context.crisisNoticeShown ?? false,
+        more_hint_shown: context.moreHintShown ?? false,
+      }),
+      signal: AbortSignal.timeout(ASK_TIMEOUT_MS),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error("답변이 너무 오래 걸려서 멈췄어요. 잠시 후 다시 물어봐 주세요.");
+    }
     // [추가] 서버에 아예 닿지 못한 경우. 브라우저의 영어 문구("Failed to fetch")가 화면에 그대로 나오지 않게 한다
     throw new Error("서버 오류 (연결 실패)");
   }

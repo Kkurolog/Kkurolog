@@ -15,11 +15,16 @@ class Embedder(Protocol):
 class OpenAIEmbedder:
     """OpenAI 임베딩. OPENAI_API_KEY 환경변수가 필요하다."""
 
-    def __init__(self, model: str, batch_size: int = 100, timeout: float | None = None) -> None:
+    def __init__(
+        self, model: str, batch_size: int = 100, timeout: float | None = None, max_retries: int | None = None
+    ) -> None:
         from openai import OpenAI  # requirements-rag.txt 를 설치해야 import 된다
 
-        # timeout(초): /ask 에서는 짧게 준다. None 이면 SDK 기본값 (적재 스크립트처럼 오래 걸려도 될 때)
+        # timeout(초)·max_retries(다시 시도 횟수): /ask 에서는 작게 준다.
+        # None 이면 SDK 기본값 (적재 스크립트처럼 오래 걸려도 될 때)
         kwargs = {"timeout": timeout} if timeout is not None else {}
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
         self._client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], **kwargs)
         self._model = model
         self._batch_size = batch_size

@@ -23,6 +23,7 @@ from app.rag.models import Chunk, GeneratedCard, GeneratorOutput, RagCard, RagSo
 logger = logging.getLogger("uvicorn.error")
 
 MAX_CARDS = 4
+MAX_PARAGRAPHS = 2  # 카드 한 장의 본문 문단 수. 문단이 길어진 만큼 수를 줄였다 (지시문 6번과 같다)
 
 
 AVATAR_COUNT = 8
@@ -66,6 +67,9 @@ def assemble_cards(
             valid = [i for i in piece.chunk_ids if i in given]
             unknown += [i for i in piece.chunk_ids if i not in given]
             if text and valid:
+                if len(pieces) == MAX_PARAGRAPHS:  # 넘치는 문단은 버린다 (그 문단의 출처도 붙이지 않는다)
+                    logger.warning("문단이 %d개보다 많이 왔어요. 앞의 것만 씁니다.", MAX_PARAGRAPHS)
+                    break
                 pieces.append(text)
                 ids += valid
         if pieces and card.label.strip():

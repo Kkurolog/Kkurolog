@@ -325,7 +325,7 @@ class FakePipeline:
         self.result = result
         self.questions: list[str] = []
 
-    def answer(self, question: str) -> RagAnswer:
+    def answer(self, question: str, **_previous) -> RagAnswer:
         self.questions.append(question)
         return self.result
 
@@ -396,6 +396,12 @@ NOT_CRISIS = [
     "공학대학원 진학 고민",
     "약학대학 준비",
     "대학원 생활 어때?",
+    "왕따 문제를 해결하는 프로젝트를 한 선배 있어?",
+    "학교폭력 예방 캠페인을 한 선배 있어?",
+    "나 너무 우울해",  # T1: 위기 안내가 아니라 감정을 받아 주는 안내 (의도 분석이 고른다)
+    "우울하지만 열심히 해보려고 해",
+    "너 고민상담도 잘 해?",
+    "맞아 그 선배 얘기 더 해줘",
 ]
 
 CRISIS = [
@@ -410,6 +416,11 @@ CRISIS = [
     "아동학대 같아",
     "가정에서학대받아",
     "학교에서 폭행당했어",
+    "반에서 왕따 당하고 있어",
+    "괴롭힘을 당해요",
+    "따돌림당하는 것 같아",
+    "집에서 자꾸 맞아",
+    "엄마가 자꾸 때려",
 ]
 
 
@@ -423,3 +434,12 @@ def test_career_questions_are_not_crisis(question):
 def test_crisis_questions_are_caught(question):
     assert answer_service.looks_like_crisis(question) is True
     assert ask(question).json()["answer_type"] == "safety"
+
+
+def test_previous_question_is_optional_and_accepted():
+    """앞 질문은 보내도 되고 안 보내도 된다 (이어지는 질문을 이해하는 용도)."""
+    res = client.post("/ask", json={"question": "더 자세히 알려줘", "previous_question": "창업한 선배 있어?"})
+    assert res.status_code == 200
+    assert client.post("/ask", json={"question": "창업한 선배 있어?", "previous_question": None}).status_code == 200
+    too_long = client.post("/ask", json={"question": "창업", "previous_question": "가" * 1001})
+    assert too_long.status_code == 422

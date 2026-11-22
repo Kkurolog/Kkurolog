@@ -111,10 +111,10 @@ class CachingIntentAnalyzer:
         self.prefix = f"{model}|{hashlib.md5(INTENT_SYSTEM_PROMPT.encode()).hexdigest()[:10]}|"
         self.cache = JsonCache("intents.json")
 
-    def analyze(self, question: str) -> IntentResult | None:
-        key = self.prefix + question
+    def analyze(self, question: str, previous_question: str | None = None) -> IntentResult | None:
+        key = self.prefix + question + (f"|앞:{previous_question}" if previous_question else "")
         if key not in self.cache.data:
-            result = self.inner.analyze(question)
+            result = self.inner.analyze(question, previous_question)
             if result is None:
                 return None  # 실패는 저장하지 않는다 (다음에 다시 시도)
             self.cache.data[key] = result.model_dump()
@@ -318,13 +318,23 @@ def run_intent(args, settings: RagSettings) -> None:
             rows.append({"text": text, "route": "crisis"})
             print(f"  (위기 단어에 걸려 분류 전에 상담 안내) | {text}")
             continue
-        r = analyzer.analyze(text)
+        r = analyzer.analyze(text, case.get("previous"))  # previous: 바로 앞 질문 (이어지는 질문 사례)
         if r is None:
             rows.append({"text": text, "got": None})
             print(f"✗ (분석 실패) | {text}")
             continue
         problems = []
-        if r.intent not in case["intent"]:
+        # emotion: 기대하는 감정 단계 (글자 하나 또는 허용 목록). T0 을 기대했는데 더 낮게 나오면 가장 큰 문제다
+        wanted = case.get("emotion")
+        wanted = [wanted] if isinstance(wanted, str) else wanted
+        if wanted and r.emotional_state not in wanted:
+            mark = "★ 위기를 놓침 " if "T0" in wanted else ""
+            problems.append(f"{mark}감정 단계 {r.emotional_state} (기대 {wanted})")
+        if "other" in case and r.wants_other != case["other"]:
+            problems.append(f"다른 선배 찾기 {r.wants_other} (기대 {case['other']})")
+        if wanted and r.emotional_state != "none" and r.emotional_state != "T4":
+            pass  # 감정 안내(고정 문구)로 가므로 갈래는 따지지 않는다
+        elif r.intent not in case["intent"]:
             problems.append(f"갈래 {r.intent} (기대 {case['intent']})")
         if case.get("aspect") and r.intent == "about_service" and r.about_aspect not in case["aspect"]:
             problems.append(f"측면 {r.about_aspect} (기대 {case['aspect']})")

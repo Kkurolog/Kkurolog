@@ -25,11 +25,23 @@ from app.rag.cards import assemble_cards, compose_text
 from app.rag.config import RagSettings
 from app.rag.embedding import Embedder
 from app.rag.generator import ContextDoc, Generator
-from app.rag.intent import IntentAnalyzer, IntentResult, fixed_reply_for
+from app.rag.intent import (
+    BUTTON_QUESTIONS,
+    LISTEN_BUTTONS,
+    LISTEN_MESSAGE,
+    IntentAnalyzer,
+    IntentResult,
+    emotional_reply_for,
+    fixed_reply_for,
+    has_emotion_word,
+    preface_for,
+)
 from app.rag.messages import (
+    MORE_STORIES_HINT,
+    NO_MORE_MESSAGE,
     NO_EVIDENCE_MESSAGE,
     OFF_TOPIC_MESSAGE,
-    SAFETY_MESSAGE,
+    safety_message,
     TEMPORARY_ERROR_MESSAGE,
     looks_like_crisis,  # 위기 신호 판정은 app/services/answer.py 의 함수 하나만 쓴다
 )
@@ -79,6 +91,8 @@ def to_source(chunk: Chunk) -> RagSource:
         url=chunk.url if chunk.visibility == "L3" else None,
     )
 
+EXCLUDE_SEARCH_FACTOR = 4  # 이미 본 글을 뺄 때는 이만큼 더 넉넉히 찾는다
+
 
 @dataclass
 class Retrieval:
@@ -122,18 +136,22 @@ class RagPipeline:
         self.intent_analyzer = intent_analyzer
 
     # ---- 1. 의도 분석 ----
-    def analyze_intent(self, question: str) -> IntentResult | None:
+    def analyze_intent(self, question: str, previous_question: str | None = None) -> IntentResult | None:
         """분석기가 없거나 실패하면 None → 진로 질문처럼 검색으로 보낸다 (분석 때문에 답이 막히지 않게)."""
         if self.intent_analyzer is None:
             return None
         try:
+            if previous_question:
+                return self.intent_analyzer.analyze(question, previous_question)
             return self.intent_analyzer.analyze(question)
         except Exception:
             logger.exception("의도 분석 실패 → 기존 흐름으로 넘김")
             return None
 
     # ---- 2. 검색 ----
-    def retrieve(self, question: str, intent: IntentResult | None = None) -> Retrieval:
+    def retrieve(
+        self, question: str, intent: IntentResult | None = None, exclude_sources: set[str] | None = None
+    ) -> Retrieval:
         """
         질문과 비슷한 chunk 를 찾는다.
         의도 분석이 질문에서 경로·분야 태그를 뽑았으면(intent.career_paths·career_fields),
@@ -141,10 +159,15 @@ class RagPipeline:
         """
         s = self.settings
         vector = self.embedder.embed([question])[0]
+        # exclude_sources: 이미 보여 준 글 ("다른 선배 얘기도 들려줘"). 그 글을 빼도 남는 게 있게 더 넉넉히 찾는다
+        exclude = exclude_sources or set()
+        widen = EXCLUDE_SEARCH_FACTOR if exclude else 1
         hits = [
             h
-            for h in self.store.search(vector, s.top_k)
-            if h.score >= s.similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY
+            for h in self.store.search(vector, s.top_k * widen)
+            if h.score >= s.similarity_floor
+            and h.chunk.visibility in PUBLIC_VISIBILITY
+            and h.chunk.source_id not in exclude
         ]
         paths = intent.career_paths if intent else []
         fields = intent.career_fields if intent else []
@@ -153,8 +176,12 @@ class RagPipeline:
 
         tagged = [
             h
-            for h in self.store.search(vector, s.tag_top_k, career_paths=paths or None, career_fields=fields or None)
-            if h.score >= s.tag_similarity_floor and h.chunk.visibility in PUBLIC_VISIBILITY
+            for h in self.store.search(
+                vector, s.tag_top_k * widen, career_paths=paths or None, career_fields=fields or None
+            )
+            if h.score >= s.tag_similarity_floor
+            and h.chunk.visibility in PUBLIC_VISIBILITY
+            and h.chunk.source_id not in exclude
         ]
         merged = {h.chunk.chunk_id: h for h in [*tagged, *hits]}  # 같은 chunk 는 한 번만
         return Retrieval(
@@ -197,13 +224,79 @@ class RagPipeline:
         return docs
 
     # ---- 전체 ----
-    def answer(self, question: str) -> RagAnswer:
-        if looks_like_crisis(question):
-            return RagAnswer(answer_type="safety", answer=SAFETY_MESSAGE)
+    def answer(
+        self,
+        question: str,
+        previous_question: str | None = None,
+        previous_answer: str | None = None,
+        seen_source_ids: list[str] | None = None,
+        safety_notice_shown: bool = False,
+        crisis_notice_shown: bool = False,
+        more_hint_shown: bool = False,
+    ) -> RagAnswer:
+        """
+        previous_question: 같은 대화의 바로 앞 질문. "더 자세히 알려줘" 같은 이어지는 질문을 이해하는 데 쓴다.
+        previous_answer: 그 질문에 꾸로록이 한 답. 이어지는 질문일 때만 답변 모델에 보여 줘서 같은 말을 되풀이하지 않게 한다.
+        seen_source_ids: 이 대화에서 이미 보여 준 글 번호. "다른 선배 얘기도 들려줘"일 때 그 글을 빼고 찾는다.
+        safety_notice_shown: 이 대화에서 상담 번호를 이미 보여 줬는지. true 면 가벼운 안내(T1)의 번호 줄을 되풀이하지 않는다.
+        crisis_notice_shown: 이 대화에서 위기 안내 전체 문구를 이미 보여 줬는지. true 일 때만 위기 안내를 짧게 준다.
+        more_hint_shown: 이 대화에서 "다른 선배 이야기도 더 있어요"를 이미 보여 줬는지. 대화당 한 번만 붙인다.
+        """
+        meta: dict = {}
 
-        # 인사·서비스 소개·잡담·막연한 고민은 고정 문구로 끝낸다 (검색·큰 모델 호출 없음)
-        intent = self.analyze_intent(question)
+        def safety() -> RagAnswer:
+            # 위기 안내는 항상 고정 문구다 (모델이 쓰지 않는다). 전체 문구를 이미 보여 줬을 때만 번호만 짧게 다시 준다
+            return RagAnswer(
+                answer_type="safety",
+                answer=safety_message(crisis_notice_shown),
+                safety_notice=True,
+                crisis_notice=True,
+                **meta,
+            )
+
+        is_follow_up = False
+        seen = set(seen_source_ids or [])
+
+        def no_evidence() -> RagAnswer:
+            # 방금 답을 받고 이어서 물은 학생에게는 "자료가 없어요"가 아니라 "여기까지예요"로 안내한다
+            if is_follow_up:
+                return RagAnswer(answer_type="no_evidence", answer=NO_MORE_MESSAGE, no_more=True, **meta)
+            return RagAnswer(answer_type="no_evidence", answer=NO_EVIDENCE_MESSAGE, **meta)
+
+        # T0 (급박한 위기): 정규식에 걸리면 모델을 부르지 않고 바로 안내한다 (모델이 실패해도 작동해야 한다)
+        if looks_like_crisis(question):
+            return safety()
+
+        # 감정 안내의 버튼을 누른 경우 (app/rag/intent.py 의 BTN_*)
+        pressed = question.strip()
+        if pressed in LISTEN_BUTTONS:  # 한 번 적어 달라고만 한다. 적어 준 말은 다시 단계 판정을 거친다
+            return RagAnswer(answer_type="off_topic", answer=LISTEN_MESSAGE)
+        if pressed in BUTTON_QUESTIONS:  # "선배들 이야기 들어볼래요" → 정해 둔 질문으로 찾는다
+            question, previous_question, previous_answer = BUTTON_QUESTIONS[pressed], None, None
+
+        intent = self.analyze_intent(question, previous_question)
+        if intent is None and self.intent_analyzer is not None and has_emotion_word(question):
+            # 분석이 실패했는데 감정 낱말이 있다 → 안전한 쪽(T1: 어른 연결 권유)으로 답한다
+            intent = IntentResult(intent="unclear", emotional_state="T1")
         meta = {"intent": intent.intent, "user_context": intent.user_context} if intent else {}
+        if intent is not None and intent.safety_concern:
+            # 정규식이 놓친 돌려 말한 위기 표현("요즘 다 그만두고 싶어")도 T0 → 다른 어떤 문구보다 먼저 본다
+            return safety()
+        # T1·T2·T3·T5: 감정을 받아 주는 고정 문구 (검색·큰 모델 호출 없음). T4 는 아래에서 선배 이야기로 답한다
+        emotional = emotional_reply_for(intent, safety_notice_shown) if intent is not None else None
+        if emotional is not None:
+            return RagAnswer(
+                answer_type="off_topic",
+                answer=emotional.text,
+                follow_ups=emotional.follow_ups,
+                safety_notice=emotional.safety_notice,
+                **meta,
+            )
+        preface = preface_for(intent) if intent is not None else None
+        if intent is not None and intent.standalone_question:
+            question = intent.standalone_question  # 이어지는 질문은 앞 질문과 합쳐 고쳐 쓴 것으로 찾고 답한다
+            is_follow_up = True
+        # 인사·서비스 소개·잡담·막연한 고민은 고정 문구로 끝낸다 (검색·큰 모델 호출 없음)
         if intent is not None:
             fixed = fixed_reply_for(intent)
             if fixed is not None:
@@ -217,12 +310,16 @@ class RagPipeline:
                 )
 
         try:
-            found = self.retrieve(question, intent)
-            if not found.hits and not self.settings.classify_when_no_hits:
-                return RagAnswer(answer_type="no_evidence", answer=NO_EVIDENCE_MESSAGE, **meta)
+            # '다른 선배'를 찾는 말이면 이미 보여 준 글은 빼고 찾는다 ("더 자세히"는 같은 글을 다시 써야 하므로 빼지 않는다)
+            wants_other = bool(is_follow_up and intent and intent.wants_other and seen)
+            found = self.retrieve(question, intent, exclude_sources=seen if wants_other else None)
+            if not found.hits and (wants_other or not self.settings.classify_when_no_hits):
+                return no_evidence()
             docs = self.build_context(found)
             if intent is None:
                 output = self.generator.generate(question, docs)
+            elif is_follow_up and previous_answer:
+                output = self.generator.generate(question, docs, intent=intent, previous_answer=previous_answer)
             else:
                 output = self.generator.generate(question, docs, intent=intent)
         except Exception:
@@ -231,27 +328,49 @@ class RagPipeline:
             return RagAnswer(answer_type="no_evidence", answer=TEMPORARY_ERROR_MESSAGE, failed=True, **meta)
 
         if output.answer_type == "safety":
-            return RagAnswer(answer_type="safety", answer=SAFETY_MESSAGE, **meta)
+            return safety()
         if output.answer_type == "off_topic":
             return RagAnswer(answer_type="off_topic", answer=OFF_TOPIC_MESSAGE, **meta)
         if output.answer_type == "no_evidence" or not docs:
-            return RagAnswer(answer_type="no_evidence", answer=NO_EVIDENCE_MESSAGE, **meta)
+            return no_evidence()
 
         # ---- 5. 카드 조립: 근거 없는 조각·카드를 버리고, 카드마다 출처를 붙인다 (app/rag/cards.py) ----
         given = {c.chunk_id: c for doc in docs for c in doc.chunks}
         structured = assemble_cards(output, given, to_source, greeted=bool(intent and intent.has_greeting))
         if structured is None:  # 근거가 확인된 카드가 한 장도 없다 → 출처 없는 답변은 내보내지 않는다
-            return RagAnswer(answer_type="no_evidence", answer=NO_EVIDENCE_MESSAGE, **meta)
+            return no_evidence()
+
+        # 맺음말의 "다른 선배 이야기도 더 있어요"는 시스템이 붙인다 (모델은 더 있는지 알 수 없다). 세 조건을 모두 만족할 때만:
+        #   1) 질문이 특정 길·분야의 선배를 찾는다 (의도 분석이 태그를 뽑았다)
+        #   2) 그 태그에 맞는 선배의 글이 아직 보여 주지 않은 채로 남아 있다
+        #   3) 이 대화에서 아직 이 말을 한 적이 없다
+        # (예전 기준 '안 쓴 글이 하나라도 있으면'은 답변의 97% 에 붙어서 의미가 없었다 → 2026-11-23 측정)
+        shown = seen | {s.source_id for card in structured.cards for s in card.sources}
+        has_more = not more_hint_shown and bool(found.tagged_sources - shown)
+        structured.closing = with_more_hint(structured.closing, has_more)
 
         # 전체 출처 = 카드들의 출처를 순서대로 모은 것 (같은 chunk 는 한 번만)
         all_sources = {s.chunk_id: s for card in structured.cards for s in card.sources}
         return RagAnswer(
             answer_type="answer",
-            answer=compose_text(structured),
+            answer="\n\n".join(filter(None, [preface, compose_text(structured)])),
+            preface=preface,
             sources=list(all_sources.values()),
             structured=structured,
+            more_hint=has_more,
             **meta,
         )
+
+
+_MORE_CLAIM = re.compile(r"[^.!?]*(다른|또 다른)[^.!?]*더 있[^.!?]*[.!?]?\s*")
+
+
+def with_more_hint(closing: str | None, has_more: bool) -> str | None:
+    """모델이 쓴 '더 있어요' 문장은 지우고, 실제로 남은 글이 있을 때만 시스템 문구를 붙인다."""
+    text = _MORE_CLAIM.sub("", closing or "").strip()
+    if has_more:
+        text = f"{text} {MORE_STORIES_HINT}".strip()
+    return text or None
 
 
 def build_pipeline_from_env(settings: RagSettings | None = None, local_chunks_path: str | None = None) -> RagPipeline:
@@ -269,7 +388,9 @@ def build_pipeline_from_env(settings: RagSettings | None = None, local_chunks_pa
     analyzer = ClaudeIntentAnalyzer(s.intent_model, timeout=s.intent_timeout_seconds) if s.intent_enabled else None
     return RagPipeline(
         intent_analyzer=analyzer,
-        embedder=OpenAIEmbedder(s.embedding_model, timeout=s.embedding_timeout_seconds),
+        embedder=OpenAIEmbedder(
+            s.embedding_model, timeout=s.embedding_timeout_seconds, max_retries=s.embedding_max_retries
+        ),
         store=store,
         generator=ClaudeGenerator(
             s.claude_model,
@@ -277,6 +398,7 @@ def build_pipeline_from_env(settings: RagSettings | None = None, local_chunks_pa
             s.claude_max_tokens,
             s.claude_use_fallbacks,
             timeout=s.claude_timeout_seconds,
+            max_retries=s.claude_max_retries,
         ),
         settings=s,
     )

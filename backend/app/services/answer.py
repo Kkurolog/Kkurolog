@@ -74,14 +74,41 @@ CRISIS_PATTERNS = [
     r"아동\s*학대",  # 붙여 쓴 '아동학대' 도 잡는다
     r"학대\s*(를|당|받)",  # '가정에서학대받아' 처럼 붙여 써도 잡는다
     r"폭행\s*당",
+    # 맞고 있다는 말. '맞아'만으로는 잡지 않는다 ("맞아, 그 선배" 같은 맞장구와 구분)
+    r"(자꾸|맨날|매일|계속)\s*(맞아|맞았|맞고|맞는데|때려|때리|때렸)",
+    r"또\s*(맞았|때렸)",  # "또 맞는 말이네" 는 제외
+    r"(집|아빠|엄마|아버지|어머니|부모|형|오빠|언니|누나|선생|애들|친구|선배)\S{0,4}\s*(자꾸\s*|계속\s*|맨날\s*)?(때려|때리|때렸|맞았|맞고\s*(있|살|다))",
+    # 괴롭힘·따돌림을 '당한다'는 말만 잡는다. 단어만 있으면 잡지 않는다
+    # ("왕따 문제를 해결하는 프로젝트를 한 선배 있어?" 는 진로 질문). 돌려 말한 표현은 의도 분석(emotional_state T0)이 본다
+    r"(괴롭힘|왕따|따돌림)\s*(을|를)?\s*당",
 ]
 _CRISIS_REGEX = re.compile("|".join(CRISIS_PATTERNS))
 
+# 문구 원칙: 방법·수단·장소를 쓰지 않는다. 진단명을 붙이지 않는다. 전화가 부담스러운 학생을 위해 문자·카톡 창구를 함께 적는다.
+# 창구는 공식 창구만 쓴다 (109·1388·112·119). 번호를 바꾸려면 출처를 확인한다.
 SAFETY_MESSAGE = (
-    "지금 많이 힘든 마음이 느껴져요. 혼자 견디지 말고 믿을 수 있는 코치님이나 어른에게 꼭 이야기해 주세요. "
-    "바로 이야기할 사람이 필요하면 언제든 자살예방상담전화 109, 청소년상담 1388(문자·카톡 상담도 가능)에 "
-    "연락할 수 있어요. 위험한 상황이면 112·119에 바로 연락해 주세요."
+    "지금 많이 힘들다는 게 느껴져요. 그 이야기를 꺼내 준 것만으로도 큰 용기예요.\n\n"
+    "이건 저 혼자 들을 이야기가 아니에요. 믿을 수 있는 어른 — 코치님이나 가족, 선생님 중 한 분에게 "
+    "오늘 중으로 꼭 이야기해 주세요.\n\n"
+    "지금 바로 이야기할 사람이 필요하면\n"
+    "자살예방상담 109 (24시간)\n"
+    "청소년전화 1388 · 문자 #1388 · 카카오톡 '다들어줄개'\n"
+    "위험한 상황이면 112 · 119\n\n"
+    "전화가 어려우면 문자나 카톡으로도 돼요."
 )
+# 같은 대화에서 위기 안내를 이미 한 번 보여 줬을 때. 같은 긴 문구를 되풀이하지 않고 번호만 다시 준다
+SAFETY_MESSAGE_SHORT = (
+    "혼자 두고 싶지 않아요. 지금 바로 이야기할 수 있는 곳이에요.\n\n"
+    "자살예방상담 109 (24시간)\n"
+    "청소년전화 1388 · 문자 #1388\n"
+    "위험한 상황이면 112 · 119"
+)
+
+
+def safety_message(notice_shown: bool = False) -> str:
+    """위기 안내 문구. notice_shown: 이 대화에서 이미 한 번 보여 줬는지."""
+    return SAFETY_MESSAGE_SHORT if notice_shown else SAFETY_MESSAGE
+
 
 OFF_TOPIC_MESSAGE = (
     "꾸로록은 거꾸로캠퍼스 졸업생·코치의 진로 경험을 나누는 곳이라, 이 질문에는 답하기 어려워요. "
@@ -89,6 +116,15 @@ OFF_TOPIC_MESSAGE = (
 )
 
 NO_EVIDENCE_MESSAGE = "현재 자료만으로는 답하기 어려워요. 비슷한 경험을 가진 사람을 찾아볼까요?"
+
+# 이어지는 질문("다른 선배 얘기도 들려줘", "더 자세히")에 더 전할 이야기가 없을 때.
+# 방금 답을 받은 학생에게 "자료만으로는 답하기 어려워요"는 고장처럼 보여서 따로 둔다
+NO_MORE_MESSAGE = (
+    "지금 찾을 수 있는 선배 이야기는 여기까지예요. 더 궁금한 점은 비슷한 경험을 가진 선배에게 직접 물어볼 수 있어요."
+)
+
+# 이번 답에 쓰지 않은 글이 검색에 더 걸렸을 때만 시스템이 맺음말 뒤에 붙인다 (모델이 쓰지 않는다)
+MORE_STORIES_HINT = "다른 선배 이야기도 더 있어요."
 
 # 검색·Claude 호출이 실패했을 때. answer_type 은 no_evidence 로 보내서 프론트가 멘토 찾기로 이어 준다.
 # (새 오류 코드를 만들지 않아 프론트를 고칠 필요가 없다)
@@ -106,9 +142,12 @@ def looks_like_crisis(question: str) -> bool:
     return _CRISIS_REGEX.search(question) is not None
 
 
-def safety_answer() -> AskResponse:
-    """위기 신호일 때의 고정 안내 답변."""
-    return _special_answer("safety", SAFETY_MESSAGE)
+def safety_answer(notice_shown: bool = False) -> AskResponse:
+    """위기 신호일 때의 고정 안내 답변. notice_shown: 이 대화에서 위기 안내를 이미 한 번 보여 줬는지 (그러면 짧게)."""
+    answer = _special_answer("safety", safety_message(notice_shown))
+    answer.safety_notice = True
+    answer.crisis_notice = True
+    return answer
 
 
 def _special_answer(answer_type: AnswerType, message: str) -> AskResponse:
@@ -141,7 +180,15 @@ def get_rag_pipeline():
     return _pipeline
 
 
-def _rag_answer(question: str) -> AskResponse:
+def _rag_answer(
+    question: str,
+    previous_question: str | None = None,
+    previous_answer: str | None = None,
+    seen_source_ids: list[str] | None = None,
+    safety_notice_shown: bool = False,
+    crisis_notice_shown: bool = False,
+    more_hint_shown: bool = False,
+) -> AskResponse:
     from app.rag.adapter import to_ask_response
 
     try:
@@ -151,17 +198,49 @@ def _rag_answer(question: str) -> AskResponse:
         answer = _special_answer("no_evidence", TEMPORARY_ERROR_MESSAGE)
         answer.temporary_error = True  # '자료가 없다'가 아니라 '잠깐 문제가 생겼다'로 화면에 보이게 한다
         return answer
-    return to_ask_response(pipeline.answer(question))  # pipeline.answer 는 스스로 오류를 처리한다
+    # pipeline.answer 는 스스로 오류를 처리한다
+    return to_ask_response(
+        pipeline.answer(
+            question,
+            previous_question=previous_question,
+            previous_answer=previous_answer,
+            seen_source_ids=seen_source_ids,
+            safety_notice_shown=safety_notice_shown,
+            crisis_notice_shown=crisis_notice_shown,
+            more_hint_shown=more_hint_shown,
+        )
+    )
 
 
-def make_answer(question: str) -> AskResponse:
-    """질문을 받아 답변을 돌려준다."""
+def make_answer(
+    question: str,
+    previous_question: str | None = None,
+    previous_answer: str | None = None,
+    seen_source_ids: list[str] | None = None,
+    safety_notice_shown: bool = False,
+    crisis_notice_shown: bool = False,
+    more_hint_shown: bool = False,
+) -> AskResponse:
+    """
+    질문을 받아 답변을 돌려준다.
+    previous_question·previous_answer: 같은 대화의 바로 앞 질문과 그 답 (없으면 None).
+    이어지는 질문을 이해하고 같은 답을 되풀이하지 않는 데만 쓰고 저장하지 않는다.
+    seen_source_ids: 이 대화에서 이미 보여 준 글 번호. "다른 선배 얘기도 들려줘"일 때 그 글을 빼고 찾는다.
+    """
 
     if looks_like_crisis(question):  # main.py 에서도 먼저 거르지만, 다른 곳에서 불러도 안전하게 한 번 더
-        return safety_answer()
+        return safety_answer(crisis_notice_shown)
 
     if config.RAG_ENABLED:
-        return _rag_answer(question)
+        return _rag_answer(
+            question,
+            previous_question,
+            previous_answer,
+            seen_source_ids,
+            safety_notice_shown,
+            crisis_notice_shown,
+            more_hint_shown,
+        )
 
     # ---- 아래는 demo 답변 ----
     # 인사만 온 경우: demo 에서도 꾸로록 소개로 답한다 (LLM 없이 빠른 경로만. 자세한 건 app/rag/intent.py)

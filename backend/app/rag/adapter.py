@@ -67,6 +67,11 @@ def to_ask_response(result: RagAnswer) -> AskResponse:
         sources=_merge_sources(result.sources) if is_answer else [],
         has_enough_evidence=result.answer_type != "no_evidence",
         answer_type=result.answer_type,
+        no_more=result.no_more,
+        safety_notice=result.safety_notice,
+        crisis_notice=result.crisis_notice,
+        more_hint=result.more_hint,
+        preface=result.preface,
         temporary_error=result.failed,  # 검색·AI 호출이 실패해 임시 안내로 대신 답한 경우
         intent=result.intent,
         user_context=result.user_context,
