@@ -12,7 +12,7 @@ frontend/src/
 │  ├─ mentors/page.tsx    # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
-│  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴). 새 채팅 확인 창
+│  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴 + 최근 대화 기록, 대화 지우기)
 │  ├─ Logo.tsx            # 꾸로록 로고 (노란 얼굴 + 눈)
 │  ├─ Kkuro.tsx           # 꾸로록 캐릭터 '빼꼼 꾸로록' 눈·작은 돔. 표정: 기본/듣는 중/생각 중/찾았다!/거꾸로
 │  ├─ QuestionForm.tsx    # 질문 입력창 + 보내기 (Enter 보내기, Shift+Enter 줄바꿈)
@@ -26,14 +26,14 @@ frontend/src/
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
-   └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 자기소개 질문은 온보딩 답변으로 바로 답한다
+   └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 대화 기록은 이 브라우저 localStorage 에만 저장(최대 30개). 자기소개·인사는 온보딩 답변
 ```
 - 새 페이지는 `app/폴더명/page.tsx`로 만든다 (예: `app/mentors/page.tsx` → `/mentors`).
 - 스타일은 `className`에 Tailwind 클래스로 쓴다.
 - 색은 `globals.css`의 `@theme`에 정한 이름을 쓴다 (A안 "종이 위 블루 라인"):
   `brand`(블루: 선·제목·버튼), `accent`(옐로: 큰 도형·스티커 하이라이트, 글자색 금지), `butter`(키워드 pill),
   `sky`(hover·선택·질문 말풍선), `canvas`(크림 바탕), `surface`(흰색 입력창), `line`, `ink`/`body`/`muted`/`placeholder`(글자),
-  `danger`(토마토: 오류 1곳에만). `gray-500`, `indigo-600` 같은 Tailwind 기본 색을 직접 쓰지 않는다. 색을 바꿀 땐 `@theme`만 고친다.
+  `danger`(토마토: 오류 표시와 지우기 버튼에만, 한 화면에 한 곳). `gray-500`, `indigo-600` 같은 Tailwind 기본 색을 직접 쓰지 않는다. 색을 바꿀 땐 `@theme`만 고친다.
 - 큰 제목은 `font-display`(Jua), 나머지는 기본 `font-sans`(Noto Sans KR).
 - 움직임은 `globals.css`의 `--animate-*`에 정해 두고 `motion-safe:animate-이름`으로 쓴다 (예: `motion-safe:animate-pop-in`). `motion-safe:`를 붙이면 '동작 줄이기'를 켠 사람에게는 움직이지 않는다.
 - 넓은 화면 기준은 `lg`(1024px). 그보다 좁으면 열린 사이드바·출처 패널이 화면 위에 겹쳐 뜨고, 메인 화면의 스티커는 숨겨진다.

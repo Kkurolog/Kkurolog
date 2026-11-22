@@ -1,5 +1,5 @@
-// 채팅 화면에서 쓰는 메시지 타입을 한 곳에 모아둔 파일.
-// 나중에 대화 내역을 브라우저(localStorage)에 저장할 때도 이 타입을 그대로 저장하면 된다.
+// 채팅 화면에서 쓰는 메시지·대화 타입을 한 곳에 모아둔 파일.
+// 대화 기록은 이 모양 그대로 브라우저(localStorage)에 저장한다 (lib/useChat.ts).
 import type { AboutAspect, MentorRecommendation, Source, StructuredAnswer } from "./api";
 
 // 학생이 보낸 질문
@@ -27,3 +27,11 @@ export type AssistantMessage = {
 };
 
 export type ChatMessage = UserMessage | AssistantMessage;
+
+// 대화 하나 (사이드바 '최근 대화'의 한 줄)
+export type Conversation = {
+  id: string;
+  title: string; // 첫 질문 앞부분
+  updatedAt: number; // 마지막으로 메시지가 쌓인 시각 (ms)
+  messages: ChatMessage[];
+};

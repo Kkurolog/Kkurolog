@@ -48,8 +48,13 @@ app.include_router(admin_router)
 
 
 @app.get("/health")
+@app.head("/health", include_in_schema=False)  # /docs 에는 GET 하나만 보이게
 def health() -> dict[str, str]:
-    """서버가 살아 있는지 확인용."""
+    """
+    서버가 살아 있는지 확인용. DB·LLM을 부르지 않아 가볍다.
+    UptimeRobot 무료 플랜은 GET이 아니라 HEAD로 핑을 보내므로 HEAD도 받는다.
+    (HEAD를 안 받으면 405가 나서 UptimeRobot이 서버를 '다운'으로 표시한다)
+    """
     return {"status": "ok"}
 
 

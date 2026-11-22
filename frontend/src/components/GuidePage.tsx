@@ -1,8 +1,9 @@
 // 메인 화면 오른쪽 아래의 '접힌 종이 귀퉁이' + 그 뒤에 숨어 있는 꾸로록 사용 가이드.
 // - 평소: 귀퉁이가 살짝 접혀 있다 (흰 접힌 면 + 뒷장의 블루와 '?'). 마우스를 올리면 조금 더 들린다.
 // - 귀퉁이를 왼쪽 위로 끌면 종이가 넘어가듯 뒷장(가이드)이 드러난다. 충분히 끌고 놓으면 끝까지 넘어가고,
-//   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이나 '넘겨서 사용 가이드 보기'를 눌러도 넘어간다.
-// - 가이드에서 '시작하기'·'처음 화면으로'·Esc 를 누르면 종이가 다시 덮인다.
+//   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이(흰 접힌 면이나 블루 '?' 어디든)를 눌러도 넘어간다.
+// - 가이드에서 '시작하기'를 누르면 종이가 다시 덮이고 바로 질문을 쓸 수 있게 입력창에 커서가 간다.
+//   Esc 를 누르면 종이만 다시 덮인다.
 //
 // 넘김 크기(peel): 오른쪽 아래 꼭짓점에서 접힌 선까지의 거리(px).
 // 귀퉁이 꼭짓점이 (가로-peel, 세로-peel) 로 접혀 올라간다고 보고,
@@ -70,9 +71,13 @@ export default function GuidePage() {
     animateTo(w + h, 650, () => setOpen(true));
   }
 
-  function closeGuide() {
+  // 가이드 닫기. startTyping 이면 다 덮인 뒤 질문 입력창으로 커서를 옮긴다 ('시작하기')
+  function closeGuide(startTyping = false) {
     setOpen(false);
-    animateTo(REST, 650, () => cornerRef.current?.focus());
+    animateTo(REST, 650, () => {
+      if (startTyping) document.getElementById("question")?.focus();
+      else cornerRef.current?.focus();
+    });
   }
 
   // 다 넘어가면 가이드 제목으로 초점을 옮긴다 (화면 읽기 프로그램이 가이드부터 읽게)
@@ -125,7 +130,7 @@ export default function GuidePage() {
   }
 
   const covering = open; // 가이드가 화면을 다 덮었는지
-  const peekOpacity = Math.max(0, 1 - (peel - HOVER) / 120); // 넘길수록 '?'·안내 버튼이 사라진다
+  const peekOpacity = Math.max(0, 1 - (peel - HOVER) / 120); // 넘길수록 '?'가 사라진다
   const clip = covering
     ? "none"
     : `polygon(100% calc(100% - ${peel}px), 100% 100%, calc(100% - ${peel}px) 100%)`;
@@ -191,7 +196,7 @@ export default function GuidePage() {
             <h3 className="font-bold text-ink">꾸로록이 지키는 약속</h3>
             <ul className="mt-3 flex flex-col gap-2 text-[15px] leading-relaxed text-body">
               <li>• 인터뷰에 없는 내용은 지어내지 않아요. 자료가 부족하면 솔직하게 말하고 선배를 추천해요.</li>
-              <li>• 대화는 저장되지 않아요. &apos;새 채팅&apos;을 누르거나 새로고침하면 사라져요.</li>
+              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바의 &apos;최근 대화&apos;에서 다시 보거나 지울 수 있어요.</li>
               <li>• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
             </ul>
           </div>
@@ -199,17 +204,10 @@ export default function GuidePage() {
           <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
             <button
               type="button"
-              onClick={closeGuide}
+              onClick={() => closeGuide(true)}
               className="min-h-12 rounded-full bg-accent px-7 font-bold text-brand hover:brightness-95"
             >
               시작하기
-            </button>
-            <button
-              type="button"
-              onClick={closeGuide}
-              className="min-h-12 rounded-full border-2 border-white/70 px-6 font-bold text-white hover:bg-white/10"
-            >
-              처음 화면으로
             </button>
           </div>
         </div>
@@ -235,7 +233,7 @@ export default function GuidePage() {
             />
           </svg>
 
-          {/* 귀퉁이 손잡이: 끌거나 누르면 넘어간다 */}
+          {/* 귀퉁이 손잡이: 흰 접힌 면 + 블루 삼각형 전체. 끌거나 누르면 넘어간다 */}
           <button
             ref={cornerRef}
             type="button"
@@ -252,7 +250,7 @@ export default function GuidePage() {
                 openGuide();
               }
             }}
-            className="pointer-events-auto absolute right-0 bottom-0 cursor-grab touch-none [clip-path:polygon(100%_0,100%_100%,0_100%)] focus-visible:outline-none active:cursor-grabbing"
+            className="pointer-events-auto absolute right-0 bottom-0 cursor-grab touch-none focus-visible:outline-none active:cursor-grabbing"
             style={{ width: Math.max(peel, REST), height: Math.max(peel, REST) }}
           >
             <span
@@ -262,16 +260,6 @@ export default function GuidePage() {
             >
               ?
             </span>
-          </button>
-
-          {/* 안내 버튼 (넓은 화면) */}
-          <button
-            type="button"
-            onClick={openGuide}
-            className="pointer-events-auto absolute right-[116px] bottom-6 hidden rounded-full border-2 border-brand bg-surface px-4 py-1.5 text-sm font-bold text-brand transition-opacity hover:bg-sky sm:block"
-            style={{ opacity: peekOpacity, visibility: peekOpacity === 0 ? "hidden" : "visible" }}
-          >
-            넘겨서 사용 가이드 보기
           </button>
         </>
       )}

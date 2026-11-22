@@ -135,8 +135,12 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // 새 채팅으로 대화가 지워지면 출처 패널도 닫는다
-  const sourcePanel = messages.length > 0 ? openSource : null;
+  // 출처 패널은 '지금 보고 있는 대화'의 출처일 때만 보인다 (새 채팅·다른 대화를 열면 자동으로 닫힘)
+  const sourcePanel =
+    openSource &&
+    messages.some((m) => m.role === "assistant" && m.sources.includes(openSource))
+      ? openSource
+      : null;
 
   // 대화 전: 인사 화면
   if (messages.length === 0) {

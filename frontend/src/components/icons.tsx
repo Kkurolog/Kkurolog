@@ -40,6 +40,17 @@ export function UserIcon({ className }: IconProps) {
   );
 }
 
+// 최근 대화 (시계)
+export function HistoryIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+      <path d="M3 3.5V8h4.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Svg>
+  );
+}
+
 // 사이드바 열기·닫기 (왼쪽 칸이 나뉜 네모)
 export function SidebarIcon({ className }: IconProps) {
   return (
@@ -61,11 +72,15 @@ export function MailIcon({ className }: IconProps) {
 }
 
 // 전송 완료 (종이비행기)
+// 비행기 모양의 무게중심이 오른쪽 위로 치우쳐 있어서, 동그라미 안에 넣으면 한쪽으로 쏠려 보인다.
+// 그래서 무게중심(13.5, 10.5)이 아이콘 정가운데(12, 12)에 오도록 왼쪽 아래로 옮겨 그린다.
 export function PlaneIcon({ className }: IconProps) {
   return (
     <Svg className={className} strokeWidth={1.6}>
-      <path d="M21.5 2.5L10.5 13.5" />
-      <path d="M21.5 2.5l-7 19-4-8-8-4z" />
+      <g transform="translate(-1.5 1.5)">
+        <path d="M21.5 2.5L10.5 13.5" />
+        <path d="M21.5 2.5l-7 19-4-8-8-4z" />
+      </g>
     </Svg>
   );
 }
@@ -91,16 +106,6 @@ export function SparkleIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
       <path d="M12 0c.6 6.4 5.6 11.4 12 12-6.4.6-11.4 5.6-12 12-.6-6.4-5.6-11.4-12-12C6.4 11.4 11.4 6.4 12 0z" />
-    </svg>
-  );
-}
-
-// 도는 로딩 표시 (메일 전송 중)
-export function SpinnerIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 56 56" fill="none" aria-hidden="true" className={`motion-safe:animate-spin ${className ?? ""}`}>
-      <circle cx="28" cy="28" r="24" stroke="currentColor" strokeOpacity="0.15" strokeWidth="5" />
-      <path d="M28 4a24 24 0 0 1 24 24" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
     </svg>
   );
 }

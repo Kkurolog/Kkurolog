@@ -131,7 +131,7 @@ export default function ChatMessageView({
       {/* 방금 도착한 답변: 꾸로록이 눈을 반짝이며 빼꼼 (지난 답변은 기본 표정) */}
       <div className="flex items-end gap-2">
         <MiniKkuro mood={isLatest ? "found" : "default"} className="w-[72px] motion-safe:animate-pop-in" />
-        <span className="pb-0.5 text-[13px] font-bold text-brand">꾸로록</span>
+        <span className="pb-0.5 font-display text-xl text-brand">꾸로록</span>
       </div>
       {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
       {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
