@@ -72,4 +72,5 @@ def to_ask_response(result: RagAnswer) -> AskResponse:
         user_context=result.user_context,
         about_aspect=result.about_aspect,
         follow_ups=result.follow_ups,
+        emphasis=result.emphasis,
     )

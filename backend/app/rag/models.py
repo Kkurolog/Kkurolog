@@ -129,6 +129,7 @@ class RagAnswer(BaseModel):
     # 꾸로록 자신에 대한 질문(about_service)에 고정 문구로 답했을 때: 어느 측면인지, 다음에 물어볼 예시
     about_aspect: str | None = None
     follow_ups: list[str] = Field(default_factory=list)
+    emphasis: str | None = None  # 고정 문구 안에서 굵게 강조할 문장
     # 검색·Claude 호출이 실패해서 no_evidence 로 대신 답했는지. API 응답에는 나가지 않는다.
     # (성능 측정 때 '진짜 근거 부족'과 '오류'를 구분하려고 둔다)
     failed: bool = False

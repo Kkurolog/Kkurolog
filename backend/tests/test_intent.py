@@ -270,3 +270,25 @@ def test_claude_analyzer_keeps_aspect_only_for_about_service():
     assert result.about_aspect == "why" and result.has_greeting is True
     payload = {**payload, "intent": "career_question"}
     assert analyzer_with(json_response(payload))[0].analyze("창업한 선배 있어?").about_aspect is None
+
+
+# ---- 고정 문구 안의 한 문장 강조 ----
+
+
+def test_about_what_emphasizes_the_closing_question():
+    """자기소개의 마지막 질문을 화면에서 굵게 보여 준다. 글에는 강조 기호를 넣지 않고 '어느 문장인지'만 따로 보낸다."""
+    reply = fixed_reply_for(IntentResult(intent="about_service", about_aspect="what"))
+    assert reply.emphasis == "오늘은 어떤 고민부터 이야기해 볼까요?"
+    assert reply.emphasis in reply.text and "**" not in reply.text
+    p, _, _ = pipeline_with(IntentResult(intent="about_service", about_aspect="what"))
+    assert to_ask_response(p.answer("자기소개")).emphasis == reply.emphasis
+
+
+def test_emphasis_sentence_always_exists_in_the_text():
+    for aspect, entry in ABOUT.items():
+        if entry.emphasis:
+            assert entry.emphasis in about_message(aspect), aspect
+    # 강조할 문장이 없는 답변은 null
+    assert fixed_reply_for(IntentResult(intent="greeting")).emphasis is None
+    p, _, _ = pipeline_with(IntentResult(intent="about_service", about_aspect="why"))
+    assert to_ask_response(p.answer("왜 만들었어")).emphasis is None

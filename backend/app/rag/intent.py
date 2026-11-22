@@ -137,6 +137,9 @@ Q_REST = "엑시트하고 여행 다니면서 쉬는 시간을 가진 선배는 
 class AboutEntry(BaseModel):
     body: str
     follow_ups: list[str]  # 설명만 하고 끝내면 대화가 끊긴다. 항상 다음에 물어볼 것을 준다
+    # 화면에서 굵게 강조할 문장. body 안에 글자 그대로 들어 있어야 한다 (없으면 강조 없음).
+    # 글에 ** 같은 기호를 넣지 않고 '어느 문장인지'만 따로 알려 준다 → 강조를 모르는 화면에서도 글이 깨지지 않는다
+    emphasis: str | None = None
 
 
 ABOUT: dict[str, AboutEntry] = {
@@ -159,6 +162,7 @@ ABOUT: dict[str, AboutEntry] = {
             ]
         ),
         follow_ups=[Q_JOB, Q_TRIAL],
+        emphasis="오늘은 어떤 고민부터 이야기해 볼까요?",  # 대화를 여는 마지막 질문을 굵게
     ),
     "why": AboutEntry(
         body="\n\n".join(
@@ -264,6 +268,7 @@ class FixedReply(BaseModel):
     text: str
     about_aspect: AboutAspect | None = None
     follow_ups: list[str] = Field(default_factory=list)
+    emphasis: str | None = None  # 굵게 강조할 문장 (text 안에 그대로 있다)
 
 
 def fixed_reply_for(result: IntentResult) -> FixedReply | None:
@@ -278,7 +283,10 @@ def fixed_reply_for(result: IntentResult) -> FixedReply | None:
         return None
     if result.intent == "about_service":
         aspect = result.about_aspect or "what"
-        return FixedReply(text=about_message(aspect), about_aspect=aspect, follow_ups=ABOUT[aspect].follow_ups)
+        entry = ABOUT[aspect]
+        return FixedReply(
+            text=about_message(aspect), about_aspect=aspect, follow_ups=entry.follow_ups, emphasis=entry.emphasis
+        )
     return FixedReply(text=_TEMPLATES[result.intent])
 
 

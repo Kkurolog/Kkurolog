@@ -24,6 +24,20 @@ type Props = {
 // 꾸로록 자신에 대한 설명(왜·누가 만들었는지 등) 아래에 붙이는 안내. 선배 글이 아니라 꾸로록이 하는 말이라는 표시다.
 const ABOUT_NOTICE = "꾸로록이 직접 알려드리는 내용이에요.";
 
+// 문단 안에 강조할 문장이 있으면 그 문장만 굵게 그린다. (backend 가 '어느 문장인지'를 emphasis 로 알려 준다)
+function withEmphasis(paragraph: string, emphasis: string | null | undefined) {
+  if (!emphasis) return paragraph;
+  const at = paragraph.indexOf(emphasis);
+  if (at < 0) return paragraph;
+  return (
+    <>
+      {paragraph.slice(0, at)}
+      <strong className="font-bold">{emphasis}</strong>
+      {paragraph.slice(at + emphasis.length)}
+    </>
+  );
+}
+
 // 설명 블록에 그릴 문단만 고른다.
 // backend 의 answer 글에는 (본문) + (예시 질문 문단) + (안내 한 줄)이 함께 들어 있다.
 // 예시 질문은 버튼으로, 안내는 블록 아래 작은 글씨로 따로 그리므로 글에서는 뺀다 (같은 내용이 두 번 나오지 않게).
@@ -128,7 +142,7 @@ export default function ChatMessageView({
         <>
           {aboutParagraphs(message.content, followUps).map((paragraph, i) => (
             <p key={i} className="whitespace-pre-wrap">
-              {paragraph}
+              {withEmphasis(paragraph, message.emphasis)}
             </p>
           ))}
           <p className="text-xs leading-5 text-muted">{ABOUT_NOTICE}</p>

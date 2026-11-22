@@ -164,6 +164,13 @@ class AskResponse(BaseModel):
     follow_ups: list[str] = Field(
         default_factory=list, description="다음에 물어볼 만한 예시 질문 (about_service 일 때 2개). answer 글에도 들어 있다"
     )
+    emphasis: str | None = Field(
+        None,
+        description=(
+            "answer 안에서 굵게 강조해 보여 줄 문장 (글자 그대로 answer 에 들어 있다). 없으면 null. "
+            "answer 글에는 강조 기호를 넣지 않는다"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -58,6 +58,7 @@ export type AskResponse = {
   // 선배 글이 아니라 꾸로록의 설명이라 sources 는 비어 있다. answer 끝에 "꾸로록이 직접 알려드리는 내용이에요."가 붙는다
   about_aspect?: AboutAspect | null;
   follow_ups?: string[]; // [추가] 다음에 물어볼 예시 질문 (about_service 일 때 2개). answer 글에도 들어 있다
+  emphasis?: string | null; // [추가] answer 안에서 굵게 강조할 문장 (글자 그대로 answer 에 들어 있다). 없으면 null
 };
 
 // [추가] backend/app/schemas.py 의 AboutAspect 와 같다

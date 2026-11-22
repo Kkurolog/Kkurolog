@@ -212,6 +212,7 @@ class RagPipeline:
                     answer=fixed.text,
                     about_aspect=fixed.about_aspect,
                     follow_ups=fixed.follow_ups,
+                    emphasis=fixed.emphasis,
                     **meta,
                 )
 

@@ -48,6 +48,7 @@ function useChatState() {
         structured: result.structured ?? null,
         aboutAspect: result.about_aspect ?? null,
         followUps: result.follow_ups ?? [],
+        emphasis: result.emphasis ?? null,
         hasEnoughEvidence: result.has_enough_evidence,
         temporaryError: result.temporary_error ?? false,
         mentors: recommend.recommendations,
