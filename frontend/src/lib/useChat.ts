@@ -7,11 +7,12 @@
 //   (학생 상당수가 미성년자라 질문 내용을 서버에 쌓지 않는다. 같은 기기를 쓰는 사람에겐 보이니
 //    사이드바에서 대화마다 지울 수 있게 했다)
 // - '새 채팅'은 지금 대화를 기록에 남겨 두고 빈 화면으로 간다. 사이드바의 '최근 대화'에서 다시 열 수 있다.
-// - backend 는 질문마다 따로 답한다 (이전 대화 맥락은 보내지 않음).
+// - backend 에는 지금 질문과 '바로 앞 질문과 그 답 하나'만 보낸다 (이어지는 질문을 이해하는 용도. 서버에 저장하지 않는다).
 "use client";
 
 import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
 import { askQuestion, recommendMentors } from "./api";
+import type { AskContext } from "./api";
 import type { AssistantMessage, ChatMessage, Conversation } from "./types";
 
 const STORAGE_KEY = "kkurolog-chats-v1"; // 대화 기록을 저장하는 브라우저 저장소 이름 (형식이 바뀌면 v2 로)
@@ -48,48 +49,18 @@ function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// 온보딩: "자기소개 부탁해" 같은 질문이나 "안녕" 같은 인사에는 backend 를 부르지 않고 꾸로록 소개로 답한다 (와이어프레임 02-1)
-const ONBOARDING_ANSWER = [
-  "안녕! 나는 꾸로록이야.",
-  "나는 거꾸로캠퍼스를 먼저 졸업한 선배들의 인터뷰를 바탕으로 너와 이야기를 나누는 챗봇이야.",
-  "선배들이 어떤 진로를 선택했는지뿐 아니라, 그 과정에서 어떤 고민을 했고, 무엇을 시도했으며, 어떤 실패와 시행착오를 겪었는지도 들려줄 수 있어.",
-  "아직 진로를 정하지 못했거나 무슨 질문을 해야 할지 모르겠어도 괜찮아. 우리 천천히 이야기해 보자!",
-  "선배들의 어떤 경험이 궁금해?",
-].join("\n\n");
+// 인사("안녕")·자기소개 요청("넌 누구야")도 backend 로 보낸다.
+// backend 가 문맥으로 판단해서(1차 의도 분석, backend/app/rag/intent.py) 꾸로록 소개 문구로 답한다.
+// 예전에는 여기서 키워드로 골랐는데, "창업한 선배는 누구야?" 같은 진짜 질문까지 소개로 답하는 문제가 있었다.
 
-// 메시지 '전체'가 인사일 때만 온보딩으로 보낸다. ("안녕! 창업한 선배 있어?" 처럼 질문이 같이 있으면 backend 로)
-// 끝에 붙는 문장부호·웃음(ㅎㅋ)·물결은 지우고 비교한다. 예: "안녕하세요!!", "하이 ㅎㅎ", "반가워~"
-const GREETING_ONLY =
-  /^(안녕(하세요|하십니까|하셔요)?|하이|헬로|hi|hello|hey|반가워(요)?|반갑습니다|처음\s*왔어(요)?|꾸로록(아|님)?|꾸로록(이|은)?\s*(뭐야|뭐예요|뭐에요|뭐니))$/i;
-
-function isGreetingOnly(question: string) {
-  const text = question.trim().replace(/[\s!?.~,ㅎㅋ^]+$/g, "").replace(/^[\s!?.~,]+/, "");
-  return GREETING_ONLY.test(text);
-}
-
-function isOnboardingQuestion(question: string) {
-  return /자기\s*소개|너는\s*누구|넌\s*누구|누구야/.test(question) || isGreetingOnly(question);
-}
-
-// 질문 하나에 대한 답변 메시지를 만든다 (온보딩이면 고정 답변, 아니면 backend)
-async function buildReply(question: string): Promise<AssistantMessage> {
-  if (isOnboardingQuestion(question)) {
-    await new Promise((resolve) => setTimeout(resolve, 700)); // '답변 준비 중' 화면이 잠깐 보이게
-    return {
-      id: newId(),
-      role: "assistant",
-      content: ONBOARDING_ANSWER,
-      question,
-      sources: [],
-      hasEnoughEvidence: true,
-      mentors: [],
-    };
-  }
+// 질문 하나에 대한 답변 메시지를 만든다 (인사·자기소개도 backend 가 답한다)
+// context: 이 대화의 맥락 (바로 앞 질문·답, 이미 본 글, 상담 안내를 받았는지). lib/api.ts 의 AskContext 참고
+async function buildReply(question: string, context: AskContext): Promise<AssistantMessage> {
   try {
     // 답변과 멘토 추천을 동시에 요청한다.
     // 멘토 추천이 실패해도 답변은 보여줄 수 있게, 추천 실패는 빈 목록으로 처리한다.
     const [result, recommend] = await Promise.all([
-      askQuestion(question),
+      askQuestion(question, context),
       recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
     ]);
     return {
@@ -98,7 +69,17 @@ async function buildReply(question: string): Promise<AssistantMessage> {
       content: result.answer,
       question,
       sources: result.sources,
+      structured: result.structured ?? null,
+      aboutAspect: result.about_aspect ?? null,
+      followUps: result.follow_ups ?? [],
+      emphasis: result.emphasis ?? null,
       hasEnoughEvidence: result.has_enough_evidence,
+      noMore: result.no_more ?? false,
+      safetyNotice: result.safety_notice ?? false,
+      crisisNotice: result.crisis_notice ?? false,
+      moreHint: result.more_hint ?? false,
+      preface: result.preface ?? null,
+      temporaryError: result.temporary_error ?? false,
       mentors: recommend.recommendations,
     };
   } catch (err) {
@@ -169,6 +150,19 @@ function useChatState() {
   async function ask(question: string) {
     // 1. 새 채팅 화면이면 대화를 새로 만들고, 학생 질문을 먼저 쌓는다
     let conversationId = currentId;
+    // 이 대화에서 바로 앞에 한 질문 (새 채팅이면 없음)
+    const previousQuestion = messages.findLast((m) => m.role === "user")?.content ?? null;
+    // 그 질문에 꾸로록이 한 답 (오류 안내는 답이 아니라서 보내지 않는다)
+    const lastReply = messages.findLast((m) => m.role === "assistant");
+    const previousAnswer = lastReply && !lastReply.isError ? lastReply.content : null;
+    // 이 대화에서 이미 본 글 번호 ("다른 선배 얘기도 들려줘"라고 하면 backend 가 이 글들을 빼고 찾는다)
+    const seenSourceIds = [
+      ...new Set(messages.flatMap((m) => (m.role === "assistant" ? m.sources.map((s) => s.interview_id) : []))),
+    ];
+    // 이 대화에서 상담 번호 안내를 이미 받았는지 (받았으면 backend 가 같은 긴 안내를 되풀이하지 않는다)
+    const safetyNoticeShown = messages.some((m) => m.role === "assistant" && m.safetyNotice);
+    const moreHintShown = messages.some((m) => m.role === "assistant" && m.moreHint);
+    const crisisNoticeShown = messages.some((m) => m.role === "assistant" && m.crisisNotice);
     const userMessage: ChatMessage = { id: newId(), role: "user", content: question };
     if (conversationId === null) {
       const created: Conversation = {
@@ -187,7 +181,14 @@ function useChatState() {
     setPendingIds((prev) => [...prev, id]);
 
     // 2. 답변을 받아 '질문했던 그 대화'에 붙인다 (기다리는 사이 다른 대화를 열어도 섞이지 않는다)
-    const reply = await buildReply(question);
+    const reply = await buildReply(question, {
+      previousQuestion,
+      previousAnswer,
+      seenSourceIds,
+      safetyNoticeShown,
+      crisisNoticeShown,
+      moreHintShown,
+    });
     append(id, reply);
     setPendingIds((prev) => prev.filter((p) => p !== id));
   }

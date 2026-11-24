@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from "react";
 import ChatMessageView from "@/components/ChatMessageView";
 import ContactModal from "@/components/ContactModal";
 import GuidePage from "@/components/GuidePage";
-import { KkuroEyes, MiniKkuro } from "@/components/Kkuro";
+import { KkuroEyes } from "@/components/Kkuro";
+import LoadingStatus from "@/components/LoadingStatus";
 import QuestionForm from "@/components/QuestionForm";
 import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
@@ -26,13 +27,16 @@ const STICKERS = [
   { label: "#실패해도 괜찮아", className: "top-[55%] right-[10%] -rotate-[6deg] bg-accent", delay: "-0.6s" },
 ];
 
-// 꾸로록 캐릭터(노란 반원)를 누를 때마다 차례로 입력창에 써 주는 추천 질문
+// 꾸로록 캐릭터(노란 반원)를 누를 때마다 차례로 입력창에 써 주는 추천 질문.
+// 추천한 질문이 "답하기 어려워요"로 끝나면 안 되므로, 검색 측정에서 맞는 선배의 글이 전달된 질문으로 골랐다
+// (docs/proposals/answer-quality-audit.md 0장, 2026-11-18. backend/app/rag/intent.py 의 예시 질문과 같은 기준).
+// 문장을 조금만 바꿔도 검색 결과가 달라지니, 바꾸려면 backend 담당과 다시 측정한다.
 const SUGGESTED_QUESTIONS = [
   "꾸로록, 자기소개 부탁해!",
-  "대학을 바로 가지 않고 취업한 선배들은 왜 그렇게 선택했어?",
-  "엑시트 후 바로 창업한 선배들은 어떤 고민을 했어?",
+  "엑시트하고 바로 취업한 선배는 왜 대학 대신 회사를 골랐어요?",
+  "직접 브랜드나 사업을 시작한 선배는 어떻게 시작했어요?",
   "진로를 아직 못 정했는데, 선배들은 이럴 때 어떻게 했어?",
-  "해외 대학에 간 선배들은 언제부터 준비했어?",
+  "해외 대학 입시를 준비한 선배들은 어떻게 준비했어요?",
 ];
 
 const TYPING_SPEED_MS = 45; // 추천 질문을 한 글자씩 쓰는 간격
@@ -219,24 +223,12 @@ export default function Home() {
               isLatest={i === messages.length - 1}
               onOpenSource={setOpenSource}
               onContact={(mentor, question) => setContact({ mentor, question })}
+              onAsk={ask} // 예시 질문 버튼: 입력창에서 보낸 것과 똑같이 바로 보낸다
+              askDisabled={loading}
             />
           ))}
-          {loading && (
-            // 생각 중: 꾸로록이 눈을 감고, 점 세 개가 통통 튄다
-            <div className="flex items-end gap-3 motion-safe:animate-rise-in" role="status">
-              <MiniKkuro mood="thinking" className="w-[72px]" />
-              <span className="flex gap-1.5 pb-1.5" aria-hidden="true">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="block size-2 rounded-full bg-brand motion-safe:animate-dot"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </span>
-              <p className="pb-0.5 text-[15px] text-muted">답변을 준비하고 있어요...</p>
-            </div>
-          )}
+          {/* 생각 중: 꾸로록이 눈을 감고, 점 세 개가 통통 튀고, 시간이 지나면 문구가 바뀐다 */}
+          {loading && <LoadingStatus />}
           <div ref={bottomRef} />
         </div>
 
