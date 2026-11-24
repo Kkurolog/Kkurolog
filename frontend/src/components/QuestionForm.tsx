@@ -79,7 +79,7 @@ export default function QuestionForm({
         type="submit"
         disabled={loading || typing || !value.trim()}
         aria-label={loading ? "답변을 준비하는 중" : "보내기"}
-        className="inline-flex size-10 shrink-0 items-center justify-center self-end rounded-full sm:size-12 bg-brand text-white transition-transform hover:bg-brand-dark enabled:active:scale-90 disabled:bg-brand/35"
+        className="inline-flex size-11 shrink-0 items-center justify-center self-end rounded-full sm:size-12 bg-brand text-white transition-transform hover:bg-brand-dark enabled:active:scale-90 disabled:bg-brand/35"
       >
         <ArrowUpIcon className="size-6" />
       </button>

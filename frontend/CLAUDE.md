@@ -38,6 +38,9 @@ frontend/src/
 - 큰 제목은 `font-display`(Jua), 나머지는 기본 `font-sans`(Noto Sans KR).
 - 움직임은 `globals.css`의 `--animate-*`에 정해 두고 `motion-safe:animate-이름`으로 쓴다 (예: `motion-safe:animate-pop-in`). `motion-safe:`를 붙이면 '동작 줄이기'를 켠 사람에게는 움직이지 않는다.
 - 넓은 화면 기준은 `lg`(1024px). 그보다 좁으면 열린 사이드바·출처 패널이 화면 위에 겹쳐 뜨고, 메인 화면의 스티커는 숨겨진다.
+- 휴대폰 기준은 `sm`(640px) 미만. 왼쪽 레일 대신 위쪽 막대(메뉴·로고·새 채팅), 출처 패널·메일 창은 아래에서 올라오는 시트, 멘토는 한 줄에 2명.
+  - 손가락으로 누르는 버튼은 최소 44px(`size-11`). 아이폰 노치·홈 막대는 `env(safe-area-inset-*)` 여백으로 피한다.
+  - CSS 만으로 못 바꾸는 것(입력창 안내 문구 등)은 `lib/useMediaQuery.ts`, 키보드가 올라왔는지는 `lib/useKeyboardOpen.ts`로 확인한다.
 
 ## 실행
 ```bash

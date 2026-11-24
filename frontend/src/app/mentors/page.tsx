@@ -24,9 +24,9 @@ export default function MentorsPage() {
   }, []);
 
   return (
-    <main className="w-full px-6 pt-16 pb-20 sm:px-10">
-      <div className="mx-auto flex w-full max-w-[1048px] flex-col gap-12">
-        <h1 className="font-display text-[36px] leading-[48px] text-brand">멘토 찾아보기</h1>
+    <main className="w-full px-4 pt-8 pb-[calc(3rem+env(safe-area-inset-bottom))] sm:px-10 sm:pt-16 sm:pb-20">
+      <div className="mx-auto flex w-full max-w-[1048px] flex-col gap-8 sm:gap-12">
+        <h1 className="font-display text-[30px] leading-[40px] text-brand sm:text-[36px] sm:leading-[48px]">멘토 찾아보기</h1>
 
         {/* 불러오는 중·오류·빈 목록: 거꾸로 매달린 꾸로록 */}
         {(loading || error || mentors.length === 0) && (
@@ -52,7 +52,7 @@ export default function MentorsPage() {
         )}
 
         {mentors.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-10 gap-y-14 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-10 sm:gap-y-14 md:grid-cols-3 lg:grid-cols-4">
             {mentors.map((mentor) => (
               <MentorCard key={mentor.id} mentor={mentor} onContact={setContactMentor} />
             ))}
