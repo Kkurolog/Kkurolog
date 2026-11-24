@@ -106,7 +106,7 @@ class RagCard(BaseModel):
     one_liner: str | None = None
     body: list[str]
     sources: list[RagSource] = Field(..., description="이 카드의 조각들이 실제로 인용한 chunk (카드별 출처)")
-    avatar_id: str = Field(..., description="'avatar-1'~'avatar-8'. 같은 선배는 어느 답변에서든 같은 값")
+    avatar_id: str = Field(..., description="'avatar-1'~'avatar-7'. 같은 선배는 어느 답변에서든 같은 값")
 
 
 class RagStructured(BaseModel):
