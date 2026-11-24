@@ -14,9 +14,10 @@
    → 실패하면 retry (기록 안 함 = 다음 차례에 다시)
 6. mail_replies 에 기록, inquiries.replied/replied_at (멘토 첫 답장만)
 
-관리자는 첫 왕복(학생 문의 + 멘토 첫 답장)만 본다.
+관리자 문의 상세는 첫 왕복(학생 문의 + 멘토 첫 답장)만 보여 준다.
 그 뒤 메일(멘토 첫 답장 이후 들어온 모든 답장)은 followup=true 로 기록하고 본문(reply_text)은 저장하지 않는다.
 기록은 같은 메일을 두 번 전달하지 않기 위한 것이다.
+단, 전달하지 못한 메일(needs_review)은 첫 왕복 이후라도 관리자 확인필요 목록에 나온다 (본문 없이 이유만).
 """
 
 from __future__ import annotations

@@ -206,14 +206,15 @@ class SupabaseMailStore:
         ) or []
 
     def list_review_replies(self, offset: int, limit: int) -> tuple[list[dict], int]:
-        """학생에게 전달하지 못해 사람이 봐야 하는 답장 (최신순) + 전체 건수. 첫 왕복 이후 메일(followup)은 뺀다."""
+        """전달하지 못해 사람이 봐야 하는 답장 (최신순) + 전체 건수.
+        첫 왕복 이후 메일(followup)도 포함한다: 전달이 멈춘 메일이 조용히 사라지지 않게.
+        (followup 메일은 본문을 저장하지 않으므로 대화 내용은 드러나지 않는다)"""
         return self._request(
             "GET",
             "mail_replies",
             params=[
                 ("select", "*,inquiries(title,student_name,mentor_id)"),
                 ("status", "in.(needs_review,failed)"),
-                ("followup", "is.false"),
                 ("order", "received_at.desc"),
                 ("offset", str(offset)),
                 ("limit", str(limit)),

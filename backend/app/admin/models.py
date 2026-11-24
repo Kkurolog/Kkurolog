@@ -78,6 +78,7 @@ class InquiryDetail(BaseModel):
 
 
 class ReviewItem(ReplyItem):
+    followup: bool = False          # true = 첫 왕복(멘토 첫 답장) 이후 대화에서 생긴 것. 본문(reply_text)은 저장 안 됨
     inquiry_title: str | None
     student_name: str | None
     mentor_id: str | None

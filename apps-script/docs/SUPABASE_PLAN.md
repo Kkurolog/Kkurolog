@@ -216,7 +216,8 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | 보낸 사람 확인 | 그 문의의 멘토 메일 → 학생에게, 문의 때 적은 학생 메일 → 멘토에게, 둘 다 아니면 확인필요. 같은 주소면 멘토 |
 | 학생 사본 | 지금처럼 답장해도 전달 안 됨 (멘토가 답하기 전 같은 질문이 두 번 가는 것을 막음) |
 | 답장 여부·리마인드 | 멘토 첫 답장 기준 그대로 |
-| 관리자 | 첫 왕복(학생 문의 + 멘토 첫 답장)만 봄. 그 뒤 메일은 `mail_replies.followup = true`로 중복 방지 표시만, 본문 저장 안 함 |
+| 관리자 | 문의 상세는 첫 왕복(학생 문의 + 멘토 첫 답장)만 봄. 그 뒤 메일은 `mail_replies.followup = true`로 중복 방지 표시만, 본문 저장 안 함 |
+| 확인필요 | 첫 왕복 이후에 생긴 것도 확인필요 목록에 보임(본문 없이 이유만, `followup` 표시). 리뷰(#30)에서 "전달이 멈춘 메일이 아무도 모르게 사라진다"는 지적을 받아 반영 |
 | 데이터 | `supabase/migrations/0003_mail_followup.sql`: `followup` 칸, 설정 키 2개(`mentorFollowupSubjectPrefix`, `mentorFollowupIntro`), `studentForwardFooter`를 "이 메일에 답장하면 멘토님께 전달돼요."로 (예전 기본 문구일 때만) |
 | Apps Script | 변경 없음 (이미 `+문의번호` 메일을 넘기고, 중계 계정이 보낸 메일은 거름) |
 | 신경 쓰지 않기로 한 것 | 미성년자 대화 정책, 자동 응답 반복, 발송 한도, 전달 속도, 대화 종료, 보낸 사람 위조, Apps Script 실행 시간 |

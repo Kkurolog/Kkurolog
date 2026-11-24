@@ -42,7 +42,7 @@ class AdminFakeStore(FakeStore):
                       key=lambda r: r["received_at"])
 
     def list_review_replies(self, offset, limit):
-        rows = [r for r in self.replies.values() if r["status"] in ("needs_review", "failed") and not r.get("followup")]
+        rows = [r for r in self.replies.values() if r["status"] in ("needs_review", "failed")]
         out = []
         for r in rows[offset:offset + limit]:
             inquiry = self.inquiries.get(r["inquiry_id"]) or {}
@@ -202,12 +202,13 @@ def test_inquiry_detail_with_replies(env, headers):
     review = client.get("/admin/replies/review", headers=headers).json()
     assert review["total"] == 1 and review["items"][0]["reason"] == "sender_mismatch"
     assert review["items"][0]["inquiry_title"] == "제목0"
+    assert review["items"][0]["followup"] is False
     assert client.get("/admin/inquiries/q20000101-0001", headers=headers).status_code == 404
     assert client.get("/admin/inquiries/abc", headers=headers).status_code == 422
 
 
 def test_admin_shows_first_round_only(env, headers):
-    """멘토 첫 답장 이후 메일(학생 답장, 멘토 두 번째 답장, 그 뒤 확인필요)은 관리자에게 보이지 않는다."""
+    """문의 상세에는 첫 왕복만. 단, 그 뒤 전달하지 못한 메일은 확인필요 목록에 본문 없이 나온다."""
     [inquiry_id] = add_inquiries(env, 1)
     base = {"receivedAt": "2026-11-17T15:20:00+09:00", "recipients": [f"relay+{inquiry_id}@gmail.com"]}
     messages = [
@@ -222,7 +223,11 @@ def test_admin_shows_first_round_only(env, headers):
     detail = client.get(f"/admin/inquiries/{inquiry_id}", headers=headers).json()
     assert [r["message_id"] for r in detail["replies"]] == ["m1"]
     assert detail["replies"][0]["reply_text"] == "첫 답장이에요."
-    assert client.get("/admin/replies/review", headers=headers).json()["total"] == 0
+    review = client.get("/admin/replies/review", headers=headers).json()
+    assert review["total"] == 1
+    item = review["items"][0]
+    assert item["message_id"] == "x1" and item["reason"] == "sender_mismatch" and item["followup"] is True
+    assert item["reply_text"] is None and item["inquiry_id"] == inquiry_id  # 대화 내용은 드러나지 않음
 
 
 def test_times_are_shown_in_kst(env, headers):

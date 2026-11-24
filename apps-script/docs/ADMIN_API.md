@@ -78,9 +78,10 @@
 { "total": 1, "page": 1, "page_size": 20,
   "items": [ { "message_id": "…", "inquiry_id": "q20261117-0001", "from_email": "someone@example.com",
                "received_at": "…", "status": "needs_review", "reason": "sender_mismatch", "reply_text": null,
+               "followup": false,
                "inquiry_title": "진로 고민이 있어요", "student_name": "테스트학생", "mentor_id": "mt-01" } ] }
 ```
-- 자동으로 전달하지 못한 답장입니다 (첫 왕복의 것만. 그 뒤 대화의 확인필요는 중계 Gmail 라벨로만 보임). 관리자가 중계 Gmail 메일함(라벨 `메일자동화/확인필요`)에서 원문을 보고 처리합니다.
+- 자동으로 전달하지 못한 답장입니다. 첫 왕복 이후 대화에서 생긴 것도 나옵니다 (`followup: true`, 본문은 저장하지 않아 `reply_text`는 항상 null). 전달이 멈춘 메일이 조용히 사라지지 않게 하기 위해서입니다. 관리자가 중계 Gmail 메일함(라벨 `메일자동화/확인필요`)에서 원문을 보고 처리합니다.
   예: 멘토가 다른 주소로 답장했다면 멘토의 메일 주소를 고친 뒤 멘토에게 다시 '답장'을 부탁합니다.
 
 ## 5. 멘토
