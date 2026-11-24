@@ -176,67 +176,69 @@ export default function GuidePage() {
         className={`absolute inset-0 bg-brand ${open ? "pointer-events-auto overflow-y-auto" : "overflow-hidden"}`}
         style={{ clipPath: clip }}
       >
-        <div className="mx-auto flex min-h-full w-full max-w-[880px] flex-col gap-7 px-6 py-10 sm:px-10">
-          <div className="flex flex-col gap-3 text-white">
-            <p className="w-fit rounded-full border-2 border-white/70 px-3 py-1 text-sm font-medium">꾸로록 사용 가이드</p>
+        {/* 넓은 화면에서는 스크롤 없이 한 화면에 다 들어가게: 세로 가운데 정렬 + 간격·글자 크기를 화면 높이에 맞춰 줄인다 */}
+        <div className="mx-auto flex min-h-full w-full max-w-[920px] flex-col justify-center gap-[clamp(14px,2.6vh,24px)] px-6 py-[clamp(20px,4vh,40px)] sm:px-10">
+          <div className="flex flex-col gap-2 text-white">
+            <p className="w-fit rounded-full border-2 border-white/70 px-3 py-0.5 text-sm font-medium">꾸로록 사용 가이드</p>
             <h2
               id="guide-title"
               ref={titleRef}
               tabIndex={-1}
-              className="font-display text-[34px] leading-tight focus:outline-none sm:text-[44px]"
+              className="font-display text-[length:clamp(26px,4.6vh,40px)] leading-tight focus:outline-none"
             >
-              한 사람의 경험이
-              <br />
+              한 사람의 경험이 <br className="lg:hidden" />
               다음 학생의 선택지가 되도록
             </h2>
-            <p className="max-w-[620px] leading-relaxed text-white/90">
-              꾸로록은 거꾸로캠퍼스를 먼저 엑시트한 선배들의 인터뷰를 바탕으로 답하는 진로 상담 챗봇이에요. 선배들이 어떤
-              길을 갔는지뿐 아니라, 왜 그렇게 선택했고 어떤 고민과 시행착오가 있었는지 들려줘요.
+            <p className="max-w-[680px] text-[15px] leading-relaxed text-white/90">
+              거꾸로캠퍼스를 먼저 엑시트한 선배들의 인터뷰를 바탕으로, 어떤 길을 왜 골랐고 어떤 고민과 시행착오가 있었는지
+              들려주는 진로 상담 챗봇이에요.
             </p>
           </div>
 
-          <ol className="grid gap-4 sm:grid-cols-3">
+          <ol className="grid gap-3 sm:grid-cols-3">
             {[
               {
                 n: "1",
                 title: "편하게 물어보기",
-                body: "진로 고민을 그대로 적어 보세요. 뭘 물어야 할지 모르겠으면 노란 꾸로록을 눌러 보세요. 추천 질문을 써 줘요.",
+                body: "진로 고민을 그대로 적어 보세요. 막막하면 노란 꾸로록을 누르면 추천 질문을 써 줘요.",
               },
               {
                 n: "2",
                 title: "출처 확인하기",
-                body: "답변 아래 '출처'를 누르면 어떤 선배의 어떤 인터뷰에서 나온 이야기인지 오른쪽에서 볼 수 있어요.",
+                body: "답변 아래 '출처'를 누르면 어떤 선배의 어떤 인터뷰에서 나온 이야기인지 볼 수 있어요.",
               },
               {
                 n: "3",
                 title: "선배에게 메일 보내기",
-                body: "더 궁금하면 멘토 리스트에서 선배에게 메일을 보내요. 첫 연락은 꾸로록이 전달하고, 선배 연락처는 공개되지 않아요.",
+                body: "멘토 리스트에서 선배에게 메일을 보내요. 꾸로록이 전달하고, 선배 연락처는 공개되지 않아요.",
               },
             ].map((step) => (
-              <li key={step.n} className="flex flex-col gap-2 rounded-3xl border-2 border-ink/10 bg-canvas p-6">
-                <span className="inline-flex size-9 items-center justify-center rounded-full bg-accent font-display text-lg text-brand">
-                  {step.n}
-                </span>
-                <h3 className="text-lg font-bold text-ink">{step.title}</h3>
-                <p className="text-[15px] leading-relaxed text-body">{step.body}</p>
+              <li key={step.n} className="flex flex-col gap-1.5 rounded-2xl bg-canvas p-4 sm:p-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent font-display text-base text-brand">
+                    {step.n}
+                  </span>
+                  <h3 className="text-[17px] font-bold text-ink">{step.title}</h3>
+                </div>
+                <p className="text-sm leading-relaxed text-body">{step.body}</p>
               </li>
             ))}
           </ol>
 
-          <div className="rounded-3xl bg-canvas p-6">
-            <h3 className="font-bold text-ink">꾸로록이 지키는 약속</h3>
-            <ul className="mt-3 flex flex-col gap-2 text-[15px] leading-relaxed text-body">
+          <div className="rounded-2xl bg-canvas px-5 py-4">
+            <h3 className="text-[15px] font-bold text-ink">꾸로록이 지키는 약속</h3>
+            <ul className="mt-2 flex flex-col gap-1 text-sm leading-relaxed text-body">
               <li>• 인터뷰에 없는 내용은 지어내지 않아요. 자료가 부족하면 솔직하게 말하고 선배를 추천해요.</li>
-              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바의 &apos;최근 대화&apos;에서 다시 보거나 지울 수 있어요.</li>
+              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바 &apos;최근 대화&apos;에서 보거나 지울 수 있어요.</li>
               <li>• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
             </ul>
           </div>
 
-          <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
+          <div>
             <button
               type="button"
               onClick={() => closeGuide(true)}
-              className="min-h-12 rounded-full bg-accent px-7 font-bold text-brand hover:brightness-95"
+              className="min-h-12 rounded-full bg-accent px-8 font-bold text-brand hover:brightness-95"
             >
               시작하기
             </button>

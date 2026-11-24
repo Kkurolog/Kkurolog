@@ -99,16 +99,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
               <PlaneIcon className="size-14 text-brand motion-safe:animate-fly" />
             </span>
             <p id="contact-title" className="text-2xl font-bold text-ink">
-              메일을 보내는 중이에요
-              <span aria-hidden="true" className="inline-flex w-8 justify-start gap-1 pl-1">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="inline-block size-1.5 rounded-full bg-ink motion-safe:animate-dot"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </span>
+              메일을 보내는 중이에요...
             </p>
           </div>
         )}

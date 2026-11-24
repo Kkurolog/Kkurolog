@@ -54,7 +54,7 @@ export default function QuestionForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex min-h-[72px] w-full items-center gap-3 rounded-[36px] border-2 border-brand bg-surface py-3 pr-3 pl-7 focus-within:shadow-[0_0_0_4px_var(--color-sky)]"
+      className="flex min-h-14 w-full items-center gap-2 rounded-[28px] border-2 border-brand bg-surface py-2 pr-2 pl-5 focus-within:shadow-[0_0_0_4px_var(--color-sky)] sm:min-h-[72px] sm:gap-3 sm:rounded-[36px] sm:py-3 sm:pr-3 sm:pl-7"
     >
       <label htmlFor="question" className="sr-only">
         질문
@@ -72,13 +72,14 @@ export default function QuestionForm({
         rows={1}
         autoFocus={autoFocus}
         aria-busy={typing}
-        className="max-h-40 w-full resize-none bg-transparent py-1 text-base leading-6 text-ink caret-brand [field-sizing:content] placeholder:text-placeholder focus:outline-none"
+        // 안내 문구(placeholder)는 한 줄로만 보이고, 넘치면 … 으로 줄인다 (모바일에서 입력창이 두 줄로 커지지 않게)
+        className="max-h-40 w-full resize-none bg-transparent py-1 text-base leading-6 text-ink caret-brand [field-sizing:content] placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap placeholder:text-placeholder focus:outline-none"
       />
       <button
         type="submit"
         disabled={loading || typing || !value.trim()}
         aria-label={loading ? "답변을 준비하는 중" : "보내기"}
-        className="inline-flex size-12 shrink-0 items-center justify-center self-end rounded-full bg-brand text-white transition-transform hover:bg-brand-dark enabled:active:scale-90 disabled:bg-brand/35"
+        className="inline-flex size-10 shrink-0 items-center justify-center self-end rounded-full sm:size-12 bg-brand text-white transition-transform hover:bg-brand-dark enabled:active:scale-90 disabled:bg-brand/35"
       >
         <ArrowUpIcon className="size-6" />
       </button>

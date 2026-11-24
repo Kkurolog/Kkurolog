@@ -18,6 +18,7 @@ import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
 import type { Mentor, Source } from "@/lib/api";
 import { useChat } from "@/lib/useChat";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 // 메인 화면 주변에 붙은 해시태그 스티커 (꾸밈용, 넓은 화면에서만 보인다). 각자 다른 박자로 둥실둥실 떠 있다
 const STICKERS = [
@@ -82,6 +83,8 @@ function KkuroCharacter({
 
 export default function Home() {
   const { messages, loading, ask } = useChat();
+  // 좁은 화면(휴대폰)에서는 입력창 안내 문구를 짧게 해서 한 줄에 들어가게 한다
+  const narrow = useMediaQuery("(max-width: 639px)");
   const bottomRef = useRef<HTMLDivElement>(null);
   const [openSource, setOpenSource] = useState<Source | null>(null); // 오른쪽 출처 패널 (null 이면 닫힘)
   // 메일 쓰기 창: 누구에게, 어떤 질문을 미리 채울지. null 이면 닫힘
@@ -162,9 +165,11 @@ export default function Home() {
           <p className="rounded-full border-2 border-brand bg-surface px-3 py-1 text-xs font-medium text-brand sm:px-4 sm:text-sm">
             거꾸로캠퍼스 선배들의 이야기로 답하는 챗봇
           </p>
-          <h1 className="relative font-display text-[34px] leading-[48px] text-brand sm:text-[44px]">
+          {/* 휴대폰에서는 '무엇을 함께 / 고민해볼까요?' 두 줄로 나눠서, 물결 밑줄이 '고민해볼' 아래에 오게 한다 */}
+          <h1 className="relative font-display text-[30px] leading-[44px] text-brand sm:text-[44px] sm:leading-[48px]">
             <SparkleIcon className="absolute top-1 -left-14 hidden size-4 text-brand motion-safe:animate-twinkle sm:block" />
             무엇을 함께{" "}
+            <br className="sm:hidden" />
             <span className="relative inline-block">
               고민해볼
               <svg
@@ -193,7 +198,7 @@ export default function Home() {
               typing={typing}
               inputRef={inputRef}
               onFocusChange={setInputFocused}
-              placeholder="처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"
+              placeholder={narrow ? "자기소개를 부탁해 보세요!" : "처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"}
               autoFocus
             />
           </div>
@@ -240,7 +245,7 @@ export default function Home() {
               onChange={setDraft}
               onSubmit={ask}
               loading={loading}
-              placeholder="선배들의 고민, 실패, 선택에 대해 물어보세요."
+              placeholder={narrow ? "선배들에게 물어보세요" : "선배들의 고민, 실패, 선택에 대해 물어보세요."}
             />
           </div>
         </div>
