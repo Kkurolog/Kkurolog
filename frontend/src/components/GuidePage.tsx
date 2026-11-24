@@ -11,10 +11,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CloseIcon } from "./icons";
 
 const REST = 96; // 평소 접힌 크기
 const HOVER = 128; // 마우스를 올렸을 때
-const OPEN_RATIO = 0.3; // 화면 짧은 변의 30% 이상 끌고 놓으면 끝까지 넘긴다
+const OPEN_RATIO = 0.3;
+const HINT_KEY = "kkurolog-guide-hint-dismissed"; // 말풍선을 닫았는지 기억하는 브라우저 저장소 이름
+
+// 브라우저 저장소는 막혀 있을 수도 있어서(시크릿 모드 등) 실패해도 화면이 멈추지 않게 감싼다
+function hintDismissed() {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function rememberHintDismissed() {
+  try {
+    localStorage.setItem(HINT_KEY, "1");
+  } catch {
+    // 저장이 안 되면 이번 방문 동안만 숨긴다
+  }
+} // 화면 짧은 변의 30% 이상 끌고 놓으면 끝까지 넘긴다
 
 // 천천히 시작해 빨라졌다가 천천히 멈추는 곡선
 function easeInOut(t: number) {
@@ -30,6 +48,18 @@ export default function GuidePage() {
   const moved = useRef(false); // 끌었는지(=클릭이 아닌지)
   const [peel, setPeel] = useState(REST);
   const [open, setOpen] = useState(false);
+  const [showHint, setShowHint] = useState(false); // '넘겨서 사용 가이드 보기' 말풍선
+
+  // 처음 온 학생에게만, 화면이 뜨고 잠시 뒤 말풍선을 띄운다
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(!hintDismissed()), 900);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function dismissHint() {
+    setShowHint(false);
+    rememberHintDismissed();
+  }
 
   // 화면(이 영역) 크기. 끝까지 넘기려면 가로+세로만큼 넘기면 된다
   function size() {
@@ -67,6 +97,7 @@ export default function GuidePage() {
   }, [peel]);
 
   function openGuide() {
+    dismissHint(); // 가이드를 한 번 열었으면 말풍선은 더 필요 없다
     const { w, h } = size();
     animateTo(w + h, 650, () => setOpen(true));
   }
@@ -261,6 +292,33 @@ export default function GuidePage() {
               ?
             </span>
           </button>
+
+          {/* 말풍선: 귀퉁이를 가리키는 꼬리. 누르면 가이드가 열리고, X 를 누르면 사라진다 */}
+          {showHint && (
+            <div
+              className="pointer-events-auto absolute right-5 bottom-[116px] motion-safe:animate-pop-in"
+              style={{ opacity: peekOpacity, visibility: peekOpacity === 0 ? "hidden" : "visible" }}
+            >
+              <div className="relative flex items-center gap-1 rounded-2xl border-2 border-brand bg-surface py-1.5 pr-1.5 pl-4 shadow-[0_6px_16px_rgba(11,37,89,0.12)] motion-safe:animate-float">
+                <button type="button" onClick={openGuide} className="text-sm font-bold whitespace-nowrap text-brand hover:underline">
+                  넘겨서 사용 가이드 보기
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissHint}
+                  aria-label="안내 말풍선 닫기"
+                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-brand hover:bg-sky"
+                >
+                  <CloseIcon className="size-4" />
+                </button>
+                {/* 꼬리: 오른쪽 아래(귀퉁이 쪽)를 가리킨다 */}
+                <span
+                  aria-hidden="true"
+                  className="absolute right-9 -bottom-[9px] size-4 rotate-45 border-r-2 border-b-2 border-brand bg-surface"
+                />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
