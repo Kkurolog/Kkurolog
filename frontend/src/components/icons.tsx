@@ -94,6 +94,15 @@ export function PlaneIcon({ className }: IconProps) {
   );
 }
 
+// 뒤로가기 (왼쪽 화살표)
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <Svg className={className} strokeWidth={2.4}>
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </Svg>
+  );
+}
+
 export function ArrowUpIcon({ className }: IconProps) {
   return (
     <Svg className={className} strokeWidth={2.6}>

@@ -84,7 +84,7 @@ function KkuroCharacter({
 }
 
 export default function Home() {
-  const { messages, loading, ask } = useChat();
+  const { messages, loading, ask, homeVersion } = useChat();
   // 좁은 화면(휴대폰)에서는 입력창 안내 문구를 짧게 해서 한 줄에 들어가게 한다
   const narrow = useMediaQuery("(max-width: 639px)");
   // 휴대폰 키보드가 올라오면 노란 반원·귀퉁이를 숨겨서 입력창이 가려지지 않게 한다
@@ -218,7 +218,8 @@ export default function Home() {
           lookX={-0.8 + 1.6 * Math.min(1, Array.from(draft).length / 40)}
           />
         )}
-        {!keyboardOpen && <GuidePage />}
+        {/* key: 로고를 누르면(homeVersion 이 바뀌면) 가이드를 새로 그려 닫힌 상태로 돌아간다 */}
+        {!keyboardOpen && <GuidePage key={homeVersion} />}
       </main>
     );
   }

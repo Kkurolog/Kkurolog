@@ -2,6 +2,7 @@
 // - 평소: 귀퉁이가 살짝 접혀 있다 (흰 접힌 면 + 뒷장의 블루와 '?'). 마우스를 올리면 조금 더 들린다.
 // - 귀퉁이를 왼쪽 위로 끌면 종이가 넘어가듯 뒷장(가이드)이 드러난다. 충분히 끌고 놓으면 끝까지 넘어가고,
 //   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이(흰 접힌 면이나 블루 '?' 어디든)를 눌러도 넘어간다.
+// - 가이드 왼쪽 위 ← 를 누르면 종이만 다시 덮인다.
 // - 가이드에서 '시작하기'를 누르면 종이가 다시 덮이고 바로 질문을 쓸 수 있게 입력창에 커서가 간다.
 //   Esc 를 누르면 종이만 다시 덮인다.
 //
@@ -12,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { CloseIcon } from "./icons";
+import { ArrowLeftIcon, CloseIcon } from "./icons";
 
 // 평소 접힌 크기 / 마우스를 올렸을 때 크기. 휴대폰에서는 '꾸로록이 듣고 있어요'를 가리지 않게 작게
 const SIZES = { wide: { rest: 96, hover: 128 }, narrow: { rest: 56, hover: 72 } };
@@ -191,7 +192,18 @@ export default function GuidePage() {
         {/* 넓은 화면에서는 스크롤 없이 한 화면에 다 들어가게: 세로 가운데 정렬 + 간격·글자 크기를 화면 높이에 맞춰 줄인다 */}
         <div className="mx-auto flex min-h-full w-full max-w-[920px] flex-col justify-center gap-[clamp(12px,2.6vh,24px)] px-5 py-[clamp(16px,4vh,40px)] pb-[calc(clamp(16px,4vh,40px)+env(safe-area-inset-bottom))] sm:px-10">
           <div className="flex flex-col gap-2 text-white">
-            <p className="w-fit rounded-full border-2 border-white/70 px-3 py-0.5 text-sm font-medium">꾸로록 사용 가이드</p>
+            {/* 뒤로가기(←): 가이드를 덮고 메인 화면으로. 제목 줄 왼쪽에 붙여 한 화면 높이를 늘리지 않는다 */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => closeGuide()}
+                aria-label="사용 가이드 닫고 돌아가기"
+                className="-ml-2.5 inline-flex size-11 items-center justify-center rounded-full text-white hover:bg-white/15"
+              >
+                <ArrowLeftIcon className="size-6" />
+              </button>
+              <p className="w-fit rounded-full border-2 border-white/70 px-3 py-0.5 text-sm font-medium">꾸로록 사용 가이드</p>
+            </div>
             <h2
               id="guide-title"
               ref={titleRef}
