@@ -281,6 +281,10 @@ export default function GuidePage() {
             className="absolute right-0 bottom-0 drop-shadow-[-6px_-6px_10px_rgba(11,37,89,0.18)]"
             style={{ width: peel, height: peel }}
           >
+            {/* 평소(살짝 접힌 상태)에는 블루 삼각형도 여기서 직접 그린다.
+                뒷장(section)의 clip-path 로만 보이게 하면, 아이폰 사파리처럼 아래 주소창이 화면을 덮는 브라우저에서
+                뒷장과 귀퉁이 위치가 어긋나 블루 자리에 크림색 종이가 비쳐 보였다. 더 넘기면 뒷장이 그대로 드러난다 */}
+            {peel <= HOVER && <polygon points="100,0 100,100 0,100" fill="var(--color-brand)" />}
             <polygon
               points="0,0 100,0 0,100"
               fill="var(--color-surface)"
