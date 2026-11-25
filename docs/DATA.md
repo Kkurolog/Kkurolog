@@ -77,12 +77,12 @@ sources (글) 1 ──< chunks (조각) >── 1 people (인물)
 
 **참여에 동의한 졸업생만** 저장하고 노출한다.
 
-> **Supabase로 옮기는 중** (2026-11-17, 설계: [apps-script/docs/SUPABASE_PLAN.md](../apps-script/docs/SUPABASE_PLAN.md)).
+> **운영 멘토는 Supabase `mentors` 테이블에 있다** (2026-11-20 적용, 기록: [apps-script/docs/SUPABASE_PLAN.md](../apps-script/docs/SUPABASE_PLAN.md)).
 > 테이블 정의: [`supabase/migrations/0002_mail_tables.sql`](../supabase/migrations/0002_mail_tables.sql)
 > - `mentors`: 아래 필드 + `email`(백엔드 전용) + `person_id`(인터뷰 인물 `people`과 같은 사람이면 연결, 선택).
 >   `available = true`이려면 `consent = true`이고 `email`이 있어야 한다 (DB가 막는다).
-> - 멘토 문의 메일 기록도 같은 파일에 있다: `inquiries`(문의), `mail_replies`(멘토 답장 처리 기록), `mail_settings`(메일 문구·숫자 설정), `inquiry_counters`(문의번호 순번).
-> - 백엔드가 이 테이블을 읽도록 바꾸기 전까지는 아래 demo JSON을 그대로 쓴다.
+> - 멘토 문의 메일 기록도 같은 파일에 있다: `inquiries`(문의), `mail_replies`(멘토·학생 답장 처리 기록, 첫 왕복 이후는 `followup`), `mail_settings`(메일 문구·숫자 설정), `inquiry_counters`(문의번호 순번).
+> - 백엔드는 `MAIL_ENABLED=true`(운영)이면 이 테이블을, 아니면(로컬 개발·테스트) 아래 demo JSON을 읽는다. 멘토 추가·수정은 관리자 API로 한다 ([HANDOVER.md](../apps-script/docs/HANDOVER.md)).
 
 | 필드 | 설명 |
 |---|---|
