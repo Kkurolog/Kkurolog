@@ -40,11 +40,17 @@ export default function NavBar() {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // 지울 대화 id
 
+  // 열린 사이드바가 화면 위에 겹쳐 뜨는 좁은 화면(lg 미만)에서만 닫는다.
+  // 넓은 화면에서는 사이드바가 옆에 자리를 차지하므로, 메뉴를 눌러도 열린 상태를 유지한다
+  function closeIfOverlay() {
+    if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
+  }
+
   // '새 채팅': 지금 대화는 기록에 남기고 빈 화면으로
   // '새 채팅'도 로고처럼 메인(첫) 화면으로 간다. 사용 가이드가 열려 있으면 닫힌다
   function handleNewChat() {
     goHome();
-    setOpen(false);
+    closeIfOverlay();
     router.push("/");
   }
 
@@ -60,7 +66,7 @@ export default function NavBar() {
   function handleOpenConversation(id: string) {
     openConversation(id);
     router.push("/");
-    if (!window.matchMedia("(min-width: 1024px)").matches) setOpen(false);
+    closeIfOverlay();
   }
 
   const onChat = pathname === "/";
@@ -84,8 +90,9 @@ export default function NavBar() {
         >
           <MenuIcon className="size-6" />
         </button>
-        <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="flex h-14 items-center gap-2">
-          <Logo className="size-8" />
+        {/* '꾸로록' 글자를 화면 한가운데에 두고, 로고는 글자 왼쪽에 붙인다 (로고까지 묶어 가운데에 두면 글자가 오른쪽으로 밀려 보인다) */}
+        <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="relative flex h-14 items-center">
+          <Logo className="absolute top-1/2 right-full mr-2 size-8 -translate-y-1/2" />
           <span className="font-display text-xl text-brand">꾸로록</span>
         </Link>
         <button
@@ -170,7 +177,7 @@ export default function NavBar() {
               </button>
               <Link
                 href="/mentors"
-                onClick={() => setOpen(false)}
+                onClick={closeIfOverlay}
                 aria-current={onMentors ? "page" : undefined}
                 className={menuItem(onMentors)}
               >

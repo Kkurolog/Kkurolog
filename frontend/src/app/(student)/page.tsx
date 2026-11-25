@@ -84,16 +84,23 @@ function KkuroCharacter({
 }
 
 export default function Home() {
-  const { messages, loading, ask, homeVersion } = useChat();
+  const { messages, loading, ask, homeVersion, currentId } = useChat();
   // 좁은 화면(휴대폰)에서는 입력창 안내 문구를 짧게 해서 한 줄에 들어가게 한다
   const narrow = useMediaQuery("(max-width: 639px)");
   // 휴대폰 키보드가 올라오면 노란 반원·귀퉁이를 숨겨서 입력창이 가려지지 않게 한다
   const keyboardOpen = useKeyboardOpen();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [openSource, setOpenSource] = useState<Source | null>(null); // 오른쪽 출처 패널 (null 이면 닫힘)
-  // 메일 쓰기 창: 누구에게, 어떤 질문을 미리 채울지. null 이면 닫힘
-  const [contact, setContact] = useState<{ mentor: Mentor; question: string } | null>(null);
+  // 메일 쓰기 창: 누구에게 보낼지. null 이면 닫힘 (내용 칸은 비워 두고 안내 문구만 보여준다)
+  const [contact, setContact] = useState<{ mentor: Mentor } | null>(null);
   const [draft, setDraft] = useState(""); // 입력창에 쓰고 있는 질문
+  // 다른 대화(최근 대화·새 채팅)로 옮기면 입력창을 비운다. 쓰던 질문이 다른 대화에 남지 않게
+  // (effect 대신 그리는 중에 바꾸는 React 권장 방식: 대화가 바뀐 것을 기억해 두고 비교한다)
+  const [draftConversation, setDraftConversation] = useState(currentId);
+  if (draftConversation !== currentId) {
+    setDraftConversation(currentId);
+    setDraft("");
+  }
   const [typing, setTyping] = useState(false); // 추천 질문을 자동으로 쓰는 중인지
   const [inputFocused, setInputFocused] = useState(false); // 입력창에 초점이 있는지 (꾸로록이 '듣는 중' 표정)
   const suggestionIndex = useRef(0); // 다음에 써 줄 추천 질문 번호
@@ -235,7 +242,7 @@ export default function Home() {
               message={message}
               isLatest={i === messages.length - 1}
               onOpenSource={setOpenSource}
-              onContact={(mentor, question) => setContact({ mentor, question })}
+              onContact={(mentor) => setContact({ mentor })}
               onAsk={ask} // 예시 질문 버튼: 입력창에서 보낸 것과 똑같이 바로 보낸다
               askDisabled={loading}
             />
@@ -266,7 +273,6 @@ export default function Home() {
         <ContactModal
           key={contact.mentor.id} // 다른 멘토를 열면 입력칸을 새로 시작
           mentor={contact.mentor}
-          initialMessage={contact.question}
           onClose={() => setContact(null)}
         />
       )}

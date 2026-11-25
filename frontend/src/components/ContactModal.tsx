@@ -15,7 +15,6 @@ import { CloseIcon, PlaneIcon } from "./icons";
 
 type Props = {
   mentor: Mentor;
-  initialMessage?: string; // 채팅에서 열었을 때 미리 채울 학생 질문
   onClose: () => void;
 };
 
@@ -24,18 +23,18 @@ type Status = "editing" | "sending" | "done";
 const fieldClass =
   "w-full bg-transparent px-5 py-4 text-base text-ink placeholder:text-placeholder focus:bg-sky/40 focus:outline-none sm:px-8 sm:py-5";
 
-export default function ContactModal({ mentor, initialMessage = "", onClose }: Props) {
+export default function ContactModal({ mentor, onClose }: Props) {
   const [senderName, setSenderName] = useState("");
   const [replyEmail, setReplyEmail] = useState("");
   const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState(initialMessage);
+  const [message, setMessage] = useState("");
   const [status, setStatus] = useState<Status>("editing");
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false); // '이대로 보낼까요?' 확인 창
 
   const filled = [senderName, replyEmail, subject, message].every((v) => v.trim() !== "");
-  const dirty = senderName !== "" || replyEmail !== "" || subject !== "" || message !== initialMessage;
+  const dirty = senderName !== "" || replyEmail !== "" || subject !== "" || message !== "";
 
   // 닫기 요청: 작성 중인 내용이 있으면 확인 창, 없으면 바로 닫기. 전송 중에는 닫지 않는다.
   function requestClose() {
@@ -178,7 +177,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                   maxLength={2000}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="멘토에게 궁금한 것을 질문해 보세요"
+                  placeholder="메일 내용을 입력하세요."
                   className={`${fieldClass} min-h-24 flex-1 resize-none leading-relaxed`}
                 />
             </div>

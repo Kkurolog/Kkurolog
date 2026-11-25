@@ -311,9 +311,10 @@ export default function GuidePage() {
             className="pointer-events-auto absolute right-0 bottom-0 cursor-grab touch-none focus-visible:outline-none active:cursor-grabbing"
             style={{ width: Math.max(peel, REST), height: Math.max(peel, REST) }}
           >
+            {/* 휴대폰은 귀퉁이가 작아서(56px) '?'를 작게, 꼭짓점 쪽으로 붙인다. 안 그러면 흰 접힌 면에 겹쳐 잘려 보인다 */}
             <span
               aria-hidden="true"
-              className="absolute right-3 bottom-2 font-display text-2xl text-white"
+              className="absolute right-2 bottom-1.5 font-display text-xl leading-none text-white sm:right-3 sm:bottom-2 sm:text-2xl sm:leading-8"
               style={{ opacity: peekOpacity }}
             >
               ?
