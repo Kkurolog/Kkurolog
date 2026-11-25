@@ -229,8 +229,6 @@ export default function NavBar() {
 
             <p className="mx-3 mt-3 mb-5 rounded-[14px] bg-butter p-3 text-xs leading-relaxed text-body">
               대화 기록은 이 브라우저에만 저장돼요. 같이 쓰는 컴퓨터라면 다 쓴 뒤 지워 주세요.
-              <br />
-              지금 보이는 답변·멘토는 모두 가짜(demo) 데이터이며 실존 인물이 아니에요.
             </p>
           </aside>
         </>
