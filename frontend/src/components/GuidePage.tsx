@@ -1,5 +1,6 @@
 // 메인 화면 오른쪽 아래의 '접힌 종이 귀퉁이' + 그 뒤에 숨어 있는 꾸로록 사용 가이드.
 // - 평소: 귀퉁이가 살짝 접혀 있다 (흰 접힌 면 + 뒷장의 블루와 '?'). 마우스를 올리면 조금 더 들린다.
+//   휴대폰(sm 미만)에서는 평소에 흰 접힌 면을 그리지 않고 블루 삼각형과 '?'만 보인다. 끌기 시작하면 접힌 면이 나타난다.
 // - 귀퉁이를 왼쪽 위로 끌면 종이가 넘어가듯 뒷장(가이드)이 드러난다. 충분히 끌고 놓으면 끝까지 넘어가고,
 //   조금만 끌고 놓으면 제자리로 돌아간다. 귀퉁이(흰 접힌 면이나 블루 '?' 어디든)를 눌러도 넘어간다.
 // - 가이드 왼쪽 위 ← 를 누르면 종이만 다시 덮인다.
@@ -175,6 +176,7 @@ export default function GuidePage() {
 
   const covering = open; // 가이드가 화면을 다 덮었는지
   const peekOpacity = Math.max(0, 1 - (peel - HOVER) / 120); // 넘길수록 '?'가 사라진다
+  const showFold = !narrow || peel > REST; // 휴대폰에서는 평소에 블루 삼각형만 (끌 때만 흰 접힌 면)
   const clip = covering
     ? "none"
     : `polygon(100% calc(100% - ${peel}px), 100% 100%, calc(100% - ${peel}px) 100%)`;
@@ -274,22 +276,24 @@ export default function GuidePage() {
       {!covering && (
         <>
           {/* 접힌 면 (종이 뒷면). 넘김 크기만큼의 상자 중 왼쪽 위 삼각형 */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            className="absolute right-0 bottom-0 drop-shadow-[-6px_-6px_10px_rgba(11,37,89,0.18)]"
-            style={{ width: peel, height: peel }}
-          >
-            <polygon
-              points="0,0 100,0 0,100"
-              fill="var(--color-surface)"
-              stroke="var(--color-brand)"
-              strokeWidth="2"
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {showFold && (
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              className="absolute right-0 bottom-0 drop-shadow-[-6px_-6px_10px_rgba(11,37,89,0.18)]"
+              style={{ width: peel, height: peel }}
+            >
+              <polygon
+                points="0,0 100,0 0,100"
+                fill="var(--color-surface)"
+                stroke="var(--color-brand)"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
 
           {/* 귀퉁이 손잡이: 흰 접힌 면 + 블루 삼각형 전체. 끌거나 누르면 넘어간다 */}
           <button
