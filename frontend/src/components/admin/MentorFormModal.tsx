@@ -303,16 +303,24 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
             <input id={`${uid}-topics`} value={form.topics} onChange={(e) => set("topics", e.target.value)} placeholder="예: 해외 지원, 갭이어" className={input(false)} />
           </Field>
 
-          <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-4 py-4">
-            <Toggle
-              label="참여 동의"
-              hint="끄면 학생 화면 어디에도 이 멘토가 보이지 않아요."
-              checked={form.consent}
-              onChange={(v) => set("consent", v)}
-            />
-            <Toggle label="연락 가능 여부" hint="켜면 학생이 이 멘토에게 메일을 보낼 수 있어요." checked={form.available} onChange={(v) => set("available", v)} />
+          {/* 경고 문구는 흰 박스 아래에 띄운다 (박스 안에 넣으면 문구가 나올 때 박스가 늘어나 어색하다) */}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-4 py-4">
+              <Toggle
+                label="참여 동의"
+                hint="끄면 학생 화면 어디에도 이 멘토가 보이지 않아요."
+                checked={form.consent}
+                onChange={(v) => set("consent", v)}
+              />
+              <Toggle label="연락 가능 여부" hint="켜면 학생이 이 멘토에게 메일을 보낼 수 있어요." checked={form.available} onChange={(v) => set("available", v)} />
+            </div>
             {ruleBroken && (
-              <p role="alert" className="text-[13px] font-bold text-danger">
+              <p
+                role="alert"
+                // 문구가 처음 나타날 때 창 아래에 가려지지 않게, 보이는 곳까지 스크롤한다
+                ref={(el) => el?.scrollIntoView({ block: "nearest", behavior: "smooth" })}
+                className="px-2 text-[13px] font-bold text-danger"
+              >
                 {AVAILABLE_RULE}
               </p>
             )}
