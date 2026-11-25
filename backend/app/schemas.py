@@ -97,7 +97,7 @@ AnswerType = Literal["answer", "no_evidence", "off_topic", "safety"]
 #   career_question : 진로·거캠 생활 질문 (검색 + 답변 생성)
 #   smalltalk       : 잡담·감사·무관한 말
 #   unclear         : 막연해서 분야를 못 잡음 → 되묻기
-Intent = Literal["greeting", "about_service", "career_question", "smalltalk", "unclear"]
+Intent = Literal["greeting", "about_service", "career_question", "mentor_request", "smalltalk", "unclear"]
 
 # about_service 안에서 무엇을 묻는지 (app/rag/intent.py 의 AboutAspect 와 같아야 한다)
 #   what: 뭘 할 수 있어 / why: 왜 만들었어 / who: 누가 만들었어
@@ -164,6 +164,10 @@ class AskResponse(BaseModel):
     more_hint: bool = Field(False, description="'다른 선배 이야기도 더 있어요'를 붙였는지")
     # [추가] 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때 "막막한 게 당연해요. …"). 없으면 null
     preface: str | None = Field(None, description="카드 답변 위에 붙이는 한 줄")
+    # [추가] 학생이 멘토·프로필·연락할 선배를 찾았을 때 true (intent 는 mentor_request).
+    # 화면은 answer 아래에 멘토 카드를 그린다. 멘토는 mentor_query 로 /mentors/recommend 를 불러서 받는다
+    show_mentors: bool = Field(False, description="멘토 카드를 보여 줄 답인지")
+    mentor_query: str | None = Field(None, description="멘토 추천(/mentors/recommend)에 넘길 말. show_mentors 일 때만")
     no_more: bool = Field(False, description="이어지는 질문에 더 전할 이야기가 없는지")
     temporary_error: bool = Field(
         False,

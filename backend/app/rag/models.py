@@ -130,6 +130,8 @@ class RagAnswer(BaseModel):
     about_aspect: str | None = None
     follow_ups: list[str] = Field(default_factory=list)
     emphasis: str | None = None  # 고정 문구 안에서 굵게 강조할 문장
+    # 멘토·프로필을 찾는 말(mentor_request)일 때: 멘토 추천에 넘길 말. 있으면 화면이 멘토 카드를 그린다
+    mentor_query: str | None = None
     # 검색·Claude 호출이 실패해서 no_evidence 로 대신 답했는지. API 응답에는 나가지 않는다.
     # (성능 측정 때 '진짜 근거 부족'과 '오류'를 구분하려고 둔다)
     failed: bool = False
