@@ -10,6 +10,13 @@ frontend/src/
 │  ├─ page.tsx            # "/": 대화 전 인사 화면(캐릭터·스티커) → 대화 중 채팅 화면 + 오른쪽 출처 패널
 │  ├─ not-found.tsx       # 없는 주소일 때 (거꾸로 매달린 꾸로록)
 │  ├─ mentors/page.tsx    # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
+│  ├─ admin/              # 관리자 화면 (noindex, 학생 화면에서 링크하지 않음). 로그인 전엔 어느 주소든 로그인 창
+│  │  ├─ layout.tsx       # noindex + AdminShell(로그인 확인·관리자 사이드바)
+│  │  ├─ page.tsx         # "/admin" → "/admin/inquiries" 로 보냄
+│  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호·오른쪽 상세 패널), [id]/ 는 상세 전체 화면
+│  │  ├─ review/          # 확인필요 목록 (자동 전달 못 한 멘토 답장)
+│  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 (지우기 없음)
+│  │  └─ settings/        # 메일 설정 (탭 5개)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
 │  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴 + 최근 대화 기록, 대화 지우기)
@@ -22,9 +29,11 @@ frontend/src/
 │  ├─ MentorCard.tsx      # 멘토 카드 하나 (아바타·이름·메일 버튼·소개·키워드)
 │  ├─ ContactModal.tsx    # 멘토에게 메일 쓰기 창 (작성 → 전송 중 → 완료, 닫기 확인)
 │  ├─ ConfirmDialog.tsx   # 확인 창 ("새 채팅을 시작할까요?", "작성을 그만둘까요?")
-│  └─ icons.tsx           # 선 아이콘 모음 (이모지 대신 사용)
+│  ├─ icons.tsx           # 선 아이콘 모음 (이모지 대신 사용)
+│  └─ admin/              # 관리자 화면 조각: AdminShell(틀·사이드바), AdminLogin, InquiryDetailView, MentorFormModal, ui(표·pill·쪽 번호)
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
+   ├─ adminApi.ts         # 관리자 API 호출 + 타입 (backend/app/admin/models.py와 맞춤). token 은 sessionStorage, 401 이면 로그아웃
    ├─ avatar.ts           # 선배 아바타 번호(avatar-1~7) → 그림 주소 (public/avatars/avatar-01~07.svg)
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
    └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 대화 기록은 이 브라우저 localStorage 에만 저장(최대 30개). 자기소개·인사는 온보딩 답변
@@ -41,6 +50,13 @@ frontend/src/
 - 휴대폰 기준은 `sm`(640px) 미만. 왼쪽 레일 대신 위쪽 막대(메뉴·로고·새 채팅), 출처 패널·메일 창은 아래에서 올라오는 시트, 멘토는 한 줄에 2명.
   - 손가락으로 누르는 버튼은 최소 44px(`size-11`). 아이폰 노치·홈 막대는 `env(safe-area-inset-*)` 여백으로 피한다.
   - CSS 만으로 못 바꾸는 것(입력창 안내 문구 등)은 `lib/useMediaQuery.ts`, 키보드가 올라왔는지는 `lib/useKeyboardOpen.ts`로 확인한다.
+
+## 관리자 화면 규칙
+- 비밀번호는 코드·`.env`·Vercel 환경변수(특히 `NEXT_PUBLIC_`)에 넣지 않는다. 화면에서 입력받아 `POST /admin/login` 으로 보내기만 한다.
+- token 은 `sessionStorage` 에만 두고 요청마다 `Authorization: Bearer` 로 보낸다. 401 이면 token 을 지우고 로그인 창('다시 로그인해 주세요.')으로.
+- 학생(미성년자) 이름·메일은 필요한 곳에만 보여주고 `console.log` 로 찍지 않는다.
+- 학생용 사이드바(NavBar)는 `/admin` 에서 스스로 숨는다. 학생 화면에 `/admin` 링크를 두지 않는다.
+- 진짜 보안은 backend(`require_admin`)가 지킨다. 화면에서 막는 건 보여주기만이다.
 
 ## 실행
 ```bash
