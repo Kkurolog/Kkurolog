@@ -202,3 +202,14 @@ export function LogoutIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+// 인터뷰 넣기 (위로 올리는 화살표 + 받침)
+export function UploadIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12 15V4" />
+      <path d="M7.5 8.5L12 4l4.5 4.5" />
+      <path d="M4 15v2.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V15" />
+    </Svg>
+  );
+}

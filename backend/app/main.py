@@ -20,6 +20,7 @@ from app.schemas import (
     RecommendRequest,
     RecommendResponse,
 )
+from app.admin.imports import router as admin_imports_router
 from app.admin.router import router as admin_router
 from app.mail.router import router as mail_router
 from app.rate_limit import limit_ask
@@ -37,7 +38,7 @@ frontend_origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in frontend_origins if origin.strip()],
-    allow_methods=["GET", "POST", "PATCH"],  # PATCH: 관리자 페이지의 멘토·설정 수정
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],  # 관리자 페이지: PATCH 멘토·설정 수정, PUT·DELETE 인터뷰 넣기
     allow_headers=["*"],
 )
 
@@ -45,6 +46,8 @@ app.add_middleware(
 app.include_router(mail_router)
 # 관리자 페이지용 API: /admin/* (app/admin/router.py, 공용 비밀번호 ADMIN_PASSWORD 로그인)
 app.include_router(admin_router)
+# 관리자 '인터뷰 넣기': /admin/imports/* (app/admin/imports.py, txt 업로드 → AI 초안 → 검토 → 공개)
+app.include_router(admin_imports_router)
 
 
 @app.get("/health")

@@ -184,6 +184,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new AdminApiError(401, RELOGIN_MESSAGE);
   }
   if (!res.ok) throw new AdminApiError(res.status, await errorMessage(res));
+  if (res.status === 204) return undefined as T; // 지우기 등 본문이 없는 응답
   return (await res.json()) as T;
 }
 
@@ -256,6 +257,131 @@ export function fetchSettings() {
 
 export function updateSettings(values: Record<string, string>) {
   return request<SettingItem[]>("/admin/settings", { method: "PATCH", body: JSON.stringify({ values }) });
+}
+
+// ---------------------------------------------------------------- 인터뷰 넣기 (backend/app/ingest/models.py)
+export type ImportStatus = "analyzing" | "review" | "published" | "failed";
+
+export type ImportSummary = { people: number; chunks: number; confirmed: number; pii: number };
+
+export type ImportItem = {
+  id: string; // 예: imp-20261125-a1b2c3
+  filename: string;
+  status: ImportStatus;
+  error: string | null;
+  summary: ImportSummary | null;
+  source_id: string | null; // 공개 후 sources.id
+  created_at: string;
+  updated_at: string;
+  analyzed_at: string | null;
+  published_at: string | null;
+};
+
+export type DraftSource = {
+  title: string;
+  source_type: "졸업생 인터뷰" | "졸업생 에세이";
+  published_at: string | null; // YYYY-MM-DD
+  visibility: "L1" | "L2" | "L3";
+};
+
+export type PersonRole = "alumni" | "interviewer" | "other";
+
+export type DraftPerson = {
+  ref: string; // 초안 안의 이름표 (S1, S2 …)
+  label: string; // 원문에서 이 사람을 부르는 표시 (실명일 수 있다)
+  role: PersonRole;
+  link: "new" | "existing";
+  person_id: string;
+  nickname: string;
+  real_name: string;
+  path_summary: string;
+  career_paths: string[];
+  path_detail: string[];
+  career_fields: string[];
+  field_detail: string[];
+  organizations: string[];
+  ai_career_paths: string[];
+  ai_career_fields: string[];
+  confirmed: boolean;
+};
+
+export type DraftChunk = {
+  key: string; // 초안 안의 이름표 (c01, c02 …)
+  speaker: string; // DraftPerson.ref
+  question: string;
+  content: string;
+  lines: number[]; // 원문 줄 번호 [시작, 끝]
+  topics: string[];
+  topic_detail: string[];
+  ai_topics: string[];
+  confirmed: boolean;
+};
+
+export type PiiFlag = {
+  line: number;
+  text: string;
+  kind: "name" | "school" | "phone" | "email" | "address" | "other";
+  by: "ai" | "rule";
+};
+
+export type ImportDraft = {
+  source: DraftSource;
+  people: DraftPerson[];
+  chunks: DraftChunk[];
+  pii: PiiFlag[];
+  pii_checked: boolean;
+  model: string;
+  note: string | null;
+};
+
+export type ImportDetail = { item: ImportItem; raw_text: string; draft: ImportDraft | null };
+
+export type PersonOption = {
+  id: string;
+  nickname: string;
+  path_summary: string | null;
+  career_paths: string[];
+  career_fields: string[];
+};
+
+export type PublishResult = { source_id: string; people: number; chunks: number };
+
+export const MAX_IMPORT_FILES = 20;
+export const MAX_IMPORT_CHARS = 100_000;
+
+export function uploadImports(files: { filename: string; text: string }[]) {
+  return request<ImportItem[]>("/admin/imports", { method: "POST", body: JSON.stringify({ files }) });
+}
+
+export function fetchImports(opts: { page?: number; pageSize?: number } = {}) {
+  return request<Paged<ImportItem>>(`/admin/imports${query({ page: opts.page ?? 1, page_size: opts.pageSize ?? PAGE_SIZE })}`);
+}
+
+export function fetchImport(id: string) {
+  return request<ImportDetail>(`/admin/imports/${encodeURIComponent(id)}`);
+}
+
+export function saveImportDraft(id: string, draft: ImportDraft) {
+  return request<ImportDetail>(`/admin/imports/${encodeURIComponent(id)}/draft`, {
+    method: "PUT",
+    body: JSON.stringify(draft),
+  });
+}
+
+export function reanalyzeImport(id: string) {
+  return request<ImportItem>(`/admin/imports/${encodeURIComponent(id)}/analyze`, { method: "POST" });
+}
+
+export function publishImport(id: string) {
+  return request<PublishResult>(`/admin/imports/${encodeURIComponent(id)}/publish`, { method: "POST" });
+}
+
+export function deleteImport(id: string) {
+  return request<void>(`/admin/imports/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function fetchImportPeople() {
+  return request<PersonOption[]>("/admin/imports/people");
 }
 
 // ---------------------------------------------------------------- 화면 표시 도우미

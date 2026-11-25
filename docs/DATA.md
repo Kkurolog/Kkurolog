@@ -115,3 +115,20 @@ sources (글) 1 ──< chunks (조각) >── 1 people (인물)
 | 6. 테이블 만들기 | `run_sql.py` + `supabase/migrations/*.sql` | Supabase 테이블·함수 |
 | 7. 적재 | `load_to_supabase.py` (id 기준 upsert) | Supabase 데이터 |
 | 8. 임베딩 | `embed_chunks.py` (OpenAI `text-embedding-3-small`, 비어 있는 조각만) | `chunks.embedding`, `chunks.embedding_model` |
+
+## 6. 관리자 페이지 '인터뷰 넣기' (txt 업로드)
+
+스크립트 없이 관리자 페이지(`/admin/imports`)에서 새 인터뷰를 넣는 길. 코드: `backend/app/ingest/`, API: `backend/app/admin/imports.py`, 테이블: `supabase/migrations/0004_imports.sql`.
+
+| 단계 | 누가 | 하는 일 |
+|---|---|---|
+| 1. 올리기 | 관리자 | txt 여러 개 (한 번에 20개, 파일당 10만 자). UTF-8이 아니면 화면이 EUC-KR로 다시 읽는다 |
+| 2. 분석 | AI (Claude, `KKUROLOG_IMPORT_MODEL`, 기본 `claude-sonnet-5-5`) | 말한 사람(졸업생·인터뷰어·그 밖), 조각의 **줄 번호**, 태그 추천, 개인정보 의심 부분. 조각 글은 줄 번호로 원문에서 잘라 온다 (AI가 지어낸 문장이 섞이지 않게). 1,000자가 넘으면 문단에서 나눈다 |
+| 3. 검토 | 관리자 | 개인정보 확인(필요하면 조각 내용에서 지움), 사람마다 '새 인물' 또는 'DB에 있는 인물에 연결', 태그 확인, 조각 합치기·빼기·추가 |
+| 4. 공개 | backend | 남은 할 일이 없을 때만. 임베딩을 먼저 만든 뒤 `publish_import()` 한 번으로 sources·people·chunks에 넣는다 (한 트랜잭션). 원문(`raw_text`)은 지운다 |
+
+- 원문은 검토하는 동안만 `import_files`에 있다 (RLS, service_role만). 공개하면 지운다.
+- 글 번호는 `up-날짜-6자리` (예: `up-20261125-a1b2c3`), 조각 번호는 `{글 번호}-01`. `site`는 `관리자 업로드`, `url`은 빈 값.
+- 공개 등급 기본값은 L1. 졸업생 말만 조각이 되고, 인터뷰어·그 밖의 사람의 말은 조각이 되지 않는다.
+- 태그 규칙은 스크립트와 같다 (TAGS.md, 기타면 상세 칸 필수, 인물 경로 태그 1개 이상, 조각 주제 1~2개).
+- 공개한 뒤 고칠 일이 있으면 지금은 Supabase에서 직접 고친다.
