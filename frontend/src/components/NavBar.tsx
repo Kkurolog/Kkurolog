@@ -33,14 +33,7 @@ function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "b
 const iconButton =
   "group relative inline-flex size-11 items-center justify-center rounded-xl text-brand hover:bg-surface focus-visible:bg-surface focus-visible:outline-none sm:size-9";
 
-// 관리자 화면(/admin)에서는 학생용 사이드바를 그리지 않는다 (관리자 화면은 자기 사이드바가 따로 있다)
 export default function NavBar() {
-  const pathname = usePathname();
-  if (pathname.startsWith("/admin")) return null;
-  return <StudentNavBar />;
-}
-
-function StudentNavBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { conversations, currentId, goHome, open: openConversation, remove } = useChat();

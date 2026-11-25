@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
+import { createContext, Suspense, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { fetchReview, getToken, logout, subscribeAuth } from "@/lib/adminApi";
 import Logo from "../Logo";
 import { AlertIcon, InboxIcon, LogoutIcon, MailIcon, SidebarIcon, UserIcon } from "../icons";
@@ -44,7 +44,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const token = useSyncExternalStore(subscribeAuth, getToken, getServerToken);
   if (token === undefined) return null;
   if (!token) return <AdminLogin />;
-  return <SignedIn>{children}</SignedIn>;
+  // SignedIn 은 주소(usePathname)를 읽는다. 실행할 때만 아는 값이라 Suspense 로 감싼다 (cacheComponents 규칙)
+  return (
+    <Suspense fallback={null}>
+      <SignedIn>{children}</SignedIn>
+    </Suspense>
+  );
 }
 
 function SignedIn({ children }: { children: React.ReactNode }) {
