@@ -189,8 +189,9 @@ export default function NavBar() {
                           type="button"
                           onClick={() => handleOpenConversation(c.id)}
                           aria-current={active ? "page" : undefined}
+                          // 흰 바탕은 '줄 전체(li)'에 마우스가 있을 때 켠다 → X 위로 옮겨 가도 흰 바탕이 유지된다
                           className={`flex w-full flex-col rounded-xl py-2 pr-12 pl-3 text-left ${
-                            active ? "bg-surface" : "hover:bg-surface/70"
+                            active ? "bg-surface" : "group-hover/item:bg-surface/70"
                           }`}
                         >
                           <span className={`truncate text-sm ${active ? "font-bold text-brand" : "text-ink"}`}>
@@ -204,10 +205,11 @@ export default function NavBar() {
                           type="button"
                           onClick={() => setConfirmDelete(c.id)}
                           aria-label={`'${c.title}' 대화 지우기`}
-                          // 마우스가 있는 기기에서는 올렸을 때만 보이고, 터치 기기에서는 항상 보인다 (누를 영역 40px)
-                          className="absolute top-1/2 right-1 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted hover:bg-sky hover:text-brand focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100"
+                          // 마우스가 있는 기기에서는 올렸을 때만 보이고, 터치 기기에서는 항상 보인다 (누를 영역 40px).
+                          // X 에 직접 마우스를 올리면 '지우기'라는 걸 알 수 있게 토마토색 동그라미로 강조한다
+                          className="absolute top-1/2 right-1 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-colors hover:bg-danger/15 hover:text-danger-dark focus-visible:bg-danger/15 focus-visible:text-danger-dark focus-visible:opacity-100 focus-visible:outline-none [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100"
                         >
-                          <CloseIcon className="size-4" />
+                          <CloseIcon className="size-[18px]" />
                         </button>
                       </li>
                     );
