@@ -38,7 +38,7 @@ class AdminFakeStore(FakeStore):
         return self._with_mentor(row) if row else None
 
     def list_replies(self, inquiry_id):
-        return sorted((r for r in self.replies.values() if r["inquiry_id"] == inquiry_id),
+        return sorted((r for r in self.replies.values() if r["inquiry_id"] == inquiry_id and not r.get("followup")),
                       key=lambda r: r["received_at"])
 
     def list_review_replies(self, offset, limit):
@@ -192,17 +192,53 @@ def test_inquiry_detail_with_replies(env, headers):
     message = {"messageId": "msg-1", "receivedAt": "2026-11-17T15:20:00+09:00", "from": "mentor1@example.com",
                "recipients": [f"relay+{inquiry_id}@gmail.com"], "plainBody": "좋은 질문이에요."}
     stranger = {**message, "messageId": "msg-2", "from": "x@example.com"}
-    client.post("/internal/mail/inbound", json={"messages": [message, stranger]},
+    # 다른 주소 답장이 멘토 첫 답장보다 먼저 와야 첫 왕복에 들어가 관리자에게 보인다
+    client.post("/internal/mail/inbound", json={"messages": [stranger, message]},
                 headers={"X-Kkurolog-Mail-Secret": SECRET})
     detail = client.get(f"/admin/inquiries/{inquiry_id.upper()}", headers=headers).json()
     assert detail["item"]["replied"] is True
-    assert [r["status"] for r in detail["replies"]] == ["forwarded", "needs_review"]
-    assert detail["replies"][0]["reply_text"] == "좋은 질문이에요."
+    assert [r["status"] for r in detail["replies"]] == ["needs_review", "forwarded"]
+    assert detail["replies"][1]["reply_text"] == "좋은 질문이에요."
     review = client.get("/admin/replies/review", headers=headers).json()
     assert review["total"] == 1 and review["items"][0]["reason"] == "sender_mismatch"
     assert review["items"][0]["inquiry_title"] == "제목0"
+    assert review["items"][0]["followup"] is False
     assert client.get("/admin/inquiries/q20000101-0001", headers=headers).status_code == 404
     assert client.get("/admin/inquiries/abc", headers=headers).status_code == 422
+
+
+def test_admin_shows_first_round_only(env, headers):
+    """문의 상세에는 첫 왕복만. 단, 그 뒤 전달하지 못한 메일은 확인필요 목록에 본문 없이 나온다."""
+    [inquiry_id] = add_inquiries(env, 1)
+    base = {"receivedAt": "2026-11-17T15:20:00+09:00", "recipients": [f"relay+{inquiry_id}@gmail.com"]}
+    messages = [
+        {**base, "messageId": "m1", "from": "mentor1@example.com", "plainBody": "첫 답장이에요."},
+        {**base, "messageId": "s1", "from": "s0@example.org", "plainBody": "감사합니다! 하나 더요."},
+        {**base, "messageId": "m2", "from": "mentor1@example.com", "plainBody": "두 번째 답장이에요."},
+        {**base, "messageId": "x1", "from": "x@example.com", "plainBody": "누구일까요"},
+    ]
+    results = client.post("/internal/mail/inbound", json={"messages": messages},
+                          headers={"X-Kkurolog-Mail-Secret": SECRET}).json()["results"]
+    assert [r["result"] for r in results] == ["forwarded", "forwarded", "forwarded", "needs_review"]
+    detail = client.get(f"/admin/inquiries/{inquiry_id}", headers=headers).json()
+    assert [r["message_id"] for r in detail["replies"]] == ["m1"]
+    assert detail["replies"][0]["reply_text"] == "첫 답장이에요."
+    review = client.get("/admin/replies/review", headers=headers).json()
+    assert review["total"] == 1
+    item = review["items"][0]
+    assert item["message_id"] == "x1" and item["reason"] == "sender_mismatch" and item["followup"] is True
+    assert item["reply_text"] is None and item["inquiry_id"] == inquiry_id  # 대화 내용은 드러나지 않음
+
+
+def test_times_are_shown_in_kst(env, headers):
+    """Supabase 는 시각을 UTC(Z)로 돌려준다. 관리자 응답은 한국 시간(+09:00)으로 바꿔 보여 준다."""
+    [inquiry_id] = add_inquiries(env, 1)
+    env["store"].inquiries[inquiry_id].update(
+        created_at="2026-11-20T13:15:01.123456Z", replied=True, replied_at="2026-11-20T15:00:00+00:00")
+    item = client.get(f"/admin/inquiries/{inquiry_id}", headers=headers).json()["item"]
+    assert item["created_at"] == "2026-11-20T22:15:01+09:00"
+    assert item["replied_at"] == "2026-11-21T00:00:00+09:00"
+    assert login().json()["expires_at"].endswith("+09:00")
 
 
 # ---------------------------------------------------------------- 멘토
@@ -245,7 +281,7 @@ def test_update_mentor(env, headers):
 # ---------------------------------------------------------------- 설정
 def test_settings_read_and_update_apply_to_next_mail(env, headers):
     items = client.get("/admin/settings", headers=headers).json()
-    assert len(items) == 16 and {"key", "value", "description"} <= items[0].keys()
+    assert len(items) == 18 and {"key", "value", "description"} <= items[0].keys()
     res = client.patch("/admin/settings", json={"values": {"mentorSubjectPrefix": "[새 문의]", "rateLimitPerDay": "7"}},
                        headers=headers)
     assert res.status_code == 200

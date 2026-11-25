@@ -9,6 +9,7 @@ from app.mail.mail_settings import DEFAULTS, merge_settings, number
 from app.mail.reply_parser import extract_reply_text, find_inquiry_id
 from app.mail.templates import (
     inquiry_id_line,
+    mentor_followup_mail,
     mentor_inquiry_mail,
     mentor_intro_line,
     student_copy_mail,
@@ -90,10 +91,33 @@ def test_student_copy_has_no_inquiry_id_or_email():
 
 
 def test_student_forward_shows_mentor_name_only():
-    mail = student_forward_mail(SETTINGS, "학생", "제목", "새벽", "답장 내용")
+    mail = student_forward_mail(SETTINGS, "q20261117-0001", "학생", "제목", "새벽", "답장 내용")
     assert mail.subject == "[꾸로록 답장] 제목"
     assert "새벽" in mail.text_body and "답장 내용" in mail.text_body
     assert "@" not in mail.text_body + mail.html_body
+    assert "이 메일에 답장하면 멘토님께 전달돼요." in mail.text_body  # 학생도 답장으로 이어서 보낼 수 있음
+    assert mail.text_body.endswith("문의번호: q20261117-0001") and "q20261117-0001" in mail.html_body
+
+
+def test_mentor_followup_mail():
+    mail = mentor_followup_mail(SETTINGS, "q20261117-0001", "새벽", "하늘", "제목", "하나 더 궁금해요 <b>")
+    assert mail.subject == "[꾸로록 추가 질문] 제목"
+    assert "학생이 멘토님의 답장에 이어서 메시지를 보냈어요." in mail.text_body
+    assert "하늘" in mail.text_body and "하나 더 궁금해요" in mail.text_body
+    assert mail.text_body.endswith("문의번호: q20261117-0001")
+    assert "&lt;b&gt;" in mail.html_body and "@" not in mail.text_body + mail.html_body
+
+
+def test_extract_student_reply_drops_forward_mail():
+    """학생이 [꾸로록 답장] 메일에 답장: 인용 표시 없이 원래 메일이 붙어 와도 학생이 쓴 부분만."""
+    body = ("네 감사합니다!\n\n안녕하세요, 하늘님.\n멘토님이 보내주신 답장을 전달해 드려요.\n\n- 답장한 멘토: 새벽\n"
+            "이 메일에 답장하면 멘토님께 전달돼요.\n문의번호: q20261117-0001")
+    assert extract_reply_text(body, SETTINGS) == "네 감사합니다!"
+
+
+def test_extract_mentor_reply_to_followup_drops_followup_mail():
+    body = "물론이죠!\n학생이 멘토님의 답장에 이어서 메시지를 보냈어요.\n- 학생 이름: 하늘"
+    assert extract_reply_text(body, SETTINGS) == "물론이죠!"
 
 
 def test_settings_merge_and_numbers():

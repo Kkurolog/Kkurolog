@@ -1,7 +1,7 @@
 # 메일 자동화 Supabase 이전 계획 (B 방식)
 
-> 상태: **진행 중** (B-1 완료: 테이블 SQL, 2026-11-17 팀 Supabase에 적용 / B-2 완료: Apps Script 메일 전용 코드 / B-3 완료: 백엔드 코드, `MAIL_ENABLED=false`로 꺼 둔 상태 / B-4 완료: 팀 Supabase에 멘토 10명, mt-01~06 메일·연락 가능 / B-5 완료: 관리자 API). 다음: PR → 배포 → 실제 왕복 테스트. 이 문서는 단계마다 갱신합니다.
-> 지금 운영 중인 구조(구글 시트 + Apps Script)는 B-3까지 끝나고 실제 왕복 테스트를 통과할 때까지 그대로 둡니다.
+> 상태: **완료** (2026-11-20). B-1~B-5 코드·데이터를 main에 합치고(PR #18) 운영에 적용, 실제 왕복 테스트 통과 (11장).
+> 이 문서는 옮긴 이유·결정·확인 기록입니다. 지금 구조와 사용법은 [README](../README.md), 운영·인수인계는 [HANDOVER.md](./HANDOVER.md)를 봅니다.
 
 ## 1. 왜 바꾸나
 
@@ -105,15 +105,15 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 | **B-3** | 백엔드: Supabase에서 멘토 읽기(`mentors_demo.json` 대신), 문의 처리(검사·횟수 제한·번호·기록·sendMail), 답장 처리, 리마인드, 내부 API, 테스트 | ✅ 코드 완료 (`backend/app/mail/`, pytest 158개 통과). `MAIL_ENABLED=true`로 켜기 전까지는 예전과 같이 동작 |
 | **B-4** | 데이터 옮기기: 멘토 프로필은 `scripts/load_mentors.py`로, 실제 메일·연락 가능은 Table Editor에서 직접. 기존 시트 문의(팀 테스트)는 옮기지 않고 새로 시작 | ✅ 스크립트 완료 (팀 Supabase 적용은 직접) |
 | **B-5** | 관리자 API (문의 목록·상세, 멘토 수정, 설정 수정) + 관리자 로그인 방식 | ✅ 코드 완료 (`backend/app/admin/`, 명세 [ADMIN_API.md](./ADMIN_API.md), pytest 179개) |
-| 마무리 | 실제 왕복 테스트, 문서(README·HANDOVER·BACKEND_INTEGRATION) 정리, PR | |
+| 마무리 | 운영 적용, 실제 왕복 테스트, 문서(README·HANDOVER·BACKEND_INTEGRATION) 정리, 관리자 응답 시각을 한국 시간으로 | ✅ 2026-11-20 (11장) |
 
 ## 6. 바뀌거나 없어지는 것
 
 - **구글 시트**: 저장소로 쓰지 않습니다. Apps Script는 지금 시트에 붙은 프로젝트를 그대로 씁니다 (웹앱 링크·키·트리거 유지). 시트의 메뉴("메일 자동화")만 쓰고, 탭은 비워 두거나 지워도 됩니다.
 - **`apps-script/src/Admin.gs`(관리자 API)**: B-2에서 지웠습니다. 관리자 조회는 백엔드가 Supabase에서 직접 합니다 (B-5). 시트·판단 관련 파일(`Sheets`, `Mentors`, `Inquiries`, `MailTemplates`, `ReplyParser`, `Replies`)과 `templates/*.csv`도 지웠습니다. 메일 문장 만들기·인용문 지우기는 B-3에서 백엔드(파이썬)로 옮깁니다.
-- **`apps-script/docs/BACKEND_INTEGRATION.md`**: 시트 방식 기준의 연결 안내라 B-3이 끝나면 새 구조로 다시 씁니다.
-- **`backend/app/data/mentors_demo.json`**: B-3에서 `mentors` 테이블로 바뀝니다. 테스트용 가짜 데이터로만 남길지 B-3에서 정합니다.
-- **인수인계**: "시트 사본 + 계정 교체"에서 "관리자 페이지로 운영 + 처음 한 번 설치(Supabase·백엔드·Apps Script)"로 바뀝니다. `HANDOVER.md`는 마무리 단계에서 다시 씁니다.
+- **`apps-script/docs/BACKEND_INTEGRATION.md`**: 새 구조 기준으로 다시 썼습니다 (2026-11-20).
+- **`backend/app/data/mentors_demo.json`**: `MAIL_ENABLED=false`(로컬 개발·테스트)일 때 쓰는 가짜 데이터로 남깁니다. 운영 멘토는 Supabase `mentors`입니다.
+- **인수인계**: "시트 사본 + 계정 교체"에서 "관리자 기능으로 운영 + 처음 한 번 설치(Supabase·백엔드·Apps Script)"로 바뀌었습니다. [HANDOVER.md](./HANDOVER.md) (2026-11-20).
 
 ## 7. 백엔드 구현 (B-3)
 
@@ -178,7 +178,50 @@ python run_sql.py --query "select count(*) from public.mail_settings"   # 16 이
 **이때 찾아서 고친 것**
 - `SUPABASE_URL`에 대시보드의 REST 주소(`…/rest/v1`)를 넣으면 404 PGRST125 → 끝의 `/rest/v1`을 떼고 쓰도록 수정. `.env.example`에 "프로젝트 주소까지만" 안내.
 - `/docs`에서 관리자 API를 시험하면 출입증이 전달되지 않아 401 → 관리자 인증을 HTTP Bearer 방식으로 선언해 `/docs`에 Authorize 버튼이 생기게 수정 (관리자 페이지가 보내는 형식은 같음).
-- Windows의 애플리케이션 제어 정책이 가상환경의 `uvicorn.exe`를 막음 → `python -m uvicorn app.main:app --reload`로 실행 (README 확정 때 반영).
+- Windows의 애플리케이션 제어 정책이 가상환경의 `uvicorn.exe`를 막음 → `python -m uvicorn app.main:app --reload`로 실행 (README·BACKEND_INTEGRATION에 반영).
 
-**남은 확인**: 메일 웹앱과의 연결(sendMail·getQuota), Apps Script → 백엔드 자동 답장 전달 → merge·배포 후 실제 왕복 테스트.
+**남은 확인**: 메일 웹앱과의 연결(sendMail·getQuota), Apps Script → 백엔드 자동 답장 전달 → 11장에서 확인.
+
+## 11. 운영 적용과 실제 왕복 테스트 (2026-11-19 ~ 11-20)
+
+**테스트 사본으로 먼저 확인 (2026-11-19)**: 운영 시트의 사본에 새 코드를 붙이고(setup·트리거는 실행 안 함) 웹앱을 따로 배포, 로컬 백엔드(`MAIL_ENABLED=true`)와 팀 Supabase로 확인.
+| 확인 | 결과 |
+|---|---|
+| 문의 → 멘토 메일(Reply-To `중계계정+문의번호`) + 학생 사본, Supabase 기록, 관리자 조회 | 정상 |
+| 답장(직접 만든 JSON을 `/internal/mail/inbound`로) | `forwarded`, 학생에게 인용문·멘토 주소 없이 전달, `replied=true` |
+| 같은 메일 다시 | `forwarded`, 메일은 다시 안 감 |
+| 다른 주소에서 온 답장 / 없는 문의번호 / 틀린 비밀값 | `needs_review`(`sender_mismatch`) / `ignored` / 401 |
+
+정리: 테스트 문의 삭제(`inquiry_counters`는 문의번호 재사용을 막으려고 남김), 사본 웹앱 보관, 사본 시트 삭제.
+
+**운영 적용 (2026-11-20)**
+1. Render 백엔드: main 최신 커밋 배포 확인 (`SUPABASE_URL`·`SUPABASE_KEY`는 이미 있음).
+2. 운영 Apps Script: `src/` 14개 파일로 교체, 옛 파일 삭제, `BACKEND_URL` 추가, setup(트리거 2개), 배포 관리 → 새 버전(URL 유지).
+3. Render 환경변수 추가: `APPS_SCRIPT_URL`, `APPS_SCRIPT_API_KEY`, `MAIL_WEBHOOK_SECRET`, `ADMIN_PASSWORD`(운영용 새 값), `MAIL_ENABLED=true`.
+4. 확인: 관리자 로그인·문의 0건, `testBackendConnection` ✅, 사이트 멘토 9명(동의한 멘토, 연락 가능 mt-01~06).
+
+**실제 왕복 테스트 (Vercel 사이트에서)**: 문의 → 멘토 `[꾸로록 문의]` + 학생 `[꾸로록 보낸 문의]` → 멘토가 Gmail에서 '답장'(받는 주소 `+문의번호` 확인) → 5분 안에 학생에게 `[꾸로록 답장]`(멘토 문장만) → 관리자 상세 `replied=true`, `forwarded`. 리마인드 수동 실행 정상(대상 0건). 테스트 문의는 삭제.
+
+**이때 바꾼 것**: 관리자 API가 시각을 UTC(`Z`)로 돌려줘 읽기 어려움 → 모든 관리자 응답 시각을 한국 시간(`+09:00`, 초 단위)으로 바꿈.
+
+**운영 메모**
+- mt-01~06은 팀원 메일을 넣은 demo 멘토로, 연락 가능 상태로 둡니다. 실제 졸업생으로 바꿀 때 관리자 API로 메일·프로필을 고칩니다.
+- UptimeRobot이 `/health`를 주기적으로 불러 Render 무료 서버가 잠들지 않습니다.
+
+## 12. 여러 번 왕복 (2026-11-21)
+
+| 정한 것 | 내용 |
+|---|---|
+| 왕복 | 학생도 `[꾸로록 답장]` 메일에 '답장'하면 멘토에게 `[꾸로록 추가 질문]`으로 전달. 횟수·기간 제한 없음 |
+| 보낸 사람 확인 | 그 문의의 멘토 메일 → 학생에게, 문의 때 적은 학생 메일 → 멘토에게, 둘 다 아니면 확인필요. 같은 주소면 멘토 |
+| 학생 사본 | 지금처럼 답장해도 전달 안 됨 (멘토가 답하기 전 같은 질문이 두 번 가는 것을 막음) |
+| 답장 여부·리마인드 | 멘토 첫 답장 기준 그대로 |
+| 관리자 | 문의 상세는 첫 왕복(학생 문의 + 멘토 첫 답장)만 봄. 그 뒤 메일은 `mail_replies.followup = true`로 중복 방지 표시만, 본문 저장 안 함 |
+| 확인필요 | 첫 왕복 이후에 생긴 것도 확인필요 목록에 보임(본문 없이 이유만, `followup` 표시). 리뷰(#30)에서 "전달이 멈춘 메일이 아무도 모르게 사라진다"는 지적을 받아 반영 |
+| 데이터 | `supabase/migrations/0003_mail_followup.sql`: `followup` 칸, 설정 키 2개(`mentorFollowupSubjectPrefix`, `mentorFollowupIntro`), `studentForwardFooter`를 "이 메일에 답장하면 멘토님께 전달돼요."로 (예전 기본 문구일 때만) |
+| Apps Script | 변경 없음 (이미 `+문의번호` 메일을 넘기고, 중계 계정이 보낸 메일은 거름) |
+| 신경 쓰지 않기로 한 것 | 미성년자 대화 정책, 자동 응답 반복, 발송 한도, 전달 속도, 대화 종료, 보낸 사람 위조, Apps Script 실행 시간 |
+| 직접 확인할 것 | 메일 앱별 인용문 지우기 (실제 왕복 테스트에서) |
+
+**적용 순서**: Supabase에 0003 실행 → (같은 날) merge·배포 → 실제 여러 번 왕복 테스트. 새 코드가 `followup` 칸을 쓰므로 SQL이 먼저다.
 

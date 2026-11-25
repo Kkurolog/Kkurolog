@@ -295,13 +295,14 @@ def test_inbound_forwards_to_student(env):
     res = inbound([message])
     assert res.json() == {"results": [{"messageId": "msg-1", "result": "forwarded"}]}
     [forward] = env["mail"].sent
-    assert forward["to"] == "student@example.org" and "reply_to_inquiry_id" not in forward
+    assert forward["to"] == "student@example.org" and forward["reply_to_inquiry_id"] == inquiry_id  # 학생도 답장 가능
     assert forward["subject"] == "[꾸로록 답장] 창업 고민 질문드려요"
     assert "좋은 질문이에요." in forward["text_body"] and "원래 문의" not in forward["text_body"]
     assert "mentor1@example.com" not in forward["text_body"].lower()
     inquiry = env["store"].inquiries[inquiry_id]
     assert inquiry["replied"] is True and inquiry["replied_at"].startswith("2026-11-17T15:20")
-    assert env["store"].replies["msg-1"]["status"] == "forwarded"
+    saved = env["store"].replies["msg-1"]
+    assert saved["status"] == "forwarded" and saved["followup"] is False and saved["reply_text"] == "좋은 질문이에요."
 
 
 def test_inbound_duplicate_message_is_not_forwarded_twice(env):
@@ -321,6 +322,80 @@ def test_inbound_second_reply_keeps_first_replied_at(env):
     assert inbound([second]).json()["results"][0]["result"] == "forwarded"
     assert env["store"].inquiries[inquiry_id]["replied_at"] == first
     assert len(env["mail"].sent) == 2
+    # 첫 왕복 이후 멘토 답장: 전달은 하지만 본문은 저장하지 않음 (관리자에게 안 보임)
+    assert env["store"].replies["msg-2"]["followup"] is True and env["store"].replies["msg-2"]["reply_text"] is None
+
+
+STUDENT_REPLY = ("멘토님 감사해요! 하나 더 여쭤봐도 될까요?\n\n"
+                 "2026년 11월 17일 (월) 오후 3:30, 꾸로록 <relay>님이 작성:\n> 안녕하세요, 하늘님.\n> 멘토님이 보내주신 답장을 전달해 드려요.")
+
+
+def test_inbound_student_reply_goes_to_mentor(env):
+    """여러 번 왕복: 멘토 답장 → 학생 답장 → 멘토 답장."""
+    inquiry_id, message = make_reply(env)
+    inbound([message])
+    first = env["store"].inquiries[inquiry_id]["replied_at"]
+    env["mail"].sent.clear()
+
+    student = {**message, "messageId": "msg-s1", "from": "STUDENT@example.org", "plainBody": STUDENT_REPLY,
+               "receivedAt": "2026-11-17T16:00:00+09:00"}
+    assert inbound([student]).json()["results"][0]["result"] == "forwarded"
+    [to_mentor] = env["mail"].sent
+    assert to_mentor["to"] == "mentor1@example.com" and to_mentor["reply_to_inquiry_id"] == inquiry_id
+    assert to_mentor["subject"] == "[꾸로록 추가 질문] 창업 고민 질문드려요"
+    body = to_mentor["text_body"]
+    assert "하나 더 여쭤봐도 될까요?" in body and "멘토님이 보내주신 답장을 전달해 드려요" not in body.split("──────────")[1]
+    assert "student@example.org" not in body.lower() and f"문의번호: {inquiry_id}" in body
+    saved = env["store"].replies["msg-s1"]
+    assert saved["status"] == "forwarded" and saved["followup"] is True and saved["reply_text"] is None
+
+    env["mail"].sent.clear()
+    again = {**message, "messageId": "msg-m2", "plainBody": "물론이죠.\n\n"
+             "2026년 11월 17일 (월) 오후 4:00, 꾸로록 <relay>님이 작성:\n> 학생이 멘토님의 답장에 이어서 메시지를 보냈어요."}
+    assert inbound([again]).json()["results"][0]["result"] == "forwarded"
+    [to_student] = env["mail"].sent
+    assert to_student["to"] == "student@example.org" and "물론이죠." in to_student["text_body"]
+    assert env["store"].inquiries[inquiry_id]["replied_at"] == first  # 답장 여부는 멘토 첫 답장 기준 그대로
+
+
+def test_inbound_student_reply_duplicate_and_empty(env):
+    inquiry_id, message = make_reply(env)
+    inbound([message])
+    env["mail"].sent.clear()
+    student = {**message, "messageId": "msg-s1", "from": "student@example.org", "plainBody": STUDENT_REPLY}
+    inbound([student])
+    assert inbound([student]).json()["results"][0]["result"] == "forwarded"
+    assert len(env["mail"].sent) == 1  # 같은 메일은 한 번만
+    empty = {**student, "messageId": "msg-s2", "plainBody": STUDENT_REPLY.split("\n\n", 1)[1]}
+    assert inbound([empty]).json()["results"][0]["result"] == "needs_review"
+    assert env["store"].replies["msg-s2"]["reason"] == "empty_body" and env["store"].replies["msg-s2"]["followup"] is True
+
+
+def test_inbound_student_reply_retry_when_send_fails(env):
+    inquiry_id, message = make_reply(env)
+    inbound([message])
+    env["mail"].fail_to["mentor1@example.com"] = "SEND_FAILED"
+    student = {**message, "messageId": "msg-s1", "from": "student@example.org", "plainBody": STUDENT_REPLY}
+    assert inbound([student]).json()["results"][0]["result"] == "retry"
+    assert "msg-s1" not in env["store"].replies  # 기록 안 함 = 다음 차례에 다시
+
+
+def test_inbound_student_reply_before_mentor_answer(env):
+    """멘토가 답하기 전에 온 학생 메일도 멘토에게 전달하고, 답장 여부는 바뀌지 않음."""
+    inquiry_id, message = make_reply(env)
+    student = {**message, "messageId": "msg-s1", "from": "student@example.org", "plainBody": "추가로 궁금한 게 있어요."}
+    assert inbound([student]).json()["results"][0]["result"] == "forwarded"
+    assert env["store"].inquiries[inquiry_id]["replied"] is False
+    assert env["store"].replies["msg-s1"]["followup"] is True
+
+
+def test_inbound_mentor_and_student_same_address_counts_as_mentor(env):
+    """팀 테스트에서 멘토·학생 주소가 같으면 멘토 답장으로 본다."""
+    inquiry_id, message = make_reply(env, sender="student@example.org")
+    env["store"].mentors[0]["email"] = "student@example.org"
+    assert inbound([message]).json()["results"][0]["result"] == "forwarded"
+    assert env["mail"].sent[0]["to"] == "student@example.org"
+    assert env["store"].inquiries[inquiry_id]["replied"] is True
 
 
 def test_inbound_sender_mismatch_needs_review(env):
