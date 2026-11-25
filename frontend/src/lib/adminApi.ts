@@ -52,6 +52,7 @@ export type ReplyItem = {
 export type InquiryDetail = { item: InquiryItem; replies: ReplyItem[] };
 
 export type ReviewItem = ReplyItem & {
+  followup: boolean; // true = 첫 왕복(멘토 첫 답장) 이후 대화에서 생긴 메일. 본문을 저장하지 않아 reply_text 가 항상 null
   inquiry_title: string | null;
   student_name: string | null;
   mentor_id: string | null;

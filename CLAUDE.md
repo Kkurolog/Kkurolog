@@ -5,7 +5,8 @@
 
 ## 폴더 구조
 - `frontend/`: Next.js(App Router) + TypeScript + Tailwind. 학생이 보는 화면 (Vercel 배포 예정)
-- `backend/`: Python + FastAPI (Render 배포 예정). `/health`, `/ask`(demo 답변), `/mentors`, `/mentors/recommend`, `/contact-requests`(메일 미발송, 로그만). 멘토는 `backend/app/data/mentors_demo.json`의 가짜 데이터
+- `backend/`: Python + FastAPI (Render 배포 예정). `/health`, `/ask`(demo 답변), `/mentors`, `/mentors/recommend`, `/contact-requests`(멘토 문의 메일), `/admin/*`(관리자 API). `MAIL_ENABLED=true`(운영)면 멘토·문의는 Supabase + 메일 웹앱(`apps-script/`)으로 실제 메일을 보내고, 꺼져 있으면(로컬 기본) `backend/app/data/mentors_demo.json` 가짜 멘토 + 로그만
+- `apps-script/`: 멘토 문의 메일 자동화 (중계 Gmail 쪽 Apps Script 코드 + 운영·인수인계 문서). 안내: `apps-script/README.md`
 - `docs/`: CONTEXT(맥락), DECISIONS(결정 기록), DATA(데이터·테이블 구조), TAGS(태그 기준), WORKFLOW(브랜치·PR 작업 방법), RAG_SETUP(실제 RAG 켜기·키 연결·측정 결과)
 - `scripts/`: 데이터 수집·청킹·태그 검사·Supabase 적재 스크립트 (Python 환경은 `scripts/.venv`로 backend와 따로). 사용법은 `scripts/README.md`
 - `supabase/migrations/`: Supabase 테이블·함수 SQL. `python scripts/run_sql.py <파일>`로 실행

@@ -1,5 +1,5 @@
 // 메일 설정 (주소 "/admin/settings", 와이어프레임 04-8-1 ~ 04-8-5)
-// 탭 5개(멘토에게 가는 메일 / 학생에게 전달하는 답장 메일 / 보낸 문의 사본 / 멘토 리마인드 / 횟수 제한), 한 줄에 한 항목.
+// 탭 6개(멘토에게 가는 메일 / 학생에게 전달하는 답장 메일 / 추가 질문 메일 / 보낸 문의 사본 / 멘토 리마인드 / 횟수 제한), 한 줄에 한 항목.
 // 바로 다음 메일부터 적용된다. 글 칸을 비우면 기본 문구로 동작한다. 숫자 칸은 0 이상의 정수만.
 // 탭을 옮겨도 고치던 값은 남아 있고, '저장'은 바뀐 칸만 모아 한 번에 보낸다.
 "use client";
@@ -25,6 +25,14 @@ const TABS: { label: string; rows: Row[]; hint?: string }[] = [
       { key: "studentSubjectPrefix", label: "제목 말머리" },
       { key: "studentForwardIntro", label: "맨 위 안내 문구" },
       { key: "studentForwardFooter", label: "맨 아래 안내 문구" },
+    ],
+  },
+  {
+    // 학생이 멘토 답장에 다시 답장했을 때 멘토에게 가는 메일 (Figma 에 없는 탭: PR #30 에서 추가된 설정)
+    label: "추가 질문 메일",
+    rows: [
+      { key: "mentorFollowupSubjectPrefix", label: "제목 말머리" },
+      { key: "mentorFollowupIntro", label: "맨 위 안내 문구" },
     ],
   },
   {

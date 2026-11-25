@@ -5,7 +5,9 @@
 - 멘토 메일: 학생 이름·제목·내용 + 맨 아래 안내 문구 + 작은 글씨 "문의번호: q…" 한 줄
   (문의번호 줄은 멘토가 Reply-To 를 지우고 답장해도 인용된 본문에서 문의를 찾는 단서)
 - 학생 메일 주소는 멘토에게 보여 주지 않는다. 멘토 메일 주소는 학생에게 보여 주지 않는다.
-- 학생 사본에는 문의번호를 넣지 않는다 (학생이 사본에 답장해도 멘토 답장으로 잘못 처리되지 않게)
+- 학생 사본에는 문의번호를 넣지 않는다 (학생이 사본에 답장해도 멘토에게 가지 않게. 멘토가 답하기 전 같은 질문이 두 번 가는 것을 막음)
+- 학생에게 전달하는 답장과 멘토에게 전달하는 학생 메시지(추가 질문)에는 Reply-To(중계계정+문의번호)와 문의번호 줄을 넣는다.
+  그래서 양쪽이 '답장'으로 계속 주고받을 수 있다 (여러 번 왕복).
 - 사용자가 쓴 글은 HTML 로 해석되지 않게 escape 한다.
 """
 
@@ -129,11 +131,13 @@ def student_copy_mail(
 
 
 def student_forward_mail(
-    settings: dict[str, str], student_name: str, title: str, mentor_name: str, reply_text: str
+    settings: dict[str, str], inquiry_id: str, student_name: str, title: str, mentor_name: str, reply_text: str
 ) -> Mail:
-    """학생에게 전달할 멘토 답장. 멘토 이름만 (멘토 이메일·문의번호·멘토 안내 문구 없음)."""
+    """학생에게 전달할 멘토 답장. 멘토 이름만 (멘토 이메일·멘토 안내 문구 없음).
+    맨 아래 문의번호 줄: 학생이 답장하면 멘토에게 전달할 때 쓰는 단서 (Reply-To 가 빠진 경우 대비)."""
     intro = settings["studentForwardIntro"]
     footer = settings["studentForwardFooter"]
+    id_line = inquiry_id_line(inquiry_id)
     text = "\n".join([
         f"안녕하세요, {student_name}님.",
         intro,
@@ -146,6 +150,8 @@ def student_forward_mail(
         "──────────",
         "",
         footer,
+        "",
+        id_line,
     ])
     html = "".join([
         _WRAP,
@@ -156,6 +162,44 @@ def student_forward_mail(
         "</table>",
         _QUOTE.format(body=_br(_e(reply_text))),
         f'<p style="margin-top:24px;font-size:12px;color:#666">{_br(_e(footer))}</p>',
+        f'<p style="margin-top:16px;font-size:11px;color:#999">{_e(id_line)}</p>',
         "</div>",
     ])
     return Mail(subject=f"{settings['studentSubjectPrefix']} {title}", text_body=text, html_body=html)
+
+
+def mentor_followup_mail(
+    settings: dict[str, str], inquiry_id: str, mentor_name: str, student_name: str, title: str, message_text: str
+) -> Mail:
+    """학생이 멘토 답장에 다시 답장했을 때 멘토에게 전달할 메일 (추가 질문). 학생 이메일 없음."""
+    intro = settings["mentorFollowupIntro"]
+    footer = settings["mentorFooter"]
+    id_line = inquiry_id_line(inquiry_id)
+    text = "\n".join([
+        f"안녕하세요, {mentor_name}님.",
+        intro,
+        "",
+        f"- 학생 이름: {student_name}",
+        f"- 문의 제목: {title}",
+        "",
+        "──────────",
+        message_text,
+        "──────────",
+        "",
+        footer,
+        "",
+        id_line,
+    ])
+    html = "".join([
+        _WRAP,
+        f"<p>안녕하세요, {_e(mentor_name)}님.<br>{_br(_e(intro))}</p>",
+        '<table style="border-collapse:collapse;margin:8px 0">',
+        _ROW.format(label="학생 이름", value=_e(student_name)),
+        _ROW.format(label="문의 제목", value=_e(title)),
+        "</table>",
+        _QUOTE.format(body=_br(_e(message_text))),
+        f'<p style="margin-top:24px;font-weight:bold">{_br(_e(footer))}</p>',
+        f'<p style="margin-top:16px;font-size:11px;color:#999">{_e(id_line)}</p>',
+        "</div>",
+    ])
+    return Mail(subject=f"{settings['mentorFollowupSubjectPrefix']} {title}", text_body=text, html_body=html)

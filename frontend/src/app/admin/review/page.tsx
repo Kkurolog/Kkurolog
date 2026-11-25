@@ -39,7 +39,10 @@ export default function ReviewPage() {
 
       <div className="mb-8 flex items-start gap-3 rounded-2xl bg-butter px-5 py-4 text-[13px] leading-5 text-ink">
         <AlertIcon className="mt-px size-5 shrink-0 text-brand" />
-        <p>학생에게 자동으로 전달하지 못한 답장이에요. 중계 Gmail 메일함(라벨 메일자동화/확인필요)에서 원문을 보고 처리해 주세요.</p>
+        <p>
+          학생에게 자동으로 전달하지 못한 답장이에요. 중계 Gmail 메일함(라벨 메일자동화/확인필요)에서 원문을 보고 처리해 주세요.
+          <span className="mt-1 block text-[12px] text-body">&lsquo;추가 대화&rsquo; 표시는 첫 답장 이후 이어진 대화에서 온 메일이에요. 본문을 저장하지 않아 Gmail에서만 볼 수 있어요.</span>
+        </p>
       </div>
 
       {current?.error ? (
@@ -87,7 +90,19 @@ export default function ReviewPage() {
                   <td className={`${td} font-medium`}>{item.inquiry_id ?? "—"}</td>
                   <td className={`${td} text-body`}>{formatDateTime(item.received_at)}</td>
                   <td className={`${td} truncate`} title={item.from_email}>{item.from_email}</td>
-                  <td className={td}>{reasonLabel(item.reason)}</td>
+                  <td className={td}>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      {item.followup && (
+                        <span
+                          className="shrink-0 rounded-full bg-sky px-2 text-[11px] leading-5 font-bold text-brand"
+                          title="첫 답장 이후 이어진 대화에서 온 메일이에요. 본문은 저장하지 않아 Gmail에서 확인해야 해요."
+                        >
+                          추가 대화
+                        </span>
+                      )}
+                      <span className="truncate">{reasonLabel(item.reason)}</span>
+                    </span>
+                  </td>
                   <td className={`${td} truncate`} title={item.inquiry_title ?? undefined}>{item.inquiry_title ?? "—"}</td>
                 </tr>
               ))}

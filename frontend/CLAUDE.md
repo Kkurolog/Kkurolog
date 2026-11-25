@@ -6,17 +6,19 @@
 ```
 frontend/src/
 ├─ app/
-│  ├─ layout.tsx          # 모든 페이지 공통 틀 (왼쪽 사이드바 + 페이지 내용). ChatProvider로 대화 상태를 감싼다
-│  ├─ page.tsx            # "/": 대화 전 인사 화면(캐릭터·스티커) → 대화 중 채팅 화면 + 오른쪽 출처 패널
+│  ├─ layout.tsx          # 모든 페이지 공통 틀 (html·body·글꼴·배경색만)
+│  ├─ (student)/          # 학생 화면 묶음 (괄호 폴더는 주소에 나오지 않는다)
+│  │  ├─ layout.tsx       # 왼쪽 사이드바(NavBar) + 페이지 내용. ChatProvider로 대화 상태를 감싼다
+│  │  ├─ page.tsx         # "/": 대화 전 인사 화면(캐릭터·스티커) → 대화 중 채팅 화면 + 오른쪽 출처 패널
+│  │  └─ mentors/page.tsx # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
 │  ├─ not-found.tsx       # 없는 주소일 때 (거꾸로 매달린 꾸로록)
-│  ├─ mentors/page.tsx    # "/mentors": 멘토 찾아보기 (한 줄에 4명씩 카드)
 │  ├─ admin/              # 관리자 화면 (noindex, 학생 화면에서 링크하지 않음). 로그인 전엔 어느 주소든 로그인 창
 │  │  ├─ layout.tsx       # noindex + AdminShell(로그인 확인·관리자 사이드바)
 │  │  ├─ page.tsx         # "/admin" → "/admin/inquiries" 로 보냄
 │  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호·오른쪽 상세 패널), [id]/ 는 상세 전체 화면
 │  │  ├─ review/          # 확인필요 목록 (자동 전달 못 한 멘토 답장)
 │  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 (지우기 없음)
-│  │  └─ settings/        # 메일 설정 (탭 5개)
+│  │  └─ settings/        # 메일 설정 (탭 6개)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
 │  ├─ NavBar.tsx          # 사이드바: 닫힘(72px 아이콘 레일 + 툴팁) / 열림(280px 메뉴 + 최근 대화 기록, 대화 지우기)
@@ -38,7 +40,8 @@ frontend/src/
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
    └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 대화 기록은 이 브라우저 localStorage 에만 저장(최대 30개). 자기소개·인사는 온보딩 답변
 ```
-- 새 페이지는 `app/폴더명/page.tsx`로 만든다 (예: `app/mentors/page.tsx` → `/mentors`).
+- 새 학생 페이지는 `app/(student)/폴더명/page.tsx`로 만든다 (예: `app/(student)/mentors/page.tsx` → `/mentors`). 관리자 페이지는 `app/admin/` 아래.
+- `next.config`의 `cacheComponents`가 켜져 있다. 주소를 읽는 훅(`usePathname`·`useSearchParams`·`useParams`)을 쓰는 클라이언트 컴포넌트는 `<Suspense>`로 감싼다. 안 감싸면 `npm run build`가 멈춘다 (특히 `[id]` 같은 동적 주소).
 - 스타일은 `className`에 Tailwind 클래스로 쓴다.
 - 색은 `globals.css`의 `@theme`에 정한 이름을 쓴다 (A안 "종이 위 블루 라인"):
   `brand`(블루: 선·제목·버튼), `accent`(옐로: 큰 도형·스티커 하이라이트, 글자색 금지), `butter`(키워드 pill),
