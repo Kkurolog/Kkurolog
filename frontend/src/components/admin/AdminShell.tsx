@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { fetchReview, getToken, logout, subscribeAuth } from "@/lib/adminApi";
 import Logo from "../Logo";
-import { AlertIcon, InboxIcon, LogoutIcon, MailIcon, SidebarIcon, UserIcon } from "../icons";
+import { AlertIcon, InboxIcon, LogoutIcon, MailIcon, SidebarIcon, UploadIcon, UserIcon } from "../icons";
 import AdminLogin from "./AdminLogin";
 
 type AdminContextValue = {
@@ -34,6 +34,7 @@ const MENU = [
   { href: "/admin/inquiries", label: "문의 목록", Icon: InboxIcon },
   { href: "/admin/review", label: "확인필요 목록", Icon: AlertIcon, badge: true },
   { href: "/admin/mentors", label: "멘토 목록", Icon: UserIcon },
+  { href: "/admin/imports", label: "인터뷰 넣기", Icon: UploadIcon },
   { href: "/admin/settings", label: "메일 설정", Icon: MailIcon },
 ] as const;
 

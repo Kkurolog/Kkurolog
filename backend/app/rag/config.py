@@ -43,6 +43,11 @@ class RagSettings:
     intent_model: str = "claude-haiku-5-5"  # 인사인지 질문인지만 가르므로 작고 빠른 모델
     intent_timeout_seconds: float = 10.0  # 넘기면 분석을 건너뛰고 기존 흐름으로 간다
 
+    # ---- 관리자 '인터뷰 넣기' 분석 (app/ingest/analyzer.py) ----
+    # txt 원문에서 말한 사람·조각·태그를 찾는다. 학생이 기다리는 게 아니라 뒤에서 돌므로 시간이 넉넉하다
+    import_model: str = "claude-sonnet-5-5"
+    import_timeout_seconds: float = 300.0
+
     # ---- 대기 시간 상한 (초) ----
     # SDK 기본값은 10분이라, 학생이 답을 너무 오래 기다리지 않게 줄인다.
     # SDK 는 실패하면 기본 2번 다시 시도해서 최악의 대기 시간이 이 값의 약 3배가 된다.
