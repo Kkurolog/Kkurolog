@@ -24,10 +24,10 @@ export function formatSourceDate(date: string) {
   return match[2] ? `${match[1]}년 ${Number(match[2])}월` : `${match[1]}년`;
 }
 
-// 카드 아래쪽 출처 문구. 예: "2024년 4월 글", 제목이 있으면 "2024년 4월 글 · “글 제목”"
+// 카드 아래쪽 출처 문구. 예: "#2024년 4월 글", 제목이 있으면 "#2024년 4월 글 · “글 제목”"
 // 글 제목과 원문 주소는 backend 가 공개 등급 L3 글에만 보낸다 (제목과 원문에 졸업생 이름이 있어서, 익명 글에는 오지 않는다).
 function cardSourceLabel(source: Source) {
-  const when = source.date ? `${formatSourceDate(source.date)} 글` : "선배 글";
+  const when = source.date ? `#${formatSourceDate(source.date)} 글` : "#선배 글"; // 앞의 # 는 출처 표시
   return source.title ? `${when} · “${source.title}”` : when;
 }
 
