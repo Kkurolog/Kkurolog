@@ -84,8 +84,9 @@ export default function NavBar() {
         >
           <MenuIcon className="size-6" />
         </button>
-        <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="flex h-14 items-center gap-2">
-          <Logo className="size-8" />
+        {/* '꾸로록' 글자를 화면 한가운데에 두고, 로고는 글자 왼쪽에 붙인다 (로고까지 묶어 가운데에 두면 글자가 오른쪽으로 밀려 보인다) */}
+        <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="relative flex h-14 items-center">
+          <Logo className="absolute top-1/2 right-full mr-2 size-8 -translate-y-1/2" />
           <span className="font-display text-xl text-brand">꾸로록</span>
         </Link>
         <button
