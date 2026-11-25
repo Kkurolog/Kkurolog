@@ -36,13 +36,14 @@ const iconButton =
 export default function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, currentId, startNew, goHome, open: openConversation, remove } = useChat();
+  const { conversations, currentId, goHome, open: openConversation, remove } = useChat();
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // 지울 대화 id
 
   // '새 채팅': 지금 대화는 기록에 남기고 빈 화면으로
+  // '새 채팅'도 로고처럼 메인(첫) 화면으로 간다. 사용 가이드가 열려 있으면 닫힌다
   function handleNewChat() {
-    startNew();
+    goHome();
     setOpen(false);
     router.push("/");
   }
