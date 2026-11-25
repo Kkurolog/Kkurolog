@@ -40,6 +40,15 @@ export function UserIcon({ className }: IconProps) {
   );
 }
 
+// 메뉴 (줄 세 개) — 휴대폰 위쪽 막대
+export function MenuIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </Svg>
+  );
+}
+
 // 최근 대화 (시계)
 export function HistoryIcon({ className }: IconProps) {
   return (

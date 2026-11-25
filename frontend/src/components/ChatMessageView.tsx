@@ -192,7 +192,7 @@ export default function ChatMessageView({
               <button
                 type="button"
                 onClick={() => onOpenSource(source)}
-                className="text-left text-brand underline-offset-4 hover:underline focus-visible:underline"
+                className="py-1.5 text-left text-brand underline-offset-4 hover:underline focus-visible:underline sm:py-0"
               >
                 {sourceLabel(source)}
               </button>

@@ -45,27 +45,28 @@ export default function MentorCard({ mentor, onContact, reason }: Props) {
   const keywords = mentor.career_paths.slice(0, 3).map(toKeyword);
 
   return (
-    <article className="flex w-full flex-col items-center gap-4 text-center">
+    <article className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
       <MentorPhoto name={mentor.name} avatarId={mentor.avatar_id} />
       <div className="flex flex-col items-center gap-1.5">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-bold text-ink">{mentor.name}</h3>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <h3 className="text-base font-bold text-ink sm:text-lg">{mentor.name}</h3>
           <button
             type="button"
             onClick={() => onContact(mentor)}
             disabled={!mentor.available}
             aria-label={mentor.available ? `${mentor.name}에게 메일 쓰기` : `${mentor.name}은(는) 지금 연락을 받지 않아요`}
             title={mentor.available ? "메일 쓰기" : "지금은 연락을 받지 않아요"}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border-[1.5px] border-brand text-brand hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-30"
+            // 휴대폰에서는 손가락으로 누르기 쉽게 44px
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] border-brand text-brand hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-30 sm:size-8"
           >
             <MailIcon className="size-[18px]" />
           </button>
         </div>
-        <p className="text-sm leading-snug text-body">{mentor.path_summary}</p>
+        <p className="text-[13px] leading-snug text-body sm:text-sm">{mentor.path_summary}</p>
         {keywords.length > 0 && (
-          <ul className="flex flex-wrap justify-center gap-2 pt-1.5">
+          <ul className="flex flex-wrap justify-center gap-1.5 pt-1 sm:gap-2 sm:pt-1.5">
             {keywords.map((keyword) => (
-              <li key={keyword} className="rounded-3xl bg-butter px-3 py-[5px] text-[13px] font-medium text-ink">
+              <li key={keyword} className="rounded-3xl bg-butter px-2.5 py-1 text-xs font-medium text-ink sm:px-3 sm:py-[5px] sm:text-[13px]">
                 {keyword}
               </li>
             ))}

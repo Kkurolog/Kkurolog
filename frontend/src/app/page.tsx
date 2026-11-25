@@ -18,6 +18,8 @@ import SourcePanel from "@/components/SourcePanel";
 import { SparkleIcon } from "@/components/icons";
 import type { Mentor, Source } from "@/lib/api";
 import { useChat } from "@/lib/useChat";
+import { useKeyboardOpen } from "@/lib/useKeyboardOpen";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 // 메인 화면 주변에 붙은 해시태그 스티커 (꾸밈용, 넓은 화면에서만 보인다). 각자 다른 박자로 둥실둥실 떠 있다
 const STICKERS = [
@@ -56,20 +58,21 @@ function KkuroCharacter({
   listening: boolean;
   lookX: number;
 }) {
+  // 휴대폰에서는 화면 높이에 맞춰 반원이 보이는 높이·눈 크기를 줄인다 (작은 화면에서 입력창과 겹치지 않게)
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[200px] overflow-hidden lg:h-[267px]">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[clamp(120px,24dvh,200px)] overflow-hidden lg:h-[267px]">
       <button
         type="button"
         onClick={onClick}
         aria-label="꾸로록에게 추천 질문 받기 (입력창에 질문이 써져요)"
-        className="group pointer-events-auto absolute top-2 left-1/2 size-[1100px] -translate-x-1/2 cursor-pointer rounded-full bg-accent transition-transform duration-300 ease-out hover:-translate-y-2 focus-visible:-translate-y-2 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand active:translate-y-0 lg:size-[1504px]"
+        className="group pointer-events-auto absolute top-2 left-1/2 size-[900px] -translate-x-1/2 cursor-pointer sm:size-[1100px] rounded-full bg-accent transition-transform duration-300 ease-out hover:-translate-y-2 focus-visible:-translate-y-2 focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand active:translate-y-0 lg:size-[1504px]"
       >
         <KkuroEyes
           mood={listening ? "listening" : "default"}
           lookX={lookX}
-          className="absolute top-8 left-1/2 h-[104px] -translate-x-1/2 lg:top-12 lg:h-[140px]"
+          className="absolute top-[clamp(12px,3dvh,32px)] left-1/2 h-[clamp(60px,13dvh,104px)] -translate-x-1/2 lg:top-12 lg:h-[140px]"
         />
-        <span className="absolute top-[150px] left-1/2 -translate-x-1/2 text-[15px] font-bold whitespace-nowrap text-brand lg:top-[218px]">
+        <span className="absolute top-[calc(clamp(120px,24dvh,200px)-40px)] left-1/2 -translate-x-1/2 text-sm font-bold whitespace-nowrap text-brand sm:text-[15px] lg:top-[218px]">
           <span className="group-hover:hidden group-focus-visible:hidden">
             {typing ? "꾸로록이 질문을 쓰고 있어요" : "꾸로록이 듣고 있어요"}
           </span>
@@ -82,6 +85,10 @@ function KkuroCharacter({
 
 export default function Home() {
   const { messages, loading, ask } = useChat();
+  // 좁은 화면(휴대폰)에서는 입력창 안내 문구를 짧게 해서 한 줄에 들어가게 한다
+  const narrow = useMediaQuery("(max-width: 639px)");
+  // 휴대폰 키보드가 올라오면 노란 반원·귀퉁이를 숨겨서 입력창이 가려지지 않게 한다
+  const keyboardOpen = useKeyboardOpen();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [openSource, setOpenSource] = useState<Source | null>(null); // 오른쪽 출처 패널 (null 이면 닫힘)
   // 메일 쓰기 창: 누구에게, 어떤 질문을 미리 채울지. null 이면 닫힘
@@ -117,7 +124,8 @@ export default function Home() {
     let count = 0;
     setDraft("");
     setTyping(true);
-    inputRef.current?.focus(); // 입력창의 커서가 글 끝을 따라가며 깜빡인다
+    // 입력창의 커서가 글 끝을 따라가며 깜빡인다. 휴대폰에서는 키보드가 미리 올라와 반원을 가리지 않게, 다 쓴 뒤에만 초점을 준다
+    if (!narrow) inputRef.current?.focus();
     typingTimer.current = setInterval(() => {
       count += 1;
       setDraft(chars.slice(0, count).join(""));
@@ -145,7 +153,7 @@ export default function Home() {
   // 대화 전: 인사 화면
   if (messages.length === 0) {
     return (
-      <main className="paper-lines relative flex min-h-screen flex-1 flex-col items-center overflow-hidden px-5">
+      <main className="paper-lines relative flex min-h-[480px] flex-1 flex-col items-center overflow-hidden px-5">
         {STICKERS.map((s) => (
           // 기울기(rotate)와 둥실 움직임(translate)은 서로 다른 CSS 속성이라 함께 써도 된다
           <span
@@ -158,13 +166,15 @@ export default function Home() {
           </span>
         ))}
 
-        <section className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-6 pt-[22vh] text-center lg:pt-[30vh]">
+        <section className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-6 pt-[14dvh] text-center sm:pt-[22vh] lg:pt-[30vh]">
           <p className="rounded-full border-2 border-brand bg-surface px-3 py-1 text-xs font-medium text-brand sm:px-4 sm:text-sm">
             거꾸로캠퍼스 선배들의 이야기로 답하는 챗봇
           </p>
-          <h1 className="relative font-display text-[34px] leading-[48px] text-brand sm:text-[44px]">
+          {/* 휴대폰에서는 '무엇을 함께 / 고민해볼까요?' 두 줄로 나눠서, 물결 밑줄이 '고민해볼' 아래에 오게 한다 */}
+          <h1 className="relative font-display text-[30px] leading-[44px] text-brand sm:text-[44px] sm:leading-[48px]">
             <SparkleIcon className="absolute top-1 -left-14 hidden size-4 text-brand motion-safe:animate-twinkle sm:block" />
             무엇을 함께{" "}
+            <br className="sm:hidden" />
             <span className="relative inline-block">
               고민해볼
               <svg
@@ -193,20 +203,22 @@ export default function Home() {
               typing={typing}
               inputRef={inputRef}
               onFocusChange={setInputFocused}
-              placeholder="처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"
-              autoFocus
+              placeholder={narrow ? "자기소개를 부탁해 보세요!" : "처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"}
+              autoFocus={!narrow}
             />
           </div>
         </section>
 
-        <KkuroCharacter
+        {!keyboardOpen && (
+          <KkuroCharacter
           onClick={fillSuggestion}
           typing={typing}
           listening={typing || inputFocused}
           // 글이 길어질수록 눈동자가 왼쪽 → 오른쪽으로 따라간다 (40자쯤에서 오른쪽 끝)
           lookX={-0.8 + 1.6 * Math.min(1, Array.from(draft).length / 40)}
-        />
-        <GuidePage />
+          />
+        )}
+        {!keyboardOpen && <GuidePage />}
       </main>
     );
   }
@@ -215,7 +227,7 @@ export default function Home() {
   return (
     <div className="flex min-w-0 flex-1">
       <main className="paper-lines flex min-w-0 flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-[680px] flex-1 flex-col gap-8 px-5 pt-12 pb-6">
+        <div className="mx-auto flex w-full max-w-[680px] flex-1 flex-col gap-8 px-4 pt-6 pb-6 sm:px-5 sm:pt-12">
           {messages.map((message, i) => (
             <ChatMessageView
               key={message.id}
@@ -234,13 +246,14 @@ export default function Home() {
 
         {/* 입력창은 화면 아래에 붙어 있게 한다 */}
         <div className="sticky bottom-0 bg-canvas">
-          <div className="mx-auto w-full max-w-[680px] px-5 pt-4 pb-6">
+          {/* 아이폰 홈 막대에 가리지 않게 아래쪽 안전 영역만큼 더 띄운다 */}
+          <div className="mx-auto w-full max-w-[680px] px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-5 sm:pt-4 sm:pb-6">
             <QuestionForm
               value={draft}
               onChange={setDraft}
               onSubmit={ask}
               loading={loading}
-              placeholder="선배들의 고민, 실패, 선택에 대해 물어보세요."
+              placeholder={narrow ? "선배들에게 물어보세요" : "선배들의 고민, 실패, 선택에 대해 물어보세요."}
             />
           </div>
         </div>

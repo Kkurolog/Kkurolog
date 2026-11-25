@@ -5,6 +5,7 @@
 // '새 채팅'은 지금 대화를 기록에 남겨 두고 빈 화면으로 간다. 열린 사이드바의 '최근 대화'에서 다시 열 수 있고,
 // 대화마다 지울 수 있다 (지우기 전에 확인 창). 레일의 시계 아이콘을 누르면 사이드바가 열려 기록이 보인다.
 // 좁은 화면(lg 미만)에서는 열린 사이드바가 화면 위에 겹쳐 뜬다.
+// 휴대폰(sm 미만)에서는 레일 대신 위쪽에 얇은 막대(메뉴 · 로고 · 새 채팅)를 두어 본문 폭을 넓게 쓴다.
 "use client";
 
 import Link from "next/link";
@@ -13,7 +14,7 @@ import { useState } from "react";
 import { useChat } from "@/lib/useChat";
 import ConfirmDialog from "./ConfirmDialog";
 import Logo from "./Logo";
-import { CloseIcon, HistoryIcon, NewChatIcon, SidebarIcon, UserIcon } from "./icons";
+import { CloseIcon, HistoryIcon, MenuIcon, NewChatIcon, SidebarIcon, UserIcon } from "./icons";
 
 // 마우스를 올리거나 키보드로 초점이 가면 보이는 작은 말풍선
 function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "bottom" }) {
@@ -28,8 +29,9 @@ function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "b
   );
 }
 
+// 휴대폰에서는 손가락으로 누르기 쉽게 44px, 넓은 화면 레일에서는 36px
 const iconButton =
-  "group relative inline-flex size-9 items-center justify-center rounded-xl text-brand hover:bg-surface focus-visible:bg-surface focus-visible:outline-none";
+  "group relative inline-flex size-11 items-center justify-center rounded-xl text-brand hover:bg-surface focus-visible:bg-surface focus-visible:outline-none sm:size-9";
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -63,8 +65,32 @@ export default function NavBar() {
 
   return (
     <>
-      {/* 닫힌 레일 (항상 자리를 차지한다) */}
-      <header className="sticky top-0 z-20 flex h-screen w-[72px] shrink-0 flex-col items-center gap-7 border-r-2 border-brand bg-sky pt-5">
+      {/* 휴대폰: 위쪽 막대. 손가락으로 누르기 쉽게 버튼은 44px. 노치에 가리지 않게 위쪽 안전 영역만큼 띄운다 */}
+      <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b-2 border-brand bg-sky px-2 pt-[env(safe-area-inset-top)] sm:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="메뉴 열기"
+          className="inline-flex size-11 items-center justify-center rounded-xl text-brand active:bg-surface"
+        >
+          <MenuIcon className="size-6" />
+        </button>
+        <Link href="/" aria-label="꾸로록 메인으로" className="flex h-14 items-center gap-2">
+          <Logo className="size-8" />
+          <span className="font-display text-xl text-brand">꾸로록</span>
+        </Link>
+        <button
+          type="button"
+          onClick={handleNewChat}
+          aria-label="새 채팅"
+          className="inline-flex size-11 items-center justify-center rounded-xl text-brand active:bg-surface"
+        >
+          <NewChatIcon className="size-6" />
+        </button>
+      </header>
+
+      {/* 닫힌 레일 (넓은 화면에서 항상 자리를 차지한다) */}
+      <header className="sticky top-0 z-20 hidden h-screen w-[72px] shrink-0 flex-col items-center gap-7 border-r-2 border-brand bg-sky pt-5 sm:flex">
         <button type="button" onClick={() => setOpen(true)} aria-label="사이드바 열기" className={iconButton}>
           <span className="group-hover:hidden group-focus-visible:hidden">
             <Logo />
@@ -111,7 +137,7 @@ export default function NavBar() {
           <div className="fixed inset-0 z-30 bg-ink/30 lg:hidden motion-safe:animate-fade-in" onClick={() => setOpen(false)} aria-hidden="true" />
           <aside
             aria-label="사이드바"
-            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r-2 border-brand bg-sky lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
+            className="fixed inset-y-0 left-0 z-40 flex w-[280px] max-w-[85vw] flex-col border-r-2 border-brand bg-sky pt-[env(safe-area-inset-top)] lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
           >
             <div className="flex items-center justify-between px-[18px] pt-5">
               <Link href="/" aria-label="꾸로록 메인으로" className="flex items-center gap-2.5">
@@ -163,7 +189,7 @@ export default function NavBar() {
                           type="button"
                           onClick={() => handleOpenConversation(c.id)}
                           aria-current={active ? "page" : undefined}
-                          className={`flex w-full flex-col rounded-xl py-2 pr-10 pl-3 text-left ${
+                          className={`flex w-full flex-col rounded-xl py-2 pr-12 pl-3 text-left ${
                             active ? "bg-surface" : "hover:bg-surface/70"
                           }`}
                         >
@@ -178,7 +204,8 @@ export default function NavBar() {
                           type="button"
                           onClick={() => setConfirmDelete(c.id)}
                           aria-label={`'${c.title}' 대화 지우기`}
-                          className="absolute top-1/2 right-1.5 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted opacity-0 group-hover/item:opacity-100 hover:bg-sky hover:text-brand focus-visible:opacity-100"
+                          // 마우스가 있는 기기에서는 올렸을 때만 보이고, 터치 기기에서는 항상 보인다 (누를 영역 40px)
+                          className="absolute top-1/2 right-1 inline-flex size-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted hover:bg-sky hover:text-brand focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100"
                         >
                           <CloseIcon className="size-4" />
                         </button>

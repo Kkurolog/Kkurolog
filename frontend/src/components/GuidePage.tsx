@@ -11,10 +11,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { CloseIcon } from "./icons";
 
-const REST = 96; // 평소 접힌 크기
-const HOVER = 128; // 마우스를 올렸을 때
+// 평소 접힌 크기 / 마우스를 올렸을 때 크기. 휴대폰에서는 '꾸로록이 듣고 있어요'를 가리지 않게 작게
+const SIZES = { wide: { rest: 96, hover: 128 }, narrow: { rest: 56, hover: 72 } };
 const OPEN_RATIO = 0.3;
 const HINT_KEY = "kkurolog-guide-hint-dismissed"; // 말풍선을 닫았는지 기억하는 브라우저 저장소 이름
 
@@ -46,7 +47,11 @@ export default function GuidePage() {
   const frame = useRef<number | null>(null);
   const dragging = useRef(false);
   const moved = useRef(false); // 끌었는지(=클릭이 아닌지)
-  const [peel, setPeel] = useState(REST);
+  const narrow = useMediaQuery("(max-width: 639px)");
+  const { rest: REST, hover: HOVER } = narrow ? SIZES.narrow : SIZES.wide;
+  // 넘김 크기. null 이면 '평소 접힌 크기(REST)' — 화면 크기가 바뀌면 그에 맞는 크기로 자동으로 따라간다
+  const [peelState, setPeel] = useState<number | null>(null);
+  const peel = peelState ?? REST;
   const [open, setOpen] = useState(false);
   const [showHint, setShowHint] = useState(false); // '넘겨서 사용 가이드 보기' 말풍선
 
@@ -68,11 +73,12 @@ export default function GuidePage() {
   }
 
   // peel 을 target 까지 부드럽게 바꾼다. '동작 줄이기'를 켠 기기에서는 바로 바꾼다
-  function animateTo(target: number, duration = 550, done?: () => void) {
+  // toRest: 끝나면 '평소 접힌 크기' 상태(null)로 돌려 둔다
+  function animateTo(target: number, duration = 550, done?: () => void, toRest = false) {
     if (frame.current) cancelAnimationFrame(frame.current);
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
-      setPeel(target);
+      setPeel(toRest ? null : target);
       done?.();
       return;
     }
@@ -84,6 +90,7 @@ export default function GuidePage() {
       if (t < 1) frame.current = requestAnimationFrame(step);
       else {
         frame.current = null;
+        if (toRest) setPeel(null);
         done?.();
       }
     };
@@ -105,10 +112,15 @@ export default function GuidePage() {
   // 가이드 닫기. startTyping 이면 다 덮인 뒤 질문 입력창으로 커서를 옮긴다 ('시작하기')
   function closeGuide(startTyping = false) {
     setOpen(false);
-    animateTo(REST, 650, () => {
-      if (startTyping) document.getElementById("question")?.focus();
-      else cornerRef.current?.focus();
-    });
+    animateTo(
+      REST,
+      650,
+      () => {
+        if (startTyping) document.getElementById("question")?.focus();
+        else cornerRef.current?.focus();
+      },
+      true,
+    );
   }
 
   // 다 넘어가면 가이드 제목으로 초점을 옮긴다 (화면 읽기 프로그램이 가이드부터 읽게)
@@ -157,7 +169,7 @@ export default function GuidePage() {
     const { w, h } = size();
     // 끌지 않고 그냥 눌렀거나, 충분히 끌었으면 끝까지 넘긴다
     if (!moved.current || peelRef.current > Math.min(w, h) * OPEN_RATIO) openGuide();
-    else animateTo(REST, 350);
+    else animateTo(REST, 350, undefined, true);
   }
 
   const covering = open; // 가이드가 화면을 다 덮었는지
@@ -176,67 +188,70 @@ export default function GuidePage() {
         className={`absolute inset-0 bg-brand ${open ? "pointer-events-auto overflow-y-auto" : "overflow-hidden"}`}
         style={{ clipPath: clip }}
       >
-        <div className="mx-auto flex min-h-full w-full max-w-[880px] flex-col gap-7 px-6 py-10 sm:px-10">
-          <div className="flex flex-col gap-3 text-white">
-            <p className="w-fit rounded-full border-2 border-white/70 px-3 py-1 text-sm font-medium">꾸로록 사용 가이드</p>
+        {/* 넓은 화면에서는 스크롤 없이 한 화면에 다 들어가게: 세로 가운데 정렬 + 간격·글자 크기를 화면 높이에 맞춰 줄인다 */}
+        <div className="mx-auto flex min-h-full w-full max-w-[920px] flex-col justify-center gap-[clamp(12px,2.6vh,24px)] px-5 py-[clamp(16px,4vh,40px)] pb-[calc(clamp(16px,4vh,40px)+env(safe-area-inset-bottom))] sm:px-10">
+          <div className="flex flex-col gap-2 text-white">
+            <p className="w-fit rounded-full border-2 border-white/70 px-3 py-0.5 text-sm font-medium">꾸로록 사용 가이드</p>
             <h2
               id="guide-title"
               ref={titleRef}
               tabIndex={-1}
-              className="font-display text-[34px] leading-tight focus:outline-none sm:text-[44px]"
+              className="font-display text-2xl leading-tight focus:outline-none sm:text-[length:clamp(26px,4.6vh,40px)]"
             >
-              한 사람의 경험이
-              <br />
+              한 사람의 경험이 <br className="lg:hidden" />
               다음 학생의 선택지가 되도록
             </h2>
-            <p className="max-w-[620px] leading-relaxed text-white/90">
-              꾸로록은 거꾸로캠퍼스를 먼저 엑시트한 선배들의 인터뷰를 바탕으로 답하는 진로 상담 챗봇이에요. 선배들이 어떤
-              길을 갔는지뿐 아니라, 왜 그렇게 선택했고 어떤 고민과 시행착오가 있었는지 들려줘요.
+            {/* 휴대폰에서는 세로 공간이 부족해 소개 문단을 빼고 3단계·약속만 보여준다 */}
+            <p className="hidden max-w-[680px] text-[15px] leading-relaxed text-white/90 sm:block">
+              거꾸로캠퍼스를 먼저 엑시트한 선배들의 인터뷰를 바탕으로, 어떤 길을 왜 골랐고 어떤 고민과 시행착오가 있었는지
+              들려주는 진로 상담 챗봇이에요.
             </p>
           </div>
 
-          <ol className="grid gap-4 sm:grid-cols-3">
+          <ol className="grid gap-2 sm:grid-cols-3 sm:gap-3">
             {[
               {
                 n: "1",
                 title: "편하게 물어보기",
-                body: "진로 고민을 그대로 적어 보세요. 뭘 물어야 할지 모르겠으면 노란 꾸로록을 눌러 보세요. 추천 질문을 써 줘요.",
+                body: "진로 고민을 그대로 적어 보세요. 막막하면 노란 꾸로록을 누르면 추천 질문을 써 줘요.",
               },
               {
                 n: "2",
                 title: "출처 확인하기",
-                body: "답변 아래 '출처'를 누르면 어떤 선배의 어떤 인터뷰에서 나온 이야기인지 오른쪽에서 볼 수 있어요.",
+                body: "답변 아래 '출처'를 누르면 어떤 선배의 어떤 인터뷰에서 나온 이야기인지 볼 수 있어요.",
               },
               {
                 n: "3",
                 title: "선배에게 메일 보내기",
-                body: "더 궁금하면 멘토 리스트에서 선배에게 메일을 보내요. 첫 연락은 꾸로록이 전달하고, 선배 연락처는 공개되지 않아요.",
+                body: "멘토 리스트에서 선배에게 메일을 보내요. 꾸로록이 전달하고, 선배 연락처는 공개되지 않아요.",
               },
             ].map((step) => (
-              <li key={step.n} className="flex flex-col gap-2 rounded-3xl border-2 border-ink/10 bg-canvas p-6">
-                <span className="inline-flex size-9 items-center justify-center rounded-full bg-accent font-display text-lg text-brand">
-                  {step.n}
-                </span>
-                <h3 className="text-lg font-bold text-ink">{step.title}</h3>
-                <p className="text-[15px] leading-relaxed text-body">{step.body}</p>
+              <li key={step.n} className="flex flex-col gap-1 rounded-2xl bg-canvas px-4 py-3 sm:gap-1.5 sm:p-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-accent font-display text-base text-brand sm:size-8">
+                    {step.n}
+                  </span>
+                  <h3 className="text-base font-bold text-ink sm:text-[17px]">{step.title}</h3>
+                </div>
+                <p className="text-[13px] leading-relaxed text-body sm:text-sm">{step.body}</p>
               </li>
             ))}
           </ol>
 
-          <div className="rounded-3xl bg-canvas p-6">
-            <h3 className="font-bold text-ink">꾸로록이 지키는 약속</h3>
-            <ul className="mt-3 flex flex-col gap-2 text-[15px] leading-relaxed text-body">
+          <div className="rounded-2xl bg-canvas px-4 py-3 sm:px-5 sm:py-4">
+            <h3 className="text-[15px] font-bold text-ink">꾸로록이 지키는 약속</h3>
+            <ul className="mt-1.5 flex flex-col gap-1 text-[13px] leading-relaxed text-body sm:mt-2 sm:text-sm">
               <li>• 인터뷰에 없는 내용은 지어내지 않아요. 자료가 부족하면 솔직하게 말하고 선배를 추천해요.</li>
-              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바의 &apos;최근 대화&apos;에서 다시 보거나 지울 수 있어요.</li>
-              <li>• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
+              <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바 &apos;최근 대화&apos;에서 보거나 지울 수 있어요.</li>
+              <li className="hidden sm:list-item">• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
             </ul>
           </div>
 
-          <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
+          <div>
             <button
               type="button"
               onClick={() => closeGuide(true)}
-              className="min-h-12 rounded-full bg-accent px-7 font-bold text-brand hover:brightness-95"
+              className="min-h-12 rounded-full bg-accent px-8 font-bold text-brand hover:brightness-95"
             >
               시작하기
             </button>
@@ -274,7 +289,7 @@ export default function GuidePage() {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
             onPointerEnter={() => !dragging.current && peelRef.current <= HOVER && animateTo(HOVER, 250)}
-            onPointerLeave={() => !dragging.current && peelRef.current <= HOVER && animateTo(REST, 250)}
+            onPointerLeave={() => !dragging.current && peelRef.current <= HOVER && animateTo(REST, 250, undefined, true)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -296,8 +311,13 @@ export default function GuidePage() {
           {/* 말풍선: 귀퉁이를 가리키는 꼬리. 누르면 가이드가 열리고, X 를 누르면 사라진다 */}
           {showHint && (
             <div
-              className="pointer-events-auto absolute right-5 bottom-[116px] motion-safe:animate-pop-in"
-              style={{ opacity: peekOpacity, visibility: peekOpacity === 0 ? "hidden" : "visible" }}
+              className="pointer-events-auto absolute right-3 motion-safe:animate-pop-in sm:right-5"
+              // 휴대폰에서는 노란 반원(꾸로록 눈)을 가리지 않게 반원 위쪽에 띄운다
+              style={{
+                bottom: narrow ? "calc(clamp(120px, 24dvh, 200px) + 12px)" : REST + 20,
+                opacity: peekOpacity,
+                visibility: peekOpacity === 0 ? "hidden" : "visible",
+              }}
             >
               <div className="relative flex items-center gap-1 rounded-2xl border-2 border-brand bg-surface py-1.5 pr-1.5 pl-4 shadow-[0_6px_16px_rgba(11,37,89,0.12)] motion-safe:animate-float">
                 <button type="button" onClick={openGuide} className="text-sm font-bold whitespace-nowrap text-brand hover:underline">
@@ -307,7 +327,7 @@ export default function GuidePage() {
                   type="button"
                   onClick={dismissHint}
                   aria-label="안내 말풍선 닫기"
-                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-brand hover:bg-sky"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-brand hover:bg-sky sm:size-7"
                 >
                   <CloseIcon className="size-4" />
                 </button>

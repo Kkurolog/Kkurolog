@@ -21,7 +21,7 @@ type Props = {
 type Status = "editing" | "sending" | "done";
 
 const fieldClass =
-  "w-full bg-transparent px-8 py-5 text-base text-ink placeholder:text-placeholder focus:bg-sky/40 focus:outline-none";
+  "w-full bg-transparent px-5 py-4 text-base text-ink placeholder:text-placeholder focus:bg-sky/40 focus:outline-none sm:px-8 sm:py-5";
 
 export default function ContactModal({ mentor, initialMessage = "", onClose }: Props) {
   const [senderName, setSenderName] = useState("");
@@ -76,7 +76,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
       type="button"
       onClick={requestClose}
       aria-label="닫기"
-      className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-brand hover:bg-sky"
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-brand hover:bg-sky"
     >
       <CloseIcon className="size-6" />
     </button>
@@ -84,39 +84,34 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
 
   return (
     // 바깥 어두운 배경. 누르면 닫기 요청
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 motion-safe:animate-fade-in" onClick={requestClose}>
+    // 휴대폰(sm 미만)에서는 아래에서 올라오는 시트, 넓은 화면에서는 가운데 창
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 motion-safe:animate-fade-in sm:items-center sm:p-4"
+      onClick={requestClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-title"
-        className="relative flex h-[720px] max-h-[calc(100vh-32px)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border-2 border-brand bg-canvas motion-safe:animate-pop-in"
+        className="relative flex h-[92dvh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-3xl border-2 border-b-0 border-brand bg-canvas motion-safe:animate-slide-up sm:h-[720px] sm:max-h-[calc(100dvh-32px)] sm:rounded-3xl sm:border-b-2 sm:motion-safe:animate-pop-in"
         onClick={(e) => e.stopPropagation()} // 창 안쪽을 눌렀을 때는 닫히지 않게
       >
         {status === "sending" && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8" role="status">
+          <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5 sm:px-8" role="status">
             {/* 노란 동그라미는 가만히 있고, 그 안에서 종이비행기만 계속 날아간다 */}
             <span className="inline-flex size-24 items-center justify-center overflow-hidden rounded-full bg-accent">
               <PlaneIcon className="size-14 text-brand motion-safe:animate-fly" />
             </span>
             <p id="contact-title" className="text-2xl font-bold text-ink">
-              메일을 보내는 중이에요
-              <span aria-hidden="true" className="inline-flex w-8 justify-start gap-1 pl-1">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="inline-block size-1.5 rounded-full bg-ink motion-safe:animate-dot"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </span>
+              메일을 보내는 중이에요...
             </p>
           </div>
         )}
 
         {status === "done" && (
           <>
-            <div className="absolute top-10 right-7">{closeButton}</div>
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center" role="status">
+            <div className="absolute top-4 right-4 sm:top-10 sm:right-7">{closeButton}</div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 text-center sm:px-8" role="status">
               <span className="mb-6 inline-flex size-24 items-center justify-center overflow-hidden rounded-full bg-accent motion-safe:animate-pop-in">
                 <PlaneIcon className="size-14 text-brand motion-safe:animate-fly-away" />
               </span>
@@ -131,10 +126,10 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
 
         {status === "editing" && (
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center justify-between gap-4 px-8 pt-7 pb-6">
+            <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-4 sm:gap-4 sm:px-8 sm:pt-7 sm:pb-6">
               <div className="flex min-w-0 items-center gap-3">
                 <MentorPhoto name={mentor.name} avatarId={mentor.avatar_id} size="md" />
-                <h2 id="contact-title" className="shrink-0 text-xl font-bold text-ink">
+                <h2 id="contact-title" className="shrink-0 text-lg font-bold text-ink sm:text-xl">
                   {mentor.name}
                 </h2>
                 <p className="truncate text-[15px] text-muted">{mentor.path_summary}</p>
@@ -180,7 +175,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                 />
             </div>
 
-            <div className="flex items-center justify-end gap-4 px-8 pt-4 pb-7">
+            <div className="flex items-center justify-end gap-4 px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8 sm:pt-4 sm:pb-7">
               {error && (
                 <p role="alert" className="mr-auto border-l-4 border-danger pl-3 text-sm text-ink">
                   {error}
