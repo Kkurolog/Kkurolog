@@ -36,13 +36,21 @@ const iconButton =
 export default function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, currentId, startNew, open: openConversation, remove } = useChat();
+  const { conversations, currentId, startNew, goHome, open: openConversation, remove } = useChat();
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // 지울 대화 id
 
   // '새 채팅': 지금 대화는 기록에 남기고 빈 화면으로
   function handleNewChat() {
     startNew();
+    setOpen(false);
+    router.push("/");
+  }
+
+  // 로고: 어느 화면에서든 메인(첫) 화면으로. 보던 대화는 '최근 대화'에 남는다
+  function handleGoHome(e: React.MouseEvent) {
+    e.preventDefault();
+    goHome();
     setOpen(false);
     router.push("/");
   }
@@ -75,7 +83,7 @@ export default function NavBar() {
         >
           <MenuIcon className="size-6" />
         </button>
-        <Link href="/" aria-label="꾸로록 메인으로" className="flex h-14 items-center gap-2">
+        <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="flex h-14 items-center gap-2">
           <Logo className="size-8" />
           <span className="font-display text-xl text-brand">꾸로록</span>
         </Link>
@@ -140,7 +148,7 @@ export default function NavBar() {
             className="fixed inset-y-0 left-0 z-40 flex w-[280px] max-w-[85vw] flex-col border-r-2 border-brand bg-sky pt-[env(safe-area-inset-top)] lg:sticky lg:top-0 lg:z-20 lg:-ml-[72px] lg:h-screen lg:shrink-0 motion-safe:animate-slide-left"
           >
             <div className="flex items-center justify-between px-[18px] pt-5">
-              <Link href="/" aria-label="꾸로록 메인으로" className="flex items-center gap-2.5">
+              <Link href="/" onClick={handleGoHome} aria-label="꾸로록 메인으로" className="flex items-center gap-2.5">
                 <Logo />
                 <span className="font-display text-2xl text-brand">꾸로록</span>
               </Link>

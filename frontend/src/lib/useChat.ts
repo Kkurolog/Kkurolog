@@ -198,6 +198,14 @@ function useChatState() {
     setCurrentId(null);
   }
 
+  // 로고를 눌렀을 때: 메인(첫) 화면으로. 새 채팅과 같고, 열려 있던 사용 가이드 등 메인 화면 상태도 처음으로 되돌린다
+  // (homeVersion 이 바뀌면 메인 화면이 가이드를 새로 그려서 닫힌 상태가 된다)
+  const [homeVersion, setHomeVersion] = useState(0);
+  function goHome() {
+    setCurrentId(null);
+    setHomeVersion((v) => v + 1);
+  }
+
   // 최근 대화 하나 열기
   function open(conversationId: string) {
     setCurrentId(conversationId);
@@ -209,7 +217,7 @@ function useChatState() {
     if (conversationId === currentId) setCurrentId(null);
   }
 
-  return { conversations, currentId, messages, loading, ask, startNew, open, remove };
+  return { conversations, currentId, messages, loading, ask, startNew, goHome, homeVersion, open, remove };
 }
 
 type ChatState = ReturnType<typeof useChatState>;
