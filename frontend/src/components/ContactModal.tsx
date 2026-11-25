@@ -119,7 +119,6 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
                 메일 전송이 완료되었어요!
               </p>
               <p className="text-base text-muted">작성하신 메일 사본을 적어주신 메일로도 보내드렸어요.</p>
-              <p className="pt-2 text-xs text-muted">(demo: 실제 메일은 보내지 않고 서버 로그에만 남겨요)</p>
             </div>
           </>
         )}
