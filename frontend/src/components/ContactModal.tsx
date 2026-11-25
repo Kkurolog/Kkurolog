@@ -4,6 +4,7 @@
 // 상태: 작성 중(editing) → 전송 중(sending) → 완료(done)  /  실패하면 작성 중으로 돌아와 오류 문구를 보여준다
 // - 이름·메일 주소·제목·내용 중 하나라도 비어 있으면 '보내기'가 흐리고 누를 수 없다. (03-2-2, 03-2-3)
 // - 작성 중인 내용이 있을 때 X·바깥 배경·Esc 를 누르면 확인 창을 먼저 띄운다. (03-2-1)
+// - '보내기'를 누르면 바로 보내지 않고 "이대로 보낼까요?" 확인 창을 먼저 띄운다 (메일 제목·받는 선배·답장 받을 메일 주소를 한 번 더 보여줌).
 "use client";
 
 import { useEffect, useState } from "react";
@@ -31,6 +32,7 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
   const [status, setStatus] = useState<Status>("editing");
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false); // '이대로 보낼까요?' 확인 창
 
   const filled = [senderName, replyEmail, subject, message].every((v) => v.trim() !== "");
   const dirty = senderName !== "" || replyEmail !== "" || subject !== "" || message !== initialMessage;
@@ -45,15 +47,22 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
   // Esc 키로 닫기 (확인 창이 떠 있으면 확인 창이 먼저 처리한다)
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !confirmClose) requestClose();
+      if (e.key === "Escape" && !confirmClose && !confirmSend) requestClose();
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   });
 
-  async function handleSubmit(e: React.FormEvent) {
+  // '보내기': 바로 보내지 않고 확인 창부터
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!filled) return;
+    setConfirmSend(true);
+  }
+
+  // 확인 창에서 '보내기'를 눌렀을 때 실제로 보낸다
+  async function send() {
+    setConfirmSend(false);
     setStatus("sending");
     setError(null);
     try {
@@ -192,6 +201,22 @@ export default function ContactModal({ mentor, initialMessage = "", onClose }: P
           </form>
         )}
       </div>
+
+      {confirmSend && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmDialog
+            title="이대로 보낼까요?"
+            detail={subject.trim()}
+            body={`${mentor.name}에게 보내요. 보낸 뒤에는 고칠 수 없어요.`}
+            // 메일 주소를 잘못 쓰면 답장을 못 받으니 굵게 한 번 더 보여준다
+            warning={`답장 받을 메일: ${replyEmail.trim()}`}
+            cancelLabel="다시 확인"
+            confirmLabel="보내기"
+            onCancel={() => setConfirmSend(false)}
+            onConfirm={send}
+          />
+        </div>
+      )}
 
       {confirmClose && (
         <div onClick={(e) => e.stopPropagation()}>
