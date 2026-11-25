@@ -15,7 +15,7 @@ import MentorCard from "./MentorCard";
 type Props = {
   message: ChatMessage;
   onOpenSource: (source: Source) => void; // 출처 링크를 눌렀을 때
-  onContact: (mentor: Mentor, question: string) => void; // 멘토의 메일 버튼을 눌렀을 때
+  onContact: (mentor: Mentor) => void; // 멘토의 메일 버튼을 눌렀을 때 (메일 내용 칸은 비어 있는 채로 열린다)
   isLatest?: boolean; // 가장 최근 메시지인지 (방금 도착한 답변에는 '찾았다!' 꾸로록이 빼꼼 나온다)
   onAsk?: (question: string) => void; // 예시 질문 버튼을 눌렀을 때 (그 질문을 바로 보낸다)
   askDisabled?: boolean; // 답변을 기다리는 동안에는 예시 질문 버튼을 누를 수 없다
@@ -118,7 +118,7 @@ export default function ChatMessageView({
                 key={rec.mentor.id}
                 mentor={rec.mentor}
                 reason={rec.reason}
-                onContact={(mentor) => onContact(mentor, message.question)}
+                onContact={onContact}
               />
             ))}
           </div>

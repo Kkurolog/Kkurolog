@@ -14,7 +14,7 @@ export type AssistantMessage = {
   id: string;
   role: "assistant";
   content: string; // 답변 내용 (오류일 때는 오류 안내 문구)
-  question: string; // 이 답변이 어떤 질문에 대한 것인지 (연락 팝업에 미리 채울 때 쓴다)
+  question: string; // 이 답변이 어떤 질문에 대한 것인지
   sources: Source[]; // 답변에 쓴 출처
   structured?: StructuredAnswer | null; // 카드형 답변 (선배 이야기일 때만). 있으면 content 대신 카드로 그린다
   aboutAspect?: AboutAspect | null; // 꾸로록 자신에 대한 설명일 때 (왜·누가 만들었는지 등). 있으면 '설명 블록'으로 그린다
