@@ -28,7 +28,15 @@ backend/
 │  └─ admin/             # 관리자 API /admin/* (명세: apps-script/docs/ADMIN_API.md)
 │     ├─ auth.py         # 공용 비밀번호(ADMIN_PASSWORD) 로그인 → 12시간 로그인 표, 10분 10회 시도 제한
 │     ├─ models.py       # 관리자 요청·응답 형식 (학생용 schemas.py 와 분리)
-│     └─ router.py       # 문의 목록·상세, 확인필요 목록, 멘토 목록·추가·수정, 설정 보기·수정
+│     ├─ router.py       # 문의 목록·상세, 확인필요 목록, 멘토 목록·추가·수정, 설정 보기·수정
+│     └─ imports.py      # 인터뷰 넣기 /admin/imports/* (txt 업로드 → AI 초안 → 검토 → 공개)
+│  └─ ingest/            # 인터뷰 넣기 규칙·AI·저장 (설명: docs/DATA.md 6장)
+│     ├─ tags.py         # 쓸 수 있는 태그 (docs/TAGS.md 와 같게)
+│     ├─ models.py       # 초안(draft)·요청·응답 형식
+│     ├─ text.py         # 줄 번호, 말머리 떼기, 긴 답변 나누기, 개인정보 규칙(전화·메일)
+│     ├─ draft.py        # AI 결과 → 초안, 공개 전 검사, 공개할 행(sources·people·chunks) 만들기
+│     ├─ analyzer.py     # Claude 로 초안 받기 (줄 번호만, 태그는 목록 안에서만)
+│     └─ store.py        # Supabase import_files·people 읽기·쓰기, publish_import 함수 부르기
 ├─ tests/                # pytest 테스트 (API마다 하나씩)
 ├─ pytest.ini            # pytest 설정
 ├─ requirements.txt      # Python 패키지 목록
@@ -46,6 +54,7 @@ backend/
 | `POST /internal/mail/inbound` | Apps Script 전용. 헤더 `X-Kkurolog-Mail-Secret` | 멘토·학생 답장 후보 처리 결과 (apps-script/docs/API.md 2장) |
 | `POST /internal/mail/reminders` | Apps Script 전용. 헤더 `X-Kkurolog-Mail-Secret` | `{summary}` |
 | `POST /admin/login` 외 `/admin/*` | 관리자 페이지 전용. `Authorization: Bearer <token>` | apps-script/docs/ADMIN_API.md |
+| `/admin/imports/*` | 인터뷰 넣기 (txt 업로드·AI 초안·검토·공개). 관리자 로그인 필요 | apps-script/docs/ADMIN_API.md 7장 |
 
 ## 실행
 ```bash
@@ -64,7 +73,7 @@ pytest                           # 테스트
   Supabase `mentors` 테이블에 데이터가 있어야 멘토 목록이 보인다.
 - 테스트는 `tests/conftest.py`가 메일 관련 환경변수를 지워서 항상 demo로 돈다. 메일 테스트(`test_mail_*.py`)는 가짜 저장소·가짜 메일을 끼운다. 진짜 메일·DB는 부르지 않는다.
 - 멘토 이메일·학생 이메일은 로그에 그대로 남기지 않는다 (`mask_email`).
-- 관리자 API(`/admin/*`)는 `MAIL_ENABLED=true`와 `ADMIN_PASSWORD`(12자 이상)가 있어야 동작한다. 응답에 학생·멘토 메일이 들어 있으니 학생용 API 에 섞지 않는다.
+- 관리자 API(`/admin/*`)는 `MAIL_ENABLED=true`와 `ADMIN_PASSWORD`(12자 이상)가 있어야 동작한다. 단 인터뷰 넣기(`/admin/imports/*`)는 `MAIL_ENABLED`와 상관없이 `SUPABASE_URL`·`SUPABASE_KEY`·`ANTHROPIC_API_KEY`·`OPENAI_API_KEY`(+ `requirements-rag.txt`)가 필요하다. 응답에 학생·멘토 메일이 들어 있으니 학생용 API 에 섞지 않는다.
 - 관리자 응답의 시각은 모두 한국 시간(`+09:00`)이다 (`admin/models.py`의 `KstDatetime`). 새 시각 필드도 이 타입을 쓴다.
 - 운영 구조·인수인계: `apps-script/README.md`, `apps-script/docs/HANDOVER.md`
 

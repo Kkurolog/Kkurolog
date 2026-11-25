@@ -388,7 +388,7 @@ export default function ImportReview({ id }: { id: string }) {
                   </select>
                 </Field>
               </div>
-              {draft.note && <p className="mt-3 rounded-xl bg-canvas px-3 py-2 text-[12px] text-body">AI 메모: {draft.note}</p>}
+              {draft.note && <p className="mt-3 rounded-xl border border-line bg-surface px-3 py-2 text-[12px] text-body">AI 메모: {draft.note}</p>}
             </Section>
 
             {/* 개인정보 */}

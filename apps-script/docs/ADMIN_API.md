@@ -134,5 +134,22 @@
 | rateLimitMinutes / rateLimitPerWindow / rateLimitPerDay | 같은 학생 메일 횟수 제한 (기본 10분에 3건, 하루 5건, 0이면 제한 없음) |
 | reminderDays | 답장 없을 때 며칠째에 멘토에게 다시 보낼지 (기본 10, 0이면 안 보냄) |
 
+## 7. 인터뷰 넣기 (txt 업로드)
+설명: docs/DATA.md 6장. 구현: backend/app/admin/imports.py, 형식: backend/app/ingest/models.py.
+필요한 환경변수: `SUPABASE_URL`, `SUPABASE_KEY`, `ANTHROPIC_API_KEY`(분석), `OPENAI_API_KEY`(공개할 때 임베딩). 빠지면 503 (빠진 이름만 알려 줌). `MAIL_ENABLED`와는 상관없습니다.
+
+| 주소 | 하는 일 |
+|---|---|
+| `POST /admin/imports` `{files: [{filename, text}]}` | 201 `ImportItem[]` (status `analyzing`). 뒤에서 AI 분석 → `review` 또는 `failed` |
+| `GET /admin/imports?page=&page_size=` | `{total, page, page_size, items: ImportItem[]}` (원문·초안 없음) |
+| `GET /admin/imports/people` | 연결할 인물 목록 `{id, nickname, path_summary, career_paths, career_fields}[]` (실명 없음) |
+| `GET /admin/imports/{id}` | `{item, raw_text, draft}` |
+| `PUT /admin/imports/{id}/draft` | 초안 저장 (`review`일 때만, 아니면 409) |
+| `POST /admin/imports/{id}/analyze` | 다시 분석 (`failed`·`review`, 또는 15분 넘게 `analyzing`인 것) |
+| `POST /admin/imports/{id}/publish` | 200 `{source_id, people, chunks}` / 422 남은 할 일 / 409 같은 ID·이미 공개 / 502 임베딩·DB 실패 (아무것도 저장 안 됨) |
+| `DELETE /admin/imports/{id}` | 204. 공개한 데이터는 그대로 |
+
+`ImportItem`: `{id, filename, status, error, summary: {people, chunks, confirmed, pii} | null, source_id, created_at, updated_at, analyzed_at, published_at}`
+
 ## CORS
-백엔드는 `FRONTEND_ORIGINS`에 있는 주소에서 오는 `GET`, `POST`, `PATCH` 요청만 받습니다. 관리자 페이지가 학생 사이트와 다른 주소라면 `FRONTEND_ORIGINS`에 추가합니다.
+백엔드는 `FRONTEND_ORIGINS`에 있는 주소에서 오는 `GET`, `POST`, `PATCH`, `PUT`, `DELETE` 요청만 받습니다 (`PUT`·`DELETE`는 인터뷰 넣기). 관리자 페이지가 학생 사이트와 다른 주소라면 `FRONTEND_ORIGINS`에 추가합니다.

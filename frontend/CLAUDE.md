@@ -18,6 +18,7 @@ frontend/src/
 │  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호·오른쪽 상세 패널), [id]/ 는 상세 전체 화면
 │  │  ├─ review/          # 확인필요 목록 (자동 전달 못 한 멘토 답장)
 │  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 (지우기 없음)
+│  │  ├─ imports/         # 인터뷰 넣기: txt 올리기 + 파일 목록, [id]/ 는 파일별 검토 화면 (원문 | 글 정보·개인정보·사람·조각)
 │  │  └─ settings/        # 메일 설정 (탭 6개)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
 ├─ components/
@@ -32,10 +33,12 @@ frontend/src/
 │  ├─ ContactModal.tsx    # 멘토에게 메일 쓰기 창 (작성 → 전송 중 → 완료, 닫기 확인)
 │  ├─ ConfirmDialog.tsx   # 확인 창 ("새 채팅을 시작할까요?", "작성을 그만둘까요?")
 │  ├─ icons.tsx           # 선 아이콘 모음 (이모지 대신 사용)
-│  └─ admin/              # 관리자 화면 조각: AdminShell(틀·사이드바), AdminLogin, InquiryDetailView, MentorFormModal, ui(표·pill·쪽 번호)
+│  └─ admin/              # 관리자 화면 조각: AdminShell(틀·사이드바), AdminLogin, InquiryDetailView, MentorFormModal, ImportReview(인터뷰 검토), ui(표·pill·쪽 번호)
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
    ├─ adminApi.ts         # 관리자 API 호출 + 타입 (backend/app/admin/models.py와 맞춤). token 은 sessionStorage, 401 이면 로그아웃
+   ├─ importChecks.ts     # 인터뷰 넣기: 공개 전 남은 할 일(backend draft.publish_problems 와 같은 규칙), txt 읽기(UTF-8/EUC-KR)
+   ├─ tags.ts             # 태그 code → 한글 이름 (docs/TAGS.md 와 같게)
    ├─ avatar.ts           # 선배 아바타 번호(avatar-1~7) → 그림 주소 (public/avatars/avatar-01~07.svg)
    ├─ types.ts            # 채팅 메시지 타입 (ChatMessage)
    └─ useChat.ts          # 대화 상태 (ChatProvider + useChat 훅). 대화 기록은 이 브라우저 localStorage 에만 저장(최대 30개). 자기소개·인사는 온보딩 답변
