@@ -127,3 +127,78 @@ export function SparkleIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+// ---- 관리자 화면용 ----
+
+// 문의 목록 (받은편지함 트레이)
+export function InboxIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 13l2.6-7.2A2 2 0 0 1 7.5 4.5h9a2 2 0 0 1 1.9 1.3L21 13" />
+      <path d="M3 13v4.5A2.5 2.5 0 0 0 5.5 20h13a2.5 2.5 0 0 0 2.5-2.5V13h-5.5l-1.5 2.5h-4L8.5 13z" />
+    </Svg>
+  );
+}
+
+// 확인필요 (동그라미 안 느낌표)
+export function AlertIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5" />
+      <path d="M12 16.5h.01" />
+    </Svg>
+  );
+}
+
+// 전체 화면으로 보기 (바깥 네 귀퉁이 화살표)
+export function ExpandIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-7 7" />
+      <path d="M10 20H4v-6" />
+      <path d="M4 20l7-7" />
+    </Svg>
+  );
+}
+
+// 옆 패널로 줄여 보기 (안쪽으로 모이는 화살표)
+export function CollapseIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M20 10h-6V4" />
+      <path d="M14 10l7-7" />
+      <path d="M4 14h6v6" />
+      <path d="M10 14l-7 7" />
+    </Svg>
+  );
+}
+
+// 이전·다음 쪽 (꺾쇠)
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M15 5l-7 7 7 7" />
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M9 5l7 7-7 7" />
+    </Svg>
+  );
+}
+
+// 로그아웃 (문 밖으로 나가는 화살표)
+export function LogoutIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14" />
+      <path d="M10 8l-4 4 4 4" />
+      <path d="M6 12h10" />
+    </Svg>
+  );
+}

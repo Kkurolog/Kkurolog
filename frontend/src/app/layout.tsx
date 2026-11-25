@@ -1,10 +1,6 @@
 // 모든 페이지를 감싸는 공통 틀 (html, body, 글꼴, 배경색 등)
-// 넓은 화면: 왼쪽 사이드바(NavBar, 닫히면 아이콘만 있는 72px 레일) + 오른쪽 페이지 내용
-// 휴대폰(sm 미만): 위쪽 얇은 막대(로고 + 메뉴 버튼) + 아래 페이지 내용. 메뉴를 누르면 사이드바가 왼쪽에서 나온다
-// ChatProvider: 대화 내용을 페이지를 옮겨 다녀도 유지하고, 사이드바의 '새 채팅'에서도 쓸 수 있게 한다.
+// 학생 화면의 사이드바·대화 상태는 app/(student)/layout.tsx, 관리자 화면의 틀은 app/admin/layout.tsx 에 있다.
 import type { Metadata, Viewport } from "next";
-import NavBar from "@/components/NavBar";
-import { ChatProvider } from "@/lib/useChat";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,12 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full bg-canvas font-sans text-ink">
-        <ChatProvider>
-          <div className="flex min-h-dvh flex-col sm:flex-row">
-            <NavBar />
-            <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-          </div>
-        </ChatProvider>
+        {children}
       </body>
     </html>
   );
