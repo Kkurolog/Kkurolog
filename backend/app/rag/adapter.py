@@ -55,6 +55,7 @@ def _to_structured(structured: RagStructured) -> StructuredAnswer:
             )
             for n, card in enumerate(structured.cards, start=1)
         ],
+        summary=structured.summary,
         closing=structured.closing,
     )
 

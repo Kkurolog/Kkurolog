@@ -131,7 +131,10 @@ class StructuredAnswer(BaseModel):
 
     headline: str = Field(..., description="질문에 대한 한 문장 답")
     compare: str | None = Field(None, description="선배들의 길이 어떻게 다른지 한 줄. 카드가 2장 이상일 때만")
-    cards: list[AnswerCard] = Field(..., description="선배별 카드 (1~4장)")
+    cards: list[AnswerCard] = Field(..., description="선배별 카드 (1~4장). 정리형 답변이면 빈 목록")
+    # [추가] 정리형 답변: 방법·팁을 묻는 질문에는 선배별로 나누지 않고 문단 글로 답한다.
+    # 값이 있으면 cards 는 비어 있고, 출처는 응답의 sources 를 답변 맨 아래에 보여 준다
+    summary: list[str] = Field(default_factory=list, description="정리형 답변의 문단 (2~3개). 카드형이면 빈 목록")
     closing: str | None = Field(None, description="다음에 해 볼 만한 것 한 문장")
 
 

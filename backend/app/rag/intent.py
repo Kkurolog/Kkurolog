@@ -102,6 +102,9 @@ class IntentResult(BaseModel):
     # 이어지는 질문이 '앞에서 본 선배 말고 다른 선배'를 찾는 말인지 ("다른 선배 얘기도 들려줘").
     # true 면 이미 보여 준 글을 빼고 찾는다
     wants_other: bool = False
+    # 답을 어떤 모양으로 쓸지. 방법·팁을 묻는 질문("시간관리 팁 있을까?")은 선배별 카드로 나누지 않고
+    # 정리된 문단 글(summary)로 답한다. 선배의 길·선택을 묻는 질문은 선배별 카드(cards)
+    answer_format: Literal["cards", "summary"] = "cards"
 
 
     @property
@@ -596,6 +599,17 @@ feeling
   "우울" / "불안" / "막막" / "답답" / "속상" / "짜증" / "지침" / "외로움" / "힘듦"
 - 감정이 둘이면 먼저 나온 것을 고른다. 학생이 쓰지 않은 감정을 짐작해서 고르지 않는다.
 
+answer_format
+- intent 가 "career_question" 일 때, 답을 어떤 모양으로 쓸지 고른다. 그 외에는 "cards".
+- "summary": 학생이 자기가 써 볼 방법·팁·요령을 구한다. 누가 어떤 길을 갔는지가 아니라 '어떻게 하면 좋을지'가 궁금한 것이다.
+  예: "시간관리 팁 있을까?", "요즘 프로젝트 하느라 버거운데 시간관리 어떻게 해?", "자존감 떨어질 때 어떡해",
+      "발표 잘하는 법 알려줘", "팀플에서 갈등 생기면 어떻게 풀어?", "집중 안 될 때 어떻게 해?", "번아웃 왔을 때 어떻게 쉬어?"
+- "cards": 선배를 찾거나, 선배의 길·선택·경험 자체를 묻는다. 주어가 선배다.
+  예: "창업한 선배 있어?", "왜 대학 대신 취업했어?", "해외 대학 간 선배들은 어떻게 준비했어?",
+      "검정고시는 어떻게 준비했나요?", "디자인을 진로로 정한 계기가 뭐야?", "거캠 수업은 어때요?"
+- "어떻게"가 있어도 선배가 간 길의 과정(입시·취업·창업 준비)을 묻는 것이면 cards 다.
+  학생의 일상·공부·마음·관계에서 지금 쓸 방법을 구하는 것이면 summary 다. 애매하면 cards.
+
 has_greeting
 - 문장 어디에든 인사말이 섞여 있으면 true. intent 와 독립이다. career_question 이면서 true 일 수 있다.
 
@@ -655,6 +669,7 @@ INTENT_SCHEMA = {
         "feeling": {"anyOf": [{"type": "string", "enum": list(FEELINGS)}, {"type": "null"}]},
         "standalone_question": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "wants_other": {"type": "boolean"},
+        "answer_format": {"type": "string", "enum": ["cards", "summary"]},
     },
     "required": [
         "emotional_state",
@@ -668,6 +683,7 @@ INTENT_SCHEMA = {
         "confidence",
         "standalone_question",
         "wants_other",
+        "answer_format",
     ],
     "additionalProperties": False,
 }
@@ -732,6 +748,8 @@ class ClaudeIntentAnalyzer:
         standalone = (result.standalone_question or "").strip()
         result.standalone_question = standalone[:STANDALONE_MAX_CHARS] or None if previous_question else None
         result.wants_other = result.wants_other and result.standalone_question is not None
+        if result.intent != "career_question":
+            result.answer_format = "cards"
         # 태그는 진로 질문일 때만, 아는 code 만, 겹치지 않게 남긴다
         is_career = result.intent == "career_question"
         result.career_paths = [t for t in dict.fromkeys(result.career_paths) if t in CAREER_PATH_TAGS] if is_career else []

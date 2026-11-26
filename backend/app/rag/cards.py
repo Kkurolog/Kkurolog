@@ -107,6 +107,39 @@ def assemble_cards(
     )
 
 
+MAX_SUMMARY_PARAGRAPHS = 3  # 정리형 답변의 문단 수 (지시문 17번과 같다)
+
+
+def assemble_summary(output: GeneratorOutput, given: dict[str, Chunk], to_source, greeted: bool) -> RagStructured | None:
+    """
+    정리형 답변(방법·팁 질문) 조립. 선배별 카드로 나누지 않고 문단 글로 답한다.
+    카드와 같은 규칙으로 검증한다: 근거 chunk 가 없는 문단은 버리고, 하나도 안 남으면 None (→ 근거 부족).
+    출처는 살아남은 문단이 인용한 chunk 만 모아 답변 맨 아래에 한 번 보여 준다.
+    """
+    paragraphs: list[str] = []
+    ids: list[str] = []
+    unknown: list[str] = []
+    for piece in output.summary:
+        text = piece.text.strip()
+        valid = [i for i in piece.chunk_ids if i in given]
+        unknown += [i for i in piece.chunk_ids if i not in given]
+        if text and valid and len(paragraphs) < MAX_SUMMARY_PARAGRAPHS:
+            paragraphs.append(text)
+            ids += valid
+    if unknown:
+        logger.warning("Claude 가 근거에 없는 chunk id 를 냈어요: %s", unknown)
+    if not paragraphs:
+        return None
+    return RagStructured(
+        headline=fill_headline(output.headline, len(paragraphs), greeted),
+        compare=None,
+        cards=[],
+        summary=paragraphs,
+        summary_sources=[to_source(given[i]) for i in dict.fromkeys(ids)],
+        closing=(output.closing or "").strip() or None,
+    )
+
+
 def _public_person(ids: list[str], given: dict[str, Chunk]) -> tuple[str, str] | None:
     """
     카드가 인용한 chunk 가 모두 같은 사람의 것이고 전부 L3 일 때만 (person_id, 별명).
@@ -163,6 +196,7 @@ def compose_text(structured: RagStructured) -> str:
     parts = [structured.headline] if structured.headline else []
     if structured.compare:
         parts.append(structured.compare)
+    parts += structured.summary  # 정리형 답변이면 문단들 (이때 cards 는 비어 있다)
     for n, card in enumerate(structured.cards, start=1):
         lines = [f"{n}. {card_title(card)}"]
         if card.one_liner:
@@ -172,4 +206,6 @@ def compose_text(structured: RagStructured) -> str:
         parts.append("\n".join(lines))
     if structured.closing:
         parts.append(structured.closing)
+    if structured.summary_sources:  # 정리형 답변의 출처는 맨 아래에 한 번
+        parts.append(f"({source_text(structured.summary_sources)})")
     return "\n\n".join(parts)

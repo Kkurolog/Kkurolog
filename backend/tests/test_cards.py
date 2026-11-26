@@ -230,3 +230,69 @@ def test_avatar_ids_without_repeats_rules():
     # 8명째부터는 겹칠 수밖에 없지만 범위 안의 값이다
     eight = avatar_ids_without_repeats([f"person-{i}" for i in range(8)])
     assert set(eight) <= {f"avatar-{n}" for n in range(1, 8)}
+
+
+# ---- 정리형 답변 (방법·팁 질문): 선배별 카드 대신 문단 글 ----
+
+
+def summary_run(pieces, answer_format="summary", cards=(), closing=None):
+    from app.rag.intent import IntentResult
+    from app.rag.models import CardPiece
+
+    output = GeneratorOutput(
+        answer_type="answer",
+        headline="멀리 보기보다 오늘 할 일에 집중했대요.",
+        cards=list(cards),
+        summary=[CardPiece(text=t, chunk_ids=i) for t, i in pieces],
+        closing=closing,
+    )
+
+    class Analyzer:
+        def analyze(self, question, previous_question=None):
+            return IntentResult(intent="career_question", answer_format=answer_format)
+
+    p = RagPipeline(FakeEmbedder(), InMemoryVectorStore(CHUNKS), FakeGenerator(output), RagSettings(similarity_floor=0.5), Analyzer())
+    return p.answer(QUESTION)
+
+
+def test_summary_answer_has_paragraphs_no_cards_and_sources_at_bottom():
+    result = summary_run([("한 선배는 창업을 먼저 했대요.", ["p1-02"]), ("또 어떤 선배는 쉬어 갔대요.", ["p2-01"])], closing="해 보면 어떨까요?")
+    res = to_ask_response(result)
+    assert res.answer_type == "answer" and res.structured.cards == []
+    assert res.structured.summary == ["한 선배는 창업을 먼저 했대요.", "또 어떤 선배는 쉬어 갔대요."]
+    assert [s.interview_id for s in res.sources] == ["p1", "p2"]  # 출처는 응답 전체의 sources 로 (맨 아래에 그린다)
+    assert res.sources[0].url  # L3 글은 원문 주소가 있어 링크가 열린다
+    # 글로 풀어 쓴 answer: 머리말, 문단들, 맺음말, 출처 순서
+    parts = result.answer.split("\n\n")
+    assert parts[1:3] == res.structured.summary and parts[3] == "해 보면 어떨까요?" and parts[-1].startswith("(")
+    assert "새벽 선배" not in result.answer  # 선배별로 나누지 않으므로 별명 제목이 없다
+
+
+def test_summary_paragraph_without_valid_citation_is_dropped():
+    result = summary_run([("근거 있는 문단", ["p1-02"]), ("근거 없는 문단", ["없는-id"]), ("인용이 빈 문단", [])])
+    assert result.structured.summary == ["근거 있는 문단"]
+    assert summary_run([("근거 없는 문단", ["없는-id"])]).answer_type == "no_evidence"
+
+
+def test_summary_keeps_at_most_three_paragraphs():
+    result = summary_run([(f"문단 {n}", ["p1-02"]) for n in range(1, 6)])
+    assert result.structured.summary == ["문단 1", "문단 2", "문단 3"]
+
+
+def test_summary_is_used_only_when_intent_asks_for_it():
+    """의도 분석이 cards 라고 했으면, 모델이 summary 를 써 와도 카드로 답한다."""
+    cards = [card("창업 뒤 대학에 간 길", ("창업을 먼저 했대요.", ["p1-02"]))]
+    result = summary_run([("문단", ["p1-02"])], answer_format="cards", cards=cards)
+    assert result.structured.summary == [] and len(result.structured.cards) == 1
+    # summary 를 바랐는데 모델이 카드만 써 왔으면 카드로 답한다 (답이 사라지지 않게)
+    fallback = summary_run([], answer_format="summary", cards=cards)
+    assert fallback.answer_type == "answer" and len(fallback.structured.cards) == 1
+
+
+def test_answer_format_hint_goes_to_generator_only_for_summary():
+    from app.rag.generator import build_user_message
+    from app.rag.intent import IntentResult
+
+    assert "<answer_format>summary</answer_format>" in build_user_message("시간관리 팁", [], IntentResult(intent="career_question", answer_format="summary"))
+    assert "<answer_format>" not in build_user_message("창업한 선배 있어?", [], IntentResult(intent="career_question"))
+    assert "<answer_format>" not in build_user_message("질문", [])

@@ -32,7 +32,7 @@
   {"text": "창업한 선배 몇 명이야?", "intent": ["career_question"], "career_paths": ["startup"]},
   {"text": "직접 브랜드나 사업을 시작한 선배는 어떻게 시작했어요?", "intent": ["career_question"], "career_paths": ["startup"]},
   {"text": "선배들은 왜 창업을 했어?", "intent": ["career_question"], "career_paths": ["startup"]},
-  {"text": "개발자로 취업한 선배 있어?", "intent": ["career_question"], "career_paths": ["employment"], "career_fields": ["dev_it"]},
+  {"text": "개발자로 취업한 선배 있어?", "intent": ["career_question"], "career_paths": ["employment"], "career_fields": ["dev_it"], "format": "cards"},
   {"text": "검정고시 보고 수능 준비하는 거 힘들지 않았어?", "intent": ["career_question"], "career_paths": ["exam_prep"]},
   {"text": "안녕하세요 혹시 해외 대학 준비한 선배 있나요", "intent": ["career_question"], "greeting": true, "career_paths": ["overseas_university"]},
   {"text": "디자인을 진로로 정하게 된 계기가 뭐야?", "intent": ["career_question"], "career_fields": ["design_art"]},
@@ -81,7 +81,7 @@
   {"text": "학교 그만두고 검정고시 볼까 고민이야", "intent": ["career_question"], "emotion": ["none", "T4"]},
   {"text": "왕따 문제를 해결하는 프로젝트를 한 선배 있어?", "intent": ["career_question"], "emotion": "none"},
   {"text": "팀원이랑 사이가 안 좋아서 힘들어", "intent": ["career_question"], "emotion": "T4"},
-  {"text": "창업한 선배 있어?", "intent": ["career_question"], "career_paths": ["startup"], "emotion": "none"},
+  {"text": "창업한 선배 있어?", "intent": ["career_question"], "career_paths": ["startup"], "emotion": "none", "format": "cards"},
   {"text": "더 자세히 알려줘", "previous": "창업한 선배 있어?", "intent": ["career_question"], "standalone": true, "career_paths": ["startup"], "other": false},
   {"text": "그 선배는 왜 그랬어?", "previous": "대학을 안 가고 바로 취업한 선배 있어?", "intent": ["career_question"], "standalone": true, "other": false},
   {"text": "다른 선배는?", "previous": "디자인을 진로로 정한 계기가 뭐야?", "intent": ["career_question"], "standalone": true, "other": true},
@@ -121,5 +121,13 @@
   {"text": "목표가 뭐야?", "intent": ["about_service"], "aspect": ["goal"]},
   {"text": "꾸로록은 다 완성된 거야?", "intent": ["about_service"], "aspect": ["stage"]},
   {"text": "이거 테스트 중이야?", "intent": ["about_service"], "aspect": ["stage"]},
-  {"text": "꾸로록은 누가 만들었어?", "intent": ["about_service"], "aspect": ["who"]}
+  {"text": "꾸로록은 누가 만들었어?", "intent": ["about_service"], "aspect": ["who"]},
+  {"text": "요즘 임팩트랩 진행하느라 좀 힘들고 버거워… 시간관리 팁 있을까..?", "intent": ["career_question"], "format": "summary"},
+  {"text": "시간관리 팁 있을까?", "intent": ["career_question"], "format": "summary"},
+  {"text": "발표 잘하는 법 알려줘", "intent": ["career_question"], "format": "summary"},
+  {"text": "팀플에서 갈등 생기면 어떻게 풀어?", "intent": ["career_question"], "format": "summary"},
+  {"text": "집중 안 될 때 어떻게 해?", "intent": ["career_question"], "format": "summary"},
+  {"text": "번아웃 왔을 때 어떻게 쉬어?", "intent": ["career_question"], "format": "summary"},
+  {"text": "해외 대학 간 선배들은 어떻게 준비했어?", "intent": ["career_question"], "format": "cards"},
+  {"text": "왜 대학 대신 취업했어?", "intent": ["career_question"], "format": "cards"}
 ]

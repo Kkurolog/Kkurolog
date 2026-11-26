@@ -82,6 +82,8 @@ class GeneratorOutput(BaseModel):
     headline: str = ""
     compare: str | None = None
     cards: list[GeneratedCard] = Field(default_factory=list)
+    # 정리형 답변(방법·팁 질문)의 문단. 이때는 cards 가 비어 있다
+    summary: list[CardPiece] = Field(default_factory=list)
     closing: str | None = None
 
 
@@ -115,6 +117,9 @@ class RagStructured(BaseModel):
     headline: str
     compare: str | None = None
     cards: list[RagCard]
+    # 정리형 답변: 선배별로 나누지 않고 문단 글로 쓴 것. 이때 cards 는 비어 있고, 출처는 summary_sources 에 모은다
+    summary: list[str] = Field(default_factory=list)
+    summary_sources: list[RagSource] = Field(default_factory=list)
     closing: str | None = None
 
 

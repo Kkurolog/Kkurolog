@@ -15,6 +15,7 @@ import { avatarSrc } from "@/lib/avatar";
 type Props = {
   answer: StructuredAnswer;
   onOpenSource: (source: Source) => void; // 카드의 출처를 눌렀을 때 (오른쪽 출처 패널이 열린다)
+  sources?: Source[]; // 답변 전체의 출처. 정리형 답변(summary)일 때 맨 아래에 모아 보여 준다
 };
 
 // 글 날짜를 읽기 쉽게. "2024-07-31" → "2024년 7월", "2021" → "2021년". 모양이 다르면 그대로 둔다.
@@ -91,6 +92,47 @@ function RuledDivider() {
   return <div ref={ref} aria-hidden="true" className="bg-line" style={{ height: DIVIDER_HEIGHT }} />;
 }
 
+// 출처 목록. "#2024년 11월 글 · “글 제목”" 한 줄씩. 선배 카드 아래와 정리형 답변 맨 아래에서 같이 쓴다.
+function SourceLinks({
+  sources,
+  onOpenSource,
+  className = "",
+}: {
+  sources: Source[];
+  onOpenSource: Props["onOpenSource"];
+  className?: string;
+}) {
+  if (sources.length === 0) return null;
+  return (
+    <footer className={`flex flex-col gap-1 text-xs leading-5 text-muted ${className}`}>
+      {sources.map((source) => (
+        <div key={source.interview_id}>
+          {source.visibility === "L3" && source.url ? (
+            // 원문 주소가 있으면(공개 등급 L3): 누르면 원문 글이 새 탭으로 열린다
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="break-keep text-brand underline-offset-4 hover:underline focus-visible:underline"
+            >
+              {cardSourceLabel(source)}
+            </a>
+          ) : (
+            // 원문 주소가 없으면(익명 글): 예전처럼 오른쪽 출처 패널을 연다 ("원문이 공개되지 않아요" 안내)
+            <button
+              type="button"
+              onClick={() => onOpenSource(source)}
+              className="text-left underline-offset-4 hover:underline focus-visible:underline"
+            >
+              {cardSourceLabel(source)}
+            </button>
+          )}
+        </div>
+      ))}
+    </footer>
+  );
+}
+
 function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; onOpenSource: Props["onOpenSource"] }) {
   // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)을 제목 자리에 올린다.
   const title = card.nickname ? `${card.nickname} 선배` : card.label;
@@ -118,38 +160,30 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
           ))}
         </div>
 
-        <footer className="mt-3 flex flex-col gap-1 text-xs leading-5 text-muted">
-          {card.sources.map((source) => (
-            <div key={source.interview_id}>
-              {source.visibility === "L3" && source.url ? (
-                // 원문 주소가 있으면(공개 등급 L3): 누르면 원문 글이 새 탭으로 열린다
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-keep text-brand underline-offset-4 hover:underline focus-visible:underline"
-                >
-                  {cardSourceLabel(source)}
-                </a>
-              ) : (
-                // 원문 주소가 없으면(익명 글): 예전처럼 오른쪽 출처 패널을 연다 ("원문이 공개되지 않아요" 안내)
-                <button
-                  type="button"
-                  onClick={() => onOpenSource(source)}
-                  className="text-left underline-offset-4 hover:underline focus-visible:underline"
-                >
-                  {cardSourceLabel(source)}
-                </button>
-              )}
-            </div>
-          ))}
-        </footer>
+        <SourceLinks sources={card.sources} onOpenSource={onOpenSource} className="mt-3" />
       </article>
     </li>
   );
 }
 
-export default function AnswerCards({ answer, onOpenSource }: Props) {
+export default function AnswerCards({ answer, onOpenSource, sources = [] }: Props) {
+  const summary = answer.summary ?? [];
+  // 정리형 답변: 방법·팁을 묻는 질문. 선배별로 나누지 않고 문단 글로 보여 주고, 출처는 맨 아래에 모은다
+  if (summary.length > 0) {
+    return (
+      <section className="flex flex-col text-ink">
+        {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}
+        <div className="mt-4 flex flex-col gap-3 text-[15px] leading-[1.7] break-keep">
+          {summary.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+          {answer.closing && <p>{answer.closing}</p>}
+        </div>
+        <SourceLinks sources={sources} onOpenSource={onOpenSource} className="mt-4" />
+      </section>
+    );
+  }
+
   return (
     <section className="flex flex-col text-ink">
       {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}

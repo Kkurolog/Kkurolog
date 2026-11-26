@@ -21,7 +21,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from app.rag.cards import assemble_cards, compose_text
+from app.rag.cards import assemble_cards, assemble_summary, compose_text
 from app.rag.config import RagSettings
 from app.rag.embedding import Embedder
 from app.rag.generator import ContextDoc, Generator
@@ -336,8 +336,13 @@ class RagPipeline:
 
         # ---- 5. 카드 조립: 근거 없는 조각·카드를 버리고, 카드마다 출처를 붙인다 (app/rag/cards.py) ----
         given = {c.chunk_id: c for doc in docs for c in doc.chunks}
-        structured = assemble_cards(output, given, to_source, greeted=bool(intent and intent.has_greeting))
-        if structured is None:  # 근거가 확인된 카드가 한 장도 없다 → 출처 없는 답변은 내보내지 않는다
+        greeted = bool(intent and intent.has_greeting)
+        # 방법·팁 질문은 선배별 카드가 아니라 정리된 문단 글로 답한다 (모델이 그 모양으로 썼을 때만. 아니면 카드로)
+        wants_summary = bool(intent and intent.answer_format == "summary" and output.summary)
+        structured = (assemble_summary if wants_summary else assemble_cards)(output, given, to_source, greeted=greeted)
+        if structured is None and wants_summary and output.cards:  # 문단이 모두 버려졌는데 카드도 써 왔으면 카드를 쓴다
+            structured = assemble_cards(output, given, to_source, greeted=greeted)
+        if structured is None:  # 근거가 확인된 카드·문단이 하나도 없다 → 출처 없는 답변은 내보내지 않는다
             return no_evidence()
 
         # 맺음말의 "다른 선배 이야기도 더 있어요"는 시스템이 붙인다 (모델은 더 있는지 알 수 없다). 세 조건을 모두 만족할 때만:
@@ -345,12 +350,13 @@ class RagPipeline:
         #   2) 그 태그에 맞는 선배의 글이 아직 보여 주지 않은 채로 남아 있다
         #   3) 이 대화에서 아직 이 말을 한 적이 없다
         # (예전 기준 '안 쓴 글이 하나라도 있으면'은 답변의 97% 에 붙어서 의미가 없었다 → 2026-11-23 측정)
-        shown = seen | {s.source_id for card in structured.cards for s in card.sources}
+        used = [s for card in structured.cards for s in card.sources] + structured.summary_sources
+        shown = seen | {s.source_id for s in used}
         has_more = not more_hint_shown and bool(found.tagged_sources - shown)
         structured.closing = with_more_hint(structured.closing, has_more)
 
-        # 전체 출처 = 카드들의 출처를 순서대로 모은 것 (같은 chunk 는 한 번만)
-        all_sources = {s.chunk_id: s for card in structured.cards for s in card.sources}
+        # 전체 출처 = 카드(또는 정리형 문단)의 출처를 순서대로 모은 것 (같은 chunk 는 한 번만)
+        all_sources = {s.chunk_id: s for s in used}
         return RagAnswer(
             answer_type="answer",
             answer="\n\n".join(filter(None, [preface, compose_text(structured)])),

@@ -129,7 +129,11 @@ export default function ChatMessageView({
 
   // 답변을 어떤 모양으로 그릴지 고른다. 아래 3) 문단 표시는 지우면 안 된다:
   // 근거 부족·위기 안내·무관한 질문은 structured 가 없고, 예전 backend 는 structured 를 아예 보내지 않는다.
-  const cards = message.structured && message.structured.cards.length > 0 ? message.structured : null;
+  // 정리형 답변(summary, 방법·팁 질문)도 같은 컴포넌트가 그린다
+  const cards =
+    message.structured && (message.structured.cards.length > 0 || (message.structured.summary?.length ?? 0) > 0)
+      ? message.structured
+      : null;
   const isAbout = Boolean(message.aboutAspect);
   const followUps = message.followUps ?? [];
 
@@ -143,7 +147,7 @@ export default function ChatMessageView({
       {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
       {/* 감정이 담긴 진로 고민이면 카드 위에 한 줄로 먼저 받아 준다 ("막막한 게 당연해요. …") */}
       {cards && message.preface && <p>{message.preface}</p>}
-      {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
+      {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} sources={message.sources} />}
 
       {/* 2) 꾸로록 자신에 대한 설명: 다른 답변처럼 바탕 없이 글로 그린다 (흰 상자를 두지 않는다. 노트 줄 바탕을 가린다).
              선배 글이 아니라서 출처 대신 작은 안내 한 줄을 붙인다 */}

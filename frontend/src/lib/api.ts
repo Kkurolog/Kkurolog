@@ -38,7 +38,10 @@ export type AnswerCard = {
 export type StructuredAnswer = {
   headline: string; // 질문에 대한 한 문장 답
   compare: string | null; // 선배들의 길이 어떻게 다른지 한 줄 (카드 2장 이상일 때만)
-  cards: AnswerCard[]; // 1~4장
+  cards: AnswerCard[]; // 1~4장. 정리형 답변이면 빈 목록
+  // [추가] 정리형 답변의 문단 (방법·팁을 묻는 질문). 값이 있으면 선배별 카드 대신 문단 글로 그리고,
+  // 출처는 응답의 sources 를 답변 맨 아래에 모아 보여 준다
+  summary?: string[];
   closing: string | null; // 다음에 해 볼 만한 것 한 문장
 };
 
