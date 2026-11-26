@@ -6,7 +6,8 @@
 //     3) 그 외 → 글(문단) + 아래에 '출처 · …' 링크 (누르면 오른쪽에 출처 패널이 열린다)
 //   예시 질문(followUps)이 있으면 답변 아래에 버튼으로 그린다.
 // - 근거가 부족하면(hasEnoughEvidence=false) 안내 문구와 함께 이 경험을 가진 선배(멘토)를 보여준다.
-import type { Mentor, Source } from "@/lib/api";
+import Link from "next/link";
+import type { Mentor, MentorRecommendation, Source } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
 import AnswerCards, { formatSourceDate } from "./AnswerCards";
 import { MiniKkuro } from "./Kkuro";
@@ -60,6 +61,18 @@ export function sourceLabel(source: Source) {
   return `출처 · ${source.alumni} · ${source.interview_id}`;
 }
 
+// 추천 멘토 카드 묶음 (최대 3명). 근거 부족일 때와, 학생이 멘토·프로필을 찾았을 때(showMentors) 쓴다.
+function MentorGrid({ mentors, onContact }: { mentors: MentorRecommendation[]; onContact: Props["onContact"] }) {
+  if (mentors.length === 0) return null;
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
+      {mentors.map((rec) => (
+        <MentorCard key={rec.mentor.id} mentor={rec.mentor} reason={rec.reason} onContact={onContact} />
+      ))}
+    </div>
+  );
+}
+
 export default function ChatMessageView({
   message,
   onOpenSource,
@@ -111,18 +124,7 @@ export default function ChatMessageView({
             연락은 꾸로록이 대신 전달해요.
           </p>
         )}
-        {message.mentors.length > 0 && (
-          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
-            {message.mentors.map((rec) => (
-              <MentorCard
-                key={rec.mentor.id}
-                mentor={rec.mentor}
-                reason={rec.reason}
-                onContact={onContact}
-              />
-            ))}
-          </div>
-        )}
+        <MentorGrid mentors={message.mentors} onContact={onContact} />
       </div>
     );
   }
@@ -170,6 +172,19 @@ export default function ChatMessageView({
             {paragraph}
           </p>
         ))}
+
+      {/* 학생이 멘토·프로필·연락할 선배를 찾았을 때: 인터뷰 글 대신 멘토 카드를 보여 준다 */}
+      {message.showMentors && (
+        <>
+          {message.mentors.length === 0 && <p>지금은 연락할 수 있는 멘토를 찾지 못했어요.</p>}
+          <MentorGrid mentors={message.mentors} onContact={onContact} />
+          <p className="text-sm leading-6">
+            <Link href="/mentors" className="font-bold text-brand underline-offset-4 hover:underline focus-visible:underline">
+              멘토 리스트에서 더 찾아보기
+            </Link>
+          </p>
+        </>
+      )}
 
       {/* 다음에 물어볼 예시 질문: 누르면 그 질문을 바로 보낸다 */}
       {followUps.length > 0 && onAsk && (

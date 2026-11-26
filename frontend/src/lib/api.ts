@@ -56,6 +56,10 @@ export type AskResponse = {
   // "자료가 없어요"가 아니라 "잠깐 문제가 생겼어요"로 안내한다
   temporary_error?: boolean;
   // [추가] 이어지는 질문("다른 선배 얘기도 들려줘")에 더 전할 이야기가 없는지. true 면 "여기까지예요"로 안내한다
+  // [추가] 학생이 멘토·프로필·연락할 선배를 찾았을 때 true. 답변 글 아래에 멘토 카드를 그린다.
+  // 멘토는 mentor_query 로 recommendMentors 를 한 번 더 불러서 받는다 (이어지는 말이면 앞 질문의 주제가 들어 있다)
+  show_mentors?: boolean;
+  mentor_query?: string | null;
   no_more?: boolean;
   // [추가] 상담 번호가 들어 있는 안내(위기 안내 등)였는지. 받으면 같은 대화의 다음 요청부터 safety_notice_shown 을 보낸다
   safety_notice?: boolean;
@@ -89,7 +93,7 @@ export type AboutAspect =
 
 // [추가] 1차 의도 분석 결과 (backend/app/schemas.py 의 Intent 와 같다)
 // greeting·about_service·smalltalk·unclear 는 backend 가 고정 안내 문구로 답한다 (answer_type 은 off_topic)
-export type Intent = "greeting" | "about_service" | "career_question" | "smalltalk" | "unclear";
+export type Intent = "greeting" | "about_service" | "career_question" | "mentor_request" | "smalltalk" | "unclear";
 
 // [추가] 브라우저별 익명 ID. backend 가 '학생 한 명당 질문 횟수'를 셀 때 쓴다.
 // 학교 와이파이는 모두 IP가 같아서 IP로는 학생을 구분할 수 없다.

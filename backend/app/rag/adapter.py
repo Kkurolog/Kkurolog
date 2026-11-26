@@ -79,4 +79,6 @@ def to_ask_response(result: RagAnswer) -> AskResponse:
         about_aspect=result.about_aspect,
         follow_ups=result.follow_ups,
         emphasis=result.emphasis,
+        show_mentors=result.mentor_query is not None,
+        mentor_query=result.mentor_query,
     )
