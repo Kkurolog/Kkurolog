@@ -56,7 +56,20 @@ export const rowLink =
   "cursor-pointer border-t border-line transition-colors hover:bg-sky focus-visible:bg-sky focus-visible:outline-none";
 
 // 쪽 번호: < 1 2 3 … 7 >  (지금 쪽 앞뒤 1쪽 + 처음·끝만 보여준다)
-export function Pagination({ page, total, pageSize, onChange }: { page: number; total: number; pageSize: number; onChange: (p: number) => void }) {
+// className: 바깥 여백을 바꿀 때 (기본 mt-4)
+export function Pagination({
+  page,
+  total,
+  pageSize,
+  onChange,
+  className = "mt-4",
+}: {
+  page: number;
+  total: number;
+  pageSize: number;
+  onChange: (p: number) => void;
+  className?: string;
+}) {
   const last = Math.max(1, Math.ceil(total / pageSize));
   if (last <= 1) return null;
 
@@ -68,7 +81,7 @@ export function Pagination({ page, total, pageSize, onChange }: { page: number; 
 
   const circle = "flex size-8 items-center justify-center rounded-full text-[13px]";
   return (
-    <nav aria-label="쪽 번호" className="mt-4 flex items-center justify-center gap-1">
+    <nav aria-label="쪽 번호" className={`${className} flex items-center justify-center gap-1`}>
       <button
         type="button"
         onClick={() => onChange(page - 1)}
