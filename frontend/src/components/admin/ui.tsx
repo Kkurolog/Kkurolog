@@ -43,10 +43,11 @@ export function ErrorNotice({ message }: { message: string }) {
   );
 }
 
-// 표 공통 스타일 (Figma: 머리줄 연한 글자, 줄 높이 48px, 줄마다 구분선)
-export const th = "h-10 px-3 text-left text-[12px] font-medium whitespace-nowrap text-muted";
+// 표 공통 스타일: 게시판 모양 (흰 박스 없이 위쪽 굵은 파란 선 + 줄마다 구분선 + 아래 마감선)
+// 목록이 길어지면 아래 쪽 번호(Pagination)로 넘긴다. 머리줄 연한 글자, 줄 높이 48px.
+export const th = "h-11 px-3 text-left text-[12px] font-medium whitespace-nowrap text-muted";
 export const td = "h-12 px-3 text-[13px] text-ink";
-export const tableWrap = "w-full overflow-x-auto rounded-2xl border border-line bg-surface";
+export const tableWrap = "w-full overflow-x-auto border-t-2 border-b border-t-brand border-b-line";
 export const rowLink =
   "cursor-pointer border-t border-line transition-colors hover:bg-sky focus-visible:bg-sky focus-visible:outline-none";
 

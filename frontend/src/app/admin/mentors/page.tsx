@@ -1,12 +1,13 @@
 // 관리자 멘토 목록 (주소 "/admin/mentors", 와이어프레임 04-5)
 // 참여 동의하지 않은 멘토와 메일 주소까지 모두 보인다 (관리자만).
 // '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '수정'을 누른다. 멘토는 지울 수 없다.
+// backend 는 멘토 전체를 한 번에 주므로, 쪽 나누기(20명씩)는 화면에서만 한다.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import MentorFormModal from "@/components/admin/MentorFormModal";
-import { AdminPage, ErrorNotice, PageTitle, tableWrap, td, th } from "@/components/admin/ui";
-import { AdminApiError, fetchAdminMentors, type AdminMentor } from "@/lib/adminApi";
+import { AdminPage, ErrorNotice, PageTitle, Pagination, tableWrap, td, th } from "@/components/admin/ui";
+import { AdminApiError, fetchAdminMentors, PAGE_SIZE, type AdminMentor } from "@/lib/adminApi";
 
 export default function AdminMentorsPage() {
   const [mentors, setMentors] = useState<AdminMentor[] | null>(null);
@@ -14,6 +15,7 @@ export default function AdminMentorsPage() {
   // 열린 창: "new" = 추가, 멘토 = 수정, null = 닫힘
   const [editing, setEditing] = useState<AdminMentor | "new" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     fetchAdminMentors()
@@ -35,6 +37,11 @@ export default function AdminMentorsPage() {
     setNotice(editing === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`);
     setEditing(null);
   }
+
+  // 지금 쪽에 보일 멘토 (쪽이 범위를 넘으면 마지막 쪽으로)
+  const lastPage = Math.max(1, Math.ceil((mentors?.length ?? 0) / PAGE_SIZE));
+  const shownPage = Math.min(page, lastPage);
+  const shown = mentors?.slice((shownPage - 1) * PAGE_SIZE, shownPage * PAGE_SIZE);
 
   return (
     <AdminPage>
@@ -82,7 +89,7 @@ export default function AdminMentorsPage() {
                   <td colSpan={6} className={`${td} text-center text-muted`}>아직 등록된 멘토가 없어요.</td>
                 </tr>
               )}
-              {mentors?.map((m) => (
+              {shown?.map((m) => (
                 <tr key={m.id} className="border-t border-line">
                   <td className={`${td} font-medium`}>{m.id}</td>
                   <td className={td}>
@@ -129,6 +136,8 @@ export default function AdminMentorsPage() {
           </table>
         </div>
       )}
+
+      {mentors && <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} />}
 
       <div className="mt-6">
         <button
