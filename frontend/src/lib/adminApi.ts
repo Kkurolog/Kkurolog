@@ -406,7 +406,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 
 export const REPLY_STATUS_LABEL: Record<ReplyStatus, string> = {
   forwarded: "학생에게 전달함",
-  needs_review: "확인필요",
+  needs_review: "확인 필요",
   failed: "전달 실패",
 };
 
