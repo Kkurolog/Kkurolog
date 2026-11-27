@@ -217,7 +217,7 @@ export function logout() {
   clearToken();
 }
 
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 10; // 관리자 목록 한 쪽에 보일 줄 수 (PC 한 화면에 스크롤 없이 들어가게)
 
 // replied: true=답장 받음, false=답장 전, undefined=전체
 export function fetchInquiries(opts: { replied?: boolean; page?: number; pageSize?: number } = {}) {
@@ -411,7 +411,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 
 export const REPLY_STATUS_LABEL: Record<ReplyStatus, string> = {
   forwarded: "학생에게 전달함",
-  needs_review: "확인필요",
+  needs_review: "확인 필요",
   failed: "전달 실패",
 };
 

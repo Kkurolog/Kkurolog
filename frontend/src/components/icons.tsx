@@ -140,7 +140,7 @@ export function InboxIcon({ className }: IconProps) {
   );
 }
 
-// 확인필요 (동그라미 안 느낌표)
+// 확인 필요 (동그라미 안 느낌표)
 export function AlertIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
@@ -150,8 +150,6 @@ export function AlertIcon({ className }: IconProps) {
     </Svg>
   );
 }
-
-
 
 // 이전·다음 쪽 (꺾쇠)
 export function ChevronLeftIcon({ className }: IconProps) {
@@ -166,6 +164,15 @@ export function ChevronRightIcon({ className }: IconProps) {
   return (
     <Svg className={className}>
       <path d="M9 5l7 7-7 7" />
+    </Svg>
+  );
+}
+
+// 드롭다운 열기 (아래 꺾쇠)
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 9l7 7 7-7" />
     </Svg>
   );
 }

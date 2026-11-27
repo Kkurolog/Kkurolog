@@ -1,13 +1,16 @@
 // 멘토 추가·수정 창 (와이어프레임 04-6 추가, 04-6-1 id 중복, 04-7 수정, 04-7-1 연락 가능 규칙 오류)
 // - 추가: 멘토 ID 는 영어 소문자·숫자·'-' 50자까지, 한 번 정하면 바꿀 수 없다.
-// - 수정: ID 는 회색으로 잠근다. 바뀐 칸만 보낸다. 메일 주소를 비우면 지운다. 바뀐 게 없으면 '바꿀 내용이 없어요.'
+// - 수정: 멘토 ID 칸이 드롭다운이다. 눌러서 목록(ID·이름으로 찾기)에서 수정할 멘토를 고른다.
+//         고친 내용이 있는데 다른 멘토로 바꾸면 '저장하지 않고 바꿀까요?'를 먼저 묻는다.
+//         ID 자체는 바꿀 수 없다. 바뀐 칸만 보낸다. 메일 주소를 비우면 지운다. 바뀐 게 없으면 '바꿀 내용이 없어요.'
 // - 연락 가능으로 두려면 참여 동의 + 메일 주소가 모두 있어야 한다. 어기면 문구를 보여주고 저장 버튼을 끈다.
-// - 삭제는 멘토 목록의 '삭제' 버튼으로 한다 (문의 기록이 없는 멘토만). 쉬게 하려면 연락 가능을 끈다.
+// - 삭제는 멘토 목록의 '멘토 삭제' 버튼으로 한다 (문의 기록이 없는 멘토만). 쉬게 하려면 연락 가능을 끈다.
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { AdminApiError, createMentor, updateMentor, type AdminMentor, type MentorUpdate } from "@/lib/adminApi";
-import { CloseIcon } from "../icons";
+import ConfirmDialog from "../ConfirmDialog";
+import { ChevronDownIcon, CloseIcon } from "../icons";
 
 // 진로 경로 선택지 (backend 멘토 데이터와 같은 이름)
 const CAREER_PATHS = ["대학 진학", "해외 대학", "취업", "창업", "디자인·예술", "개발", "기타 경로"];
@@ -55,14 +58,19 @@ const splitList = (s: string) =>
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 type Props = {
-  mentor?: AdminMentor; // 있으면 수정, 없으면 추가
+  mode: "new" | "edit";
+  mentors?: AdminMentor[]; // 수정: 드롭다운에 보여줄 멘토 전체
+  initial?: AdminMentor | null; // 수정: 처음 고른 멘토 (없으면 드롭다운이 열린 채로 시작)
   onClose: () => void;
   onSaved: (m: AdminMentor) => void;
 };
 
-export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
-  const editing = Boolean(mentor);
-  const [form, setForm] = useState<Form>(() => toForm(mentor));
+export default function MentorFormModal({ mode, mentors = [], initial = null, onClose, onSaved }: Props) {
+  const editing = mode === "edit";
+  const [mentor, setMentor] = useState<AdminMentor | null>(initial); // 지금 수정 중인 멘토
+  const [pendingSwitch, setPendingSwitch] = useState<AdminMentor | null>(null); // 저장 안 한 채 바꾸려는 멘토
+  const locked = editing && !mentor; // 수정할 멘토를 아직 안 골랐으면 아래 칸을 잠근다
+  const [form, setForm] = useState<Form>(() => toForm(initial ?? undefined));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null); // 저장 버튼 옆 오류 문구
   const [idError, setIdError] = useState<string | null>(null);
@@ -76,11 +84,27 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !pendingSwitch) onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, pendingSwitch]);
+
+  // 드롭다운에서 다른 멘토를 골랐을 때: 고친 내용이 있으면 먼저 묻는다
+  function pickMentor(next: AdminMentor) {
+    if (next.id === mentor?.id) return;
+    if (mentor && Object.keys(changes()).length > 0) setPendingSwitch(next);
+    else switchTo(next);
+  }
+
+  function switchTo(next: AdminMentor) {
+    setPendingSwitch(null);
+    setMentor(next);
+    setForm(toForm(next));
+    setTouched({});
+    setMessage(null);
+    setIdError(null);
+  }
 
   function set<K extends keyof Form>(key: K, value: Form[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -124,6 +148,7 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (locked) return;
     setTouched({ id: true, name: true, exitYear: true, email: true });
     if (hasError || busy) return;
 
@@ -190,25 +215,33 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
         </div>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5 sm:px-8">
-          <Field id={`${uid}-id`} label="멘토 ID" error={idError ?? fieldError("id")} hint={editing ? "ID 는 바꿀 수 없어요." : undefined}>
-            <input
-              ref={editing ? undefined : firstRef}
-              id={`${uid}-id`}
-              value={form.id}
-              onChange={(e) => set("id", e.target.value.toLowerCase())}
-              onBlur={() => setTouched((t) => ({ ...t, id: true }))}
-              disabled={editing}
-              placeholder="예: mt-11 (정하면 바꿀 수 없어요)"
-              maxLength={50}
-              autoComplete="off"
-              aria-invalid={Boolean(idError ?? fieldError("id"))}
-              className={input(Boolean(idError ?? fieldError("id")))}
-            />
-          </Field>
+          {editing ? (
+            <Field id={`${uid}-id`} label="멘토 ID" hint="ID 는 바꿀 수 없어요.">
+              <MentorPicker id={`${uid}-id`} mentors={mentors} value={mentor} onPick={pickMentor} autoOpen={!mentor} />
+            </Field>
+          ) : (
+            <Field id={`${uid}-id`} label="멘토 ID" error={idError ?? fieldError("id")}>
+              <input
+                ref={firstRef}
+                id={`${uid}-id`}
+                value={form.id}
+                onChange={(e) => set("id", e.target.value.toLowerCase())}
+                onBlur={() => setTouched((t) => ({ ...t, id: true }))}
+                placeholder="예: mt-11 (정하면 바꿀 수 없어요)"
+                maxLength={50}
+                autoComplete="off"
+                aria-invalid={Boolean(idError ?? fieldError("id"))}
+                className={input(Boolean(idError ?? fieldError("id")))}
+              />
+            </Field>
+          )}
+
+          {/* 수정할 멘토를 고르기 전에는 아래 칸을 모두 잠근다 */}
+          <fieldset disabled={locked} className={`flex min-w-0 flex-col gap-5 ${locked ? "opacity-40" : ""}`}>
 
           <Field id={`${uid}-name`} label="이름 또는 별명" error={fieldError("name")}>
             <input
-              ref={editing ? firstRef : undefined}
+              ref={editing && mentor ? firstRef : undefined}
               id={`${uid}-name`}
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
@@ -325,6 +358,7 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
               </p>
             )}
           </div>
+          </fieldset>
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-line px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
@@ -338,13 +372,168 @@ export default function MentorFormModal({ mentor, onClose, onSaved }: Props) {
           </button>
           <button
             type="submit"
-            disabled={busy || ruleBroken}
+            disabled={busy || ruleBroken || locked}
             className="h-11 rounded-full bg-brand px-6 text-[14px] font-bold text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
           >
             {busy ? "저장하는 중…" : editing ? "저장" : "추가"}
           </button>
         </div>
       </form>
+
+      {pendingSwitch && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmDialog
+            title="저장하지 않고 바꿀까요?"
+            body={`'${mentor?.name}'에서 고친 내용이 사라지고 '${pendingSwitch.name}' 멘토를 열어요.`}
+            cancelLabel="계속 수정"
+            confirmLabel="바꾸기"
+            onCancel={() => setPendingSwitch(null)}
+            onConfirm={() => switchTo(pendingSwitch)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 수정할 멘토 고르기 드롭다운: 누르면 목록이 열리고, 위 칸에 ID·이름을 적어 찾을 수 있다.
+// 키보드: ↑↓ 로 옮기고 Enter 로 고르기, Esc 로 닫기 (창 전체는 닫히지 않음)
+function MentorPicker({
+  id,
+  mentors,
+  value,
+  onPick,
+  autoOpen,
+}: {
+  id: string;
+  mentors: AdminMentor[];
+  value: AdminMentor | null;
+  onPick: (m: AdminMentor) => void;
+  autoOpen: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpen);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? mentors.filter((m) => `${m.id} ${m.name}`.toLowerCase().includes(q)) : mentors;
+
+  // 바깥을 누르면 닫기
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  // 키보드로 옮긴 줄이 보이게
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  function toggle() {
+    setQuery("");
+    setActive(Math.max(0, mentors.findIndex((m) => m.id === value?.id)));
+    setOpen((o) => !o);
+  }
+
+  function choose(m: AdminMentor) {
+    setOpen(false);
+    setQuery("");
+    onPick(m);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((i) => Math.min(filtered.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => Math.max(0, i - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault(); // 폼 저장으로 넘어가지 않게
+      if (filtered[active]) choose(filtered[active]);
+    } else if (e.key === "Escape") {
+      e.stopPropagation(); // 드롭다운만 닫고 창은 그대로
+      e.nativeEvent.stopImmediatePropagation();
+      setOpen(false);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        id={id}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={toggle}
+        className={`flex h-11 w-full items-center justify-between gap-3 rounded-full border bg-surface px-4 text-left text-[14px] transition-colors hover:border-brand focus:border-brand focus:outline-none ${
+          open ? "border-brand" : "border-line"
+        }`}
+      >
+        {value ? (
+          <span className="min-w-0 truncate">
+            <span className="font-medium text-ink">{value.id}</span>
+            <span className="text-body"> · {value.name}</span>
+          </span>
+        ) : (
+          <span className="text-placeholder">수정할 멘토를 고르세요</span>
+        )}
+        <ChevronDownIcon className={`size-4 shrink-0 text-brand transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_12px_32px_rgba(11,37,89,0.12)]">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={`${id}-list`}
+            aria-activedescendant={filtered[active] ? `${id}-opt-${active}` : undefined}
+            aria-label="멘토 ID나 이름으로 찾기"
+            placeholder="ID나 이름으로 찾기"
+            autoComplete="off"
+            className="h-11 w-full border-b border-line bg-surface px-4 text-[14px] text-ink placeholder:text-placeholder focus:outline-none"
+          />
+          <ul ref={listRef} id={`${id}-list`} role="listbox" aria-label="멘토 목록" className="max-h-60 overflow-y-auto py-1">
+            {filtered.length === 0 && <li className="px-4 py-3 text-[13px] text-muted">찾는 멘토가 없어요.</li>}
+            {filtered.map((m, i) => {
+              const current = value?.id === m.id;
+              return (
+                <li
+                  key={m.id}
+                  id={`${id}-opt-${i}`}
+                  data-index={i}
+                  role="option"
+                  aria-selected={current}
+                  onMouseEnter={() => setActive(i)}
+                  onMouseDown={(e) => e.preventDefault()} // 찾기 칸의 초점을 잃지 않게
+                  onClick={() => choose(m)}
+                  className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 text-[14px] ${i === active ? "bg-sky" : ""}`}
+                >
+                  <span className="w-[96px] shrink-0 truncate font-medium text-ink">{m.id}</span>
+                  <span className="min-w-0 truncate text-body">{m.name}</span>
+                  {!m.consent && <span className="shrink-0 rounded-full border border-line px-2 text-[11px] leading-5 text-muted">동의 안 함</span>}
+                  {current && <span className="ml-auto shrink-0 text-[12px] font-bold text-brand">수정 중</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

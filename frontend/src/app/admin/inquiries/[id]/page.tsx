@@ -1,6 +1,7 @@
-// 예전 문의 상세 전체 화면 주소 ("/admin/inquiries/q20261117-0001").
-// 상세는 이제 문의 목록 위의 팝업으로만 보므로, 이 주소로 들어오면 그 문의의 팝업이 열린 목록으로 보낸다 (예전 링크·즐겨찾기용).
-// 주소의 문의번호(useParams)는 실행할 때만 알 수 있는 값이라 Suspense 로 감싼다 (next.config 의 cacheComponents 규칙).
+// 예전 문의 상세 전체 화면 주소 (예: "/admin/inquiries/q20261117-0001").
+// 이제 상세는 문의 목록 위의 창(모달)으로 보므로, "/admin/inquiries?open=문의번호" 로 보낸다.
+// 주소의 문의번호(useParams)는 실행할 때만 알 수 있는 값이라 Suspense 로 감싼다
+// (next.config 의 cacheComponents: 감싸지 않으면 build 의 미리 만들기 단계에서 멈춘다).
 "use client";
 
 import { useParams, useRouter } from "next/navigation";

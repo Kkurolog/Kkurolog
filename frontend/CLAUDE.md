@@ -15,8 +15,8 @@ frontend/src/
 │  ├─ admin/              # 관리자 화면 (noindex, 학생 화면에서 링크하지 않음). 로그인 전엔 어느 주소든 로그인 창
 │  │  ├─ layout.tsx       # noindex + AdminShell(로그인 확인·관리자 사이드바)
 │  │  ├─ page.tsx         # "/admin" → "/admin/inquiries" 로 보냄
-│  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호), 줄을 누르면 상세 팝업. [id]/ 는 예전 주소 → 팝업 열린 목록으로 보냄
-│  │  ├─ review/          # 확인필요 목록 (자동 전달 못 한 멘토 답장)
+│  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호) + 줄을 누르면 문의 상세 창(모달). [id]/ 는 예전 전체 화면 주소 → ?open= 으로 보냄. '확인 필요' 필터 = 자동 전달 못 한 멘토 답장(ReviewTable)
+│  │  ├─ review/          # 예전 확인 필요 목록 주소 → "/admin/inquiries?status=review" 로 보냄
 │  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 + 삭제 (문의 기록이 없는 멘토만)
 │  │  ├─ imports/         # 인터뷰 넣기: txt 올리기 + 파일 목록, [id]/ 는 파일별 검토 화면 (원문 | 글 정보·개인정보·사람·조각)
 │  │  └─ settings/        # 메일 설정 (탭 6개)
@@ -33,7 +33,7 @@ frontend/src/
 │  ├─ ContactModal.tsx    # 멘토에게 메일 쓰기 창 (작성 → 전송 중 → 완료, 닫기 확인)
 │  ├─ ConfirmDialog.tsx   # 확인 창 ("새 채팅을 시작할까요?", "작성을 그만둘까요?")
 │  ├─ icons.tsx           # 선 아이콘 모음 (이모지 대신 사용)
-│  └─ admin/              # 관리자 화면 조각: AdminShell(틀·사이드바), AdminLogin, InquiryDetailModal(문의 상세 팝업), MentorFormModal, ImportReview(인터뷰 검토), ui(표·pill·쪽 번호)
+│  └─ admin/              # 관리자 화면 조각: AdminShell(틀·사이드바), AdminLogin, InquiryDetailModal(문의 상세 창, 메일 쓰기 창과 같은 톤), ReviewTable(확인 필요 표), MentorFormModal, ImportReview(인터뷰 검토), ui(표·pill·쪽 번호)
 └─ lib/
    ├─ api.ts              # backend 호출 함수 + 응답 타입 (backend/app/schemas.py와 맞춤)
    ├─ adminApi.ts         # 관리자 API 호출 + 타입 (backend/app/admin/models.py와 맞춤). token 은 sessionStorage, 401 이면 로그아웃
