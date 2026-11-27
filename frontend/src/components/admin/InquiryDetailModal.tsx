@@ -1,5 +1,5 @@
 // 문의 상세 창(모달). 문의 목록·확인 필요 표에서 줄을 누르면 뜬다.
-// 모양은 학생 화면의 '메일 쓰기 창'(ContactModal)과 같은 톤: 720px 크림 바탕 + 파란 테두리 + 칸마다 옅은 파란 구분선.
+// 모양은 학생 화면의 '메일 쓰기 창'(ContactModal)과 같은 톤: 720px (바탕은 흰색) + 파란 테두리 + 칸마다 옅은 파란 구분선.
 // 휴대폰(sm 미만)에서는 아래에서 올라오는 시트. X·바깥 배경·Esc 로 닫는다.
 // 내용: 메일 제목·문의번호·답장 여부 → 학생 이름·메일, 멘토 이름, 보낸 일시, 멘토 답변 일시 → 메일 내용 → 답장 내역(오래된 것부터).
 // 학생(미성년자) 개인정보가 보이는 곳이라 필요한 칸만 보여주고, 어디에도 로그로 남기지 않는다.
@@ -61,7 +61,7 @@ export default function InquiryDetailModal({ id, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="inquiry-title"
-        className="relative flex h-[92dvh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-3xl border-2 border-b-0 border-brand bg-canvas motion-safe:animate-slide-up sm:h-[720px] sm:max-h-[calc(100dvh-32px)] sm:rounded-3xl sm:border-b-2 sm:motion-safe:animate-pop-in focus:outline-none"
+        className="relative flex h-[92dvh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-3xl border-2 border-b-0 border-brand bg-surface motion-safe:animate-slide-up sm:h-[720px] sm:max-h-[calc(100dvh-32px)] sm:rounded-3xl sm:border-b-2 sm:motion-safe:animate-pop-in focus:outline-none"
         onClick={(e) => e.stopPropagation()} // 창 안쪽을 눌렀을 때는 닫히지 않게
       >
         {/* 머리: 답장 여부·문의번호 + 메일 제목, 오른쪽 X */}
