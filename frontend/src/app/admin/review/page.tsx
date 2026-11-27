@@ -1,17 +1,16 @@
 // 확인필요 목록 (주소 "/admin/review", 와이어프레임 04-4)
 // 학생에게 자동으로 전달하지 못한 멘토 답장. 관리자는 중계 Gmail 의 '메일자동화/확인필요' 라벨에서 원문을 보고 처리한다.
-// 문의번호가 있는 줄을 누르면 그 문의의 전체 화면 상세로 간다.
+// 문의번호가 있는 줄을 누르면 그 문의의 상세 팝업이 뜬다.
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAdmin } from "@/components/admin/AdminShell";
+import InquiryDetailModal from "@/components/admin/InquiryDetailModal";
 import { AdminPage, ErrorNotice, PageTitle, Pagination, rowLink, tableWrap, td, th } from "@/components/admin/ui";
 import { AlertIcon } from "@/components/icons";
 import { AdminApiError, fetchReview, formatDateTime, PAGE_SIZE, reasonLabel, type Paged, type ReviewItem } from "@/lib/adminApi";
 
 export default function ReviewPage() {
-  const router = useRouter();
   const { setReviewTotal } = useAdmin();
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<{ page: number; data?: Paged<ReviewItem>; error?: string } | null>(null);
@@ -31,7 +30,9 @@ export default function ReviewPage() {
   }, [page, setReviewTotal]);
 
   const current = result?.page === page ? result : null;
-  const open = (id: string | null) => id && router.push(`/admin/inquiries/${encodeURIComponent(id)}`);
+  const [openId, setOpenId] = useState<string | null>(null); // 상세 팝업으로 연 문의번호
+  const open = (id: string | null) => id && setOpenId(id);
+  const closeDetail = useCallback(() => setOpenId(null), []);
 
   return (
     <AdminPage>
@@ -112,6 +113,8 @@ export default function ReviewPage() {
       )}
 
       {current?.data && <Pagination page={page} total={current.data.total} pageSize={PAGE_SIZE} onChange={setPage} />}
+
+      {openId && <InquiryDetailModal id={openId} onClose={closeDetail} />}
     </AdminPage>
   );
 }
