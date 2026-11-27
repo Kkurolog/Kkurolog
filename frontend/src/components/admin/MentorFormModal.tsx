@@ -3,7 +3,10 @@
 // - 수정: 멘토 ID 칸이 드롭다운이다. 눌러서 목록(ID·이름으로 찾기)에서 수정할 멘토를 고른다.
 //         고친 내용이 있는데 다른 멘토로 바꾸면 '저장하지 않고 바꿀까요?'를 먼저 묻는다.
 //         ID 자체는 바꿀 수 없다. 바뀐 칸만 보낸다. 메일 주소를 비우면 지운다. 바뀐 게 없으면 '바꿀 내용이 없어요.'
-// - 연락 가능으로 두려면 참여 동의 + 메일 주소가 모두 있어야 한다. 어기면 문구를 보여주고 저장 버튼을 끈다.
+// - 연락 가능으로 두려면 참여 동의 + 메일 주소가 모두 있어야 한다.
+//   참여 동의가 꺼져 있으면 연락 가능 스위치는 회색으로 잠기고(마우스를 올리면 안내), 참여 동의를 끄면 연락 가능도 같이 꺼진다.
+//   메일 주소 없이 연락 가능을 켜면 문구를 보여주고 저장 버튼을 끈다.
+// - 참여 동의가 꺼진 채로 추가하면 '학생 화면에 보이지 않아요. 그대로 추가할까요?'를 먼저 묻는다.
 // - 삭제는 멘토 목록의 '멘토 삭제' 버튼으로 한다 (문의 기록이 없는 멘토만). 쉬게 하려면 연락 가능을 끈다.
 "use client";
 
@@ -69,6 +72,7 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
   const editing = mode === "edit";
   const [mentor, setMentor] = useState<AdminMentor | null>(initial); // 지금 수정 중인 멘토
   const [pendingSwitch, setPendingSwitch] = useState<AdminMentor | null>(null); // 저장 안 한 채 바꾸려는 멘토
+  const [askNoConsent, setAskNoConsent] = useState(false); // 참여 동의가 꺼진 채 추가할지 묻는 창
   const locked = editing && !mentor; // 수정할 멘토를 아직 안 골랐으면 아래 칸을 잠근다
   const [form, setForm] = useState<Form>(() => toForm(initial ?? undefined));
   const [busy, setBusy] = useState(false);
@@ -84,11 +88,11 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !pendingSwitch) onClose();
+      if (e.key === "Escape" && !pendingSwitch && !askNoConsent) onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, pendingSwitch]);
+  }, [onClose, pendingSwitch, askNoConsent]);
 
   // 드롭다운에서 다른 멘토를 골랐을 때: 고친 내용이 있으면 먼저 묻는다
   function pickMentor(next: AdminMentor) {
@@ -110,6 +114,12 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
     setForm((f) => ({ ...f, [key]: value }));
     setMessage(null);
     if (key === "id") setIdError(null);
+  }
+
+  // 참여 동의를 끄면 연락 가능도 같이 끈다 (동의 없이는 연락을 받을 수 없다)
+  function setConsent(on: boolean) {
+    setForm((f) => ({ ...f, consent: on, available: on ? f.available : false }));
+    setMessage(null);
   }
 
   // ---- 칸별 검사
@@ -146,10 +156,21 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
     return out;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (locked) return;
     setTouched({ id: true, name: true, exitYear: true, email: true });
+    if (hasError || busy) return;
+    // 참여 동의가 꺼진 채로 추가하면 학생 화면에 안 보인다 → 그대로 추가할지 먼저 묻는다
+    if (!editing && !form.consent) {
+      setAskNoConsent(true);
+      return;
+    }
+    void save();
+  }
+
+  async function save() {
+    setAskNoConsent(false);
     if (hasError || busy) return;
 
     let body: MentorUpdate | null = null;
@@ -339,13 +360,16 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
           {/* 경고 문구는 흰 박스 아래에 띄운다 (박스 안에 넣으면 문구가 나올 때 박스가 늘어나 어색하다) */}
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-4 py-4">
+              <Toggle label="참여 동의" checked={form.consent} onChange={setConsent} />
+              <div aria-hidden="true" className="border-t border-line" />
+              {/* 참여 동의가 꺼져 있으면 잠근다 (회색). 마우스를 올리면 이유를 알려 준다 */}
               <Toggle
-                label="참여 동의"
-                hint="끄면 학생 화면 어디에도 이 멘토가 보이지 않아요."
-                checked={form.consent}
-                onChange={(v) => set("consent", v)}
+                label="연락 가능 여부"
+                checked={form.available}
+                onChange={(v) => set("available", v)}
+                disabled={!form.consent}
+                title={form.consent ? undefined : "참여 동의를 먼저 켜 주세요"}
               />
-              <Toggle label="연락 가능 여부" hint="켜면 학생이 이 멘토에게 메일을 보낼 수 있어요." checked={form.available} onChange={(v) => set("available", v)} />
             </div>
             {ruleBroken && (
               <p
@@ -379,6 +403,19 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
           </button>
         </div>
       </form>
+
+      {askNoConsent && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmDialog
+            title="그대로 추가할까요?"
+            body="참여 동의가 꺼져 있어 학생 화면에 보이지 않아요."
+            cancelLabel="돌아가기"
+            confirmLabel="추가"
+            onCancel={() => setAskNoConsent(false)}
+            onConfirm={() => void save()}
+          />
+        </div>
+      )}
 
       {pendingSwitch && (
         <div onClick={(e) => e.stopPropagation()}>
@@ -556,14 +593,30 @@ function Field({ id, label, error, hint, children }: { id: string; label: string
   );
 }
 
-function Toggle({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  checked,
+  onChange,
+  disabled = false,
+  title,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean; // 잠그면 회색으로 흐려지고 누를 수 없다
+  title?: string; // 마우스를 올렸을 때 뜨는 안내
+}) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4">
-      <span className="flex flex-col gap-0.5">
-        <span className="text-[13px] font-bold text-ink">{label}</span>
-        <span className="text-[12px] text-muted">{hint}</span>
-      </span>
-      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+    <label title={title} className={`flex items-center justify-between gap-4 ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}>
+      <span className="text-[13px] font-bold text-ink">{label}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
       <span
         aria-hidden="true"
         className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2 ${
