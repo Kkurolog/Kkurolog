@@ -14,7 +14,7 @@ import { useState } from "react";
 import { useChat } from "@/lib/useChat";
 import ConfirmDialog from "./ConfirmDialog";
 import Logo from "./Logo";
-import { CloseIcon, HistoryIcon, MenuIcon, NewChatIcon, SidebarIcon, UserIcon } from "./icons";
+import { CloseIcon, HistoryIcon, MailIcon, MenuIcon, NewChatIcon, SidebarIcon } from "./icons";
 
 // 마우스를 올리거나 키보드로 초점이 가면 보이는 작은 말풍선
 function Tooltip({ label, side = "right" }: { label: string; side?: "right" | "bottom" }) {
@@ -132,7 +132,7 @@ export default function NavBar() {
             aria-current={onMentors ? "page" : undefined}
             className={`${iconButton} ${onMentors ? "bg-surface" : ""}`}
           >
-            <UserIcon className="size-6" />
+            <MailIcon className="size-6" />
             <Tooltip label="멘토 리스트" />
           </Link>
           <button
@@ -181,7 +181,7 @@ export default function NavBar() {
                 aria-current={onMentors ? "page" : undefined}
                 className={menuItem(onMentors)}
               >
-                <UserIcon className="size-6 text-brand" />
+                <MailIcon className="size-6 text-brand" />
                 멘토 리스트
               </Link>
             </nav>

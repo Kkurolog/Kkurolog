@@ -255,7 +255,6 @@ export default function GuidePage() {
             <ul className="mt-1.5 flex flex-col gap-1 text-[13px] leading-relaxed text-body sm:mt-2 sm:text-sm">
               <li>• 인터뷰에 없는 내용은 지어내지 않아요. 자료가 부족하면 솔직하게 말하고 선배를 추천해요.</li>
               <li>• 대화 기록은 서버가 아니라 이 브라우저에만 저장돼요. 사이드바 &apos;최근 대화&apos;에서 보거나 지울 수 있어요.</li>
-              <li className="hidden sm:list-item">• 지금 보이는 답변과 멘토는 시험용(demo) 데이터예요.</li>
             </ul>
           </div>
 
