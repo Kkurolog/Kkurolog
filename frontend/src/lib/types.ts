@@ -25,6 +25,7 @@ export type AssistantMessage = {
   moreHint?: boolean; // 맺음말에 "다른 선배 이야기도 더 있어요"가 붙었는지 (대화당 한 번만 붙이려고 기억한다)
   crisisNotice?: boolean; // 위기 안내였는지 (같은 대화에서 전체 문구를 되풀이하지 않으려고 기억한다)
   preface?: string | null; // 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때)
+  showMentors?: boolean; // 멘토·프로필을 찾는 말에 대한 답인지. true 면 답변 글 아래에 멘토 카드를 그린다
   noMore?: boolean; // 이어지는 질문에 더 전할 이야기가 없는지 ("여기까지예요"로 안내한다)
   temporaryError?: boolean; // 서버 쪽 문제로 답하지 못했는지 (근거 부족과 구분해서 안내한다)
   mentors: MentorRecommendation[]; // 관련 경험을 가진 추천 멘토 (0~3명)

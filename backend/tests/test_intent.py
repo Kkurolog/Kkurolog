@@ -590,3 +590,40 @@ def test_more_hint_is_shown_once_per_conversation():
 
     again = hint_pipeline(["startup"]).answer("창업 대학", more_hint_shown=True)
     assert not again.more_hint and MORE_STORIES_HINT not in (again.structured.closing or "")
+
+
+# ---- 멘토·프로필을 찾는 말 (mentor_request): 인터뷰 대신 멘토 카드 ----
+
+
+def test_mentor_request_skips_search_and_asks_screen_to_show_mentors():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    p, gen, _ = pipeline_with(IntentResult(intent="mentor_request", career_paths=["startup"]))
+    result = p.answer("창업 멘토 추천해줘")
+    assert result.answer == MENTOR_MESSAGE and result.answer_type == "off_topic"
+    assert gen.calls == []  # 인터뷰 검색·답변 모델을 부르지 않는다
+    res = to_ask_response(result)
+    assert res.show_mentors is True and res.intent == "mentor_request"
+    assert res.has_enough_evidence is True and res.sources == []
+    assert res.mentor_query == "창업 멘토 추천해줘 창업"  # 길 이름(한글)을 붙여 멘토 추천이 고르기 쉽게
+
+
+def test_mentor_request_follow_up_uses_previous_topic():
+    intent = IntentResult(intent="mentor_request", standalone_question="창업한 선배의 프로필을 추천해줘")
+    p, _, _ = pipeline_with(intent)
+    res = to_ask_response(p.answer("프로필 추천해줘", previous_question="창업한 선배 있어?"))
+    assert res.show_mentors and res.mentor_query == "창업한 선배의 프로필을 추천해줘"
+
+
+def test_other_answers_do_not_show_mentors():
+    p, _, _ = pipeline_with(IntentResult(intent="career_question"))
+    res = to_ask_response(p.answer("창업 대학"))
+    assert res.show_mentors is False and res.mentor_query is None
+    p, _, _ = pipeline_with(IntentResult(intent="about_service", about_aspect="what"))
+    assert to_ask_response(p.answer("넌 누구야")).show_mentors is False
+
+
+def test_mentor_message_does_not_promise_contact_details():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    assert "연락처는 보이지 않아요" in MENTOR_MESSAGE and "@" not in MENTOR_MESSAGE

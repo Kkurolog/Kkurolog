@@ -63,6 +63,14 @@ async function buildReply(question: string, context: AskContext): Promise<Assist
       askQuestion(question, context),
       recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
     ]);
+    // 멘토·프로필을 찾는 말이면, backend 가 정리해 준 말(mentor_query)로 멘토를 다시 추천받는다.
+    // ("프로필 추천해줘"처럼 이어지는 말에는 주제가 없어서, 처음 받은 추천은 '다양한 멘토'일 수 있다)
+    let mentors = recommend.recommendations;
+    if (result.show_mentors && result.mentor_query && result.mentor_query !== question) {
+      mentors = await recommendMentors(result.mentor_query)
+        .then((r) => r.recommendations)
+        .catch(() => mentors);
+    }
     return {
       id: newId(),
       role: "assistant",
@@ -74,13 +82,14 @@ async function buildReply(question: string, context: AskContext): Promise<Assist
       followUps: result.follow_ups ?? [],
       emphasis: result.emphasis ?? null,
       hasEnoughEvidence: result.has_enough_evidence,
+      showMentors: result.show_mentors ?? false,
       noMore: result.no_more ?? false,
       safetyNotice: result.safety_notice ?? false,
       crisisNotice: result.crisis_notice ?? false,
       moreHint: result.more_hint ?? false,
       preface: result.preface ?? null,
       temporaryError: result.temporary_error ?? false,
-      mentors: recommend.recommendations,
+      mentors,
     };
   } catch (err) {
     return {

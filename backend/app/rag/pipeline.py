@@ -33,6 +33,7 @@ from app.rag.intent import (
     IntentResult,
     emotional_reply_for,
     fixed_reply_for,
+    mentor_query,
     has_emotion_word,
     preface_for,
 )
@@ -306,6 +307,8 @@ class RagPipeline:
                     about_aspect=fixed.about_aspect,
                     follow_ups=fixed.follow_ups,
                     emphasis=fixed.emphasis,
+                    # 멘토·프로필을 찾는 말이면 화면이 멘토 카드를 그린다 (인터뷰 검색·답변 모델은 건너뛴다)
+                    mentor_query=mentor_query(intent, question) if intent.intent == "mentor_request" else None,
                     **meta,
                 )
 
