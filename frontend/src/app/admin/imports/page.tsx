@@ -115,11 +115,9 @@ export default function ImportsPage() {
 
   return (
     <AdminPage>
-      <PageTitle sub="졸업생 인터뷰·에세이 txt를 올리면 AI가 말한 사람·조각·태그·개인정보 의심 부분 초안을 만들어요. 검토하고 공개해야 학생 답변에 쓰여요.">
-        인터뷰 넣기
-      </PageTitle>
+      <PageTitle>인터뷰 넣기</PageTitle>
 
-      {/* 올리기 */}
+      {/* 올리기 (PC 한 화면에 목록 10줄까지 들어가게 한 줄 높이로) */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -131,15 +129,20 @@ export default function ImportsPage() {
           setDragging(false);
           if (!uploading) handleFiles(e.dataTransfer.files);
         }}
-        className={`flex flex-col items-center gap-3 rounded-[20px] border-2 border-dashed px-6 py-10 text-center transition-colors ${
+        className={`flex flex-col items-center gap-3 rounded-[20px] border-2 border-dashed px-6 py-3 text-center transition-colors sm:flex-row sm:text-left ${
           dragging ? "border-brand bg-sky" : "border-line bg-surface"
         }`}
       >
-        <UploadIcon className="size-8 text-brand" />
-        <p className="text-[15px] font-bold text-ink">txt 파일을 여기에 끌어다 놓으세요</p>
-        <p className="text-[12px] text-muted">
-          한 번에 {MAX_IMPORT_FILES}개까지, 파일 하나에 {MAX_IMPORT_CHARS.toLocaleString()}자까지. 한 파일에 여러 명의 인터뷰가 섞여 있어도 괜찮아요.
-        </p>
+        <UploadIcon className="size-7 shrink-0 text-brand" />
+        <div className="flex flex-1 flex-col gap-0.5">
+          <p className="text-[14px] text-ink">
+            <span className="font-bold">졸업생 인터뷰·에세이 txt를 여기에 끌어다 놓으세요.</span>{" "}
+            <span className="text-body">AI가 사람·조각·태그·개인정보 의심 부분 초안을 만들고, 검토·공개해야 학생 답변에 쓰여요.</span>
+          </p>
+          <p className="text-[12px] text-muted">
+            한 번에 {MAX_IMPORT_FILES}개까지, 파일 하나에 {MAX_IMPORT_CHARS.toLocaleString()}자까지. 한 파일에 여러 명의 인터뷰가 섞여 있어도 괜찮아요.
+          </p>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -152,7 +155,7 @@ export default function ImportsPage() {
         />
         <label
           htmlFor="import-files"
-          className={`mt-1 inline-flex h-11 cursor-pointer items-center rounded-full px-6 text-[14px] font-bold text-white ${
+          className={`inline-flex h-11 shrink-0 cursor-pointer items-center rounded-full px-6 text-[14px] font-bold text-white ${
             uploading ? "pointer-events-none bg-line text-muted" : "bg-brand hover:bg-brand-dark"
           }`}
         >
@@ -165,12 +168,14 @@ export default function ImportsPage() {
         </p>
       )}
 
-      {/* 목록 */}
-      <h2 className="mt-10 mb-3 text-[16px] font-bold text-ink">올린 파일</h2>
+      {/* 올린 파일 목록 */}
+      <h2 className="sr-only">올린 파일</h2>
       {error ? (
-        <ErrorNotice message={error} />
+        <div className="mt-6">
+          <ErrorNotice message={error} />
+        </div>
       ) : (
-        <div className={tableWrap}>
+        <div className={`mt-5 ${tableWrap}`}>
           <table className="w-full min-w-[760px] table-fixed">
             <colgroup>
               <col />

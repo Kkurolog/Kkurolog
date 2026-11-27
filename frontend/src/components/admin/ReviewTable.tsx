@@ -42,11 +42,11 @@ export default function ReviewTable({
 
   return (
     <>
-      <div className="mb-4 flex items-start gap-3 rounded-2xl bg-butter px-5 py-4 text-[13px] leading-5 text-ink">
+      <div className="mb-3 flex items-start gap-3 rounded-2xl bg-butter px-5 py-2.5 text-[13px] leading-5 text-ink">
         <AlertIcon className="mt-px size-5 shrink-0 text-brand" />
         <p>
           학생에게 자동으로 전달하지 못한 답장이에요. 중계 Gmail 메일함(라벨 메일자동화/확인필요)에서 원문을 보고 처리해 주세요.
-          <span className="mt-1 block text-[12px] text-body">&lsquo;추가 대화&rsquo; 표시는 첫 답장 이후 이어진 대화에서 온 메일이에요. 본문을 저장하지 않아 Gmail에서만 볼 수 있어요.</span>
+          {/* '추가 대화' 설명은 배지에 마우스를 올리면 보인다 (한 화면에 표가 다 들어가게 한 줄로) */}
         </p>
       </div>
 

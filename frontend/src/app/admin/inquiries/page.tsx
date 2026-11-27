@@ -1,11 +1,10 @@
 // 관리자 문의 목록 (주소 "/admin/inquiries", 와이어프레임 04-2, 상세 패널 04-3)
-// 위: 전체 / 답장 전 / 확인 필요 숫자 카드 → 필터(전체·답장 전·답장 받음·확인 필요) → 표(20개씩) → 쪽 번호
+// 위: 필터(전체·답장 전·답장 받음·확인 필요, 버튼마다 건수) → 표(10개씩) → 쪽 번호. PC 한 화면에 스크롤 없이 들어가게 숫자 카드는 두지 않는다.
 // '확인 필요' 필터는 자동 전달 못 한 멘토 답장 표(ReviewTable)로 바뀐다 (예전 /admin/review 화면을 여기로 옮김).
 // 줄을 누르면 문의 상세 창(모달, InquiryDetailModal)이 가운데에 뜬다.
 // 필터·쪽·열린 문의는 주소(?status=&page=&open=)에 남겨서 새로고침·뒤로 가기에도 그대로 돌아온다.
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useAdmin } from "@/components/admin/AdminShell";
@@ -73,7 +72,7 @@ function Inquiries() {
     };
   }, [filter, page, key]);
 
-  // 숫자 카드 (전체·답장 전). 확인 필요 숫자는 사이드바 배지와 같은 값을 쓴다
+  // 필터 버튼의 건수 (전체·답장 전, 답장 받음 = 전체 - 답장 전). 확인 필요 건수는 사이드바 배지와 같은 값을 쓴다
   useEffect(() => {
     Promise.all([fetchInquiries({ pageSize: 1 }), fetchInquiries({ replied: false, pageSize: 1 })])
       .then(([all, pending]) => setCounts({ all: all.total, pending: pending.total }))
@@ -87,36 +86,37 @@ function Inquiries() {
       <AdminPage>
         <PageTitle>문의 목록</PageTitle>
 
-        {/* 숫자 카드 */}
-        <div className="grid grid-cols-3 gap-3 md:gap-4">
-          <SummaryCard label="전체" value={counts?.all} />
-          <SummaryCard label="답장 전" value={counts?.pending} />
-          <SummaryCard label="확인 필요" value={reviewTotal ?? undefined} href="/admin/inquiries?status=review" />
-        </div>
-
-        {/* 필터 */}
-        <div role="group" aria-label="문의 거르기" className="mt-8 mb-4 flex gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              aria-pressed={filter === f.value}
-              onClick={() => setQuery({ status: f.value === "all" ? null : f.value, page: null })}
-              className={`h-9 rounded-full border px-4 text-[13px] transition-colors ${
-                filter === f.value ? "border-brand bg-brand font-bold text-white" : "border-line bg-surface text-body hover:border-brand hover:text-brand"
-              }`}
-            >
-              {f.label}
-              {f.value === "review" && !!reviewTotal && (
-                <span
-                  aria-label={`${reviewTotal}건`}
-                  className="ml-1.5 inline-block min-w-5 rounded-full bg-butter px-1.5 text-center text-[11px] leading-5 font-bold text-ink"
-                >
-                  {reviewTotal}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* 필터 (건수 포함) */}
+        <div role="group" aria-label="문의 거르기" className="mb-4 flex flex-wrap gap-2">
+          {FILTERS.map((f) => {
+            const count =
+              f.value === "review" ? reviewTotal : counts && { all: counts.all, pending: counts.pending, replied: counts.all - counts.pending }[f.value];
+            return (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={filter === f.value}
+                onClick={() => setQuery({ status: f.value === "all" ? null : f.value, page: null })}
+                className={`h-9 rounded-full border px-4 text-[13px] transition-colors ${
+                  filter === f.value ? "border-brand bg-brand font-bold text-white" : "border-line bg-surface text-body hover:border-brand hover:text-brand"
+                }`}
+              >
+                {f.label}
+                {f.value === "review" && count ? (
+                  // 확인 필요는 처리할 일이 있다는 뜻이라 노란 배지로 눈에 띄게
+                  <span aria-label={`${count}건`} className="ml-1.5 inline-block min-w-5 rounded-full bg-butter px-1.5 text-center text-[11px] leading-5 font-bold text-ink">
+                    {count}
+                  </span>
+                ) : (
+                  count != null && (
+                    <span aria-label={`${count}건`} className={`ml-1.5 font-bold ${filter === f.value ? "text-white/80" : "text-muted"}`}>
+                      {count}
+                    </span>
+                  )
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {filter === "review" && (
@@ -205,22 +205,5 @@ function Inquiries() {
       {/* 문의 상세 창 (주소의 ?open= 에 문의번호가 있으면 뜬다) */}
       {openId && <InquiryDetailModal id={openId} onClose={() => setQuery({ open: null })} />}
     </>
-  );
-}
-
-function SummaryCard({ label, value, href }: { label: string; value?: number; href?: string }) {
-  const inner = (
-    <>
-      <span className="text-[13px] text-body">{label}</span>
-      <span className="text-[26px] leading-9 font-bold text-ink md:text-[32px] md:leading-10">{value ?? "–"}</span>
-    </>
-  );
-  const cls = "flex h-24 flex-col justify-center gap-1 rounded-[20px] border border-line bg-surface px-5";
-  return href ? (
-    <Link href={href} className={`${cls} transition-colors hover:border-brand`}>
-      {inner}
-    </Link>
-  ) : (
-    <div className={cls}>{inner}</div>
   );
 }

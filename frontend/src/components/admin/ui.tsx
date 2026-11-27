@@ -6,16 +6,20 @@ import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
 // 페이지 바깥 여백 + 최대 너비 (Figma: 사이드바 오른쪽 48px, 내용 944px)
 export function AdminPage({ children }: { children: React.ReactNode }) {
   return (
-    <main className="w-full px-4 pt-8 pb-16 sm:px-8 md:px-12 md:pt-12">
+    <main className="w-full px-4 pt-8 pb-8 sm:px-8 md:px-12 md:pt-8">
       <div className="mx-auto flex w-full max-w-[944px] flex-col">{children}</div>
     </main>
   );
 }
 
-export function PageTitle({ children, sub }: { children: React.ReactNode; sub?: string }) {
+// action: 제목 오른쪽에 둘 버튼 (예: 멘토 추가)
+export function PageTitle({ children, sub, action }: { children: React.ReactNode; sub?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-8 flex flex-col gap-2">
-      <h1 className="font-display text-[30px] leading-10 text-brand md:text-[36px] md:leading-[48px]">{children}</h1>
+    <div className="mb-6 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="font-display text-[30px] leading-10 text-brand md:text-[36px] md:leading-[48px]">{children}</h1>
+        {action}
+      </div>
       {sub && <p className="text-[13px] text-muted">{sub}</p>}
     </div>
   );
@@ -44,9 +48,9 @@ export function ErrorNotice({ message }: { message: string }) {
 }
 
 // 표 공통 스타일: 게시판 모양 (흰 박스 없이 위쪽 굵은 파란 선 + 줄마다 구분선 + 아래 마감선)
-// 목록이 길어지면 아래 쪽 번호(Pagination)로 넘긴다. 머리줄 연한 글자, 줄 높이 48px.
-export const th = "h-11 px-3 text-left text-[12px] font-medium whitespace-nowrap text-muted";
-export const td = "h-12 px-3 text-[13px] text-ink";
+// 한 쪽에 10줄씩(PAGE_SIZE), 넘치면 아래 쪽 번호(Pagination)로 넘긴다. PC 한 화면에 스크롤 없이 들어가게 줄 높이 44px.
+export const th = "h-10 px-3 text-left text-[12px] font-medium whitespace-nowrap text-muted";
+export const td = "h-11 px-3 text-[13px] text-ink";
 export const tableWrap = "w-full overflow-x-auto border-t-2 border-b border-t-brand border-b-line";
 export const rowLink =
   "cursor-pointer border-t border-line transition-colors hover:bg-sky focus-visible:bg-sky focus-visible:outline-none";
@@ -64,7 +68,7 @@ export function Pagination({ page, total, pageSize, onChange }: { page: number; 
 
   const circle = "flex size-8 items-center justify-center rounded-full text-[13px]";
   return (
-    <nav aria-label="쪽 번호" className="mt-6 flex items-center justify-center gap-1">
+    <nav aria-label="쪽 번호" className="mt-4 flex items-center justify-center gap-1">
       <button
         type="button"
         onClick={() => onChange(page - 1)}

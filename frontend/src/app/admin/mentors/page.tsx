@@ -1,7 +1,7 @@
 // 관리자 멘토 목록 (주소 "/admin/mentors", 와이어프레임 04-5)
 // 참여 동의하지 않은 멘토와 메일 주소까지 모두 보인다 (관리자만).
 // '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '수정'을 누른다. 멘토는 지울 수 없다.
-// backend 는 멘토 전체를 한 번에 주므로, 쪽 나누기(20명씩)는 화면에서만 한다.
+// backend 는 멘토 전체를 한 번에 주므로, 쪽 나누기(10명씩)는 화면에서만 한다. '멘토 추가'는 제목 오른쪽.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -45,7 +45,23 @@ export default function AdminMentorsPage() {
 
   return (
     <AdminPage>
-      <PageTitle>멘토 목록</PageTitle>
+      <PageTitle
+        action={
+          <button
+              type="button"
+              onClick={() => {
+                setNotice(null);
+                setEditing("new");
+              }}
+              disabled={!mentors}
+              className="h-11 shrink-0 rounded-full bg-brand px-6 text-[14px] font-bold text-white hover:bg-brand-dark disabled:bg-line disabled:text-muted"
+            >
+              멘토 추가
+            </button>
+        }
+      >
+        멘토 목록
+      </PageTitle>
 
       {notice && (
         <p role="status" className="mb-4 rounded-2xl bg-sky px-4 py-3 text-[13px] text-ink">
@@ -139,19 +155,6 @@ export default function AdminMentorsPage() {
 
       {mentors && <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} />}
 
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={() => {
-            setNotice(null);
-            setEditing("new");
-          }}
-          disabled={!mentors}
-          className="h-11 rounded-full bg-brand px-6 text-[14px] font-bold text-white hover:bg-brand-dark disabled:bg-line disabled:text-muted"
-        >
-          멘토 추가
-        </button>
-      </div>
 
       {editing && <MentorFormModal key={editing === "new" ? "new" : editing.id} mentor={editing === "new" ? undefined : editing} onClose={close} onSaved={handleSaved} />}
     </AdminPage>
