@@ -168,6 +168,15 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
+// 드롭다운 열기 (아래 꺾쇠)
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M5 9l7 7 7-7" />
+    </Svg>
+  );
+}
+
 // 로그아웃 (문 밖으로 나가는 화살표)
 export function LogoutIcon({ className }: IconProps) {
   return (

@@ -1,6 +1,7 @@
 // 관리자 멘토 목록 (주소 "/admin/mentors", 와이어프레임 04-5)
 // 참여 동의하지 않은 멘토와 메일 주소까지 모두 보인다 (관리자만).
-// 줄을 눌러 멘토를 고른 뒤 오른쪽 아래 '멘토 수정'을 누르면 수정 창이 뜬다. '멘토 추가'는 그 옆.
+// 오른쪽 아래 '멘토 수정'을 누르면 수정 창이 뜨고, 창의 멘토 ID 드롭다운에서 수정할 멘토를 고른다.
+// 표에서 줄을 미리 눌러 두면 그 멘토가 골라진 채로 열린다 (두 번 누르면 바로 열림). '멘토 추가'는 그 옆.
 // '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '멘토 수정'. 멘토는 지울 수 없다.
 // backend 는 멘토 전체를 한 번에 주므로, 쪽 나누기(10명씩)는 화면에서만 한다.
 "use client";
@@ -16,8 +17,8 @@ const pillButton =
 export default function AdminMentorsPage() {
   const [mentors, setMentors] = useState<AdminMentor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 열린 창: "new" = 추가, 멘토 = 수정, null = 닫힘
-  const [editing, setEditing] = useState<AdminMentor | "new" | null>(null);
+  // 열린 창: 추가 / 수정(처음 고른 멘토, 없으면 null) / 닫힘(null)
+  const [editing, setEditing] = useState<{ mode: "new" } | { mode: "edit"; initial: AdminMentor | null } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null); // 고른 멘토 (줄을 눌러 고른다)
@@ -39,7 +40,8 @@ export default function AdminMentorsPage() {
       next[i] = saved;
       return next;
     });
-    setNotice(editing === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`);
+    setNotice(editing?.mode === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`);
+    setSelectedId(saved.id);
     setEditing(null);
   }
 
@@ -50,7 +52,7 @@ export default function AdminMentorsPage() {
   // 다른 쪽으로 넘기면 고른 것이 안 보이므로, 지금 쪽에 있는 멘토만 고른 것으로 본다
   const selected = shown?.find((m) => m.id === selectedId) ?? null;
 
-  function openEditor(target: AdminMentor | "new") {
+  function openEditor(target: { mode: "new" } | { mode: "edit"; initial: AdminMentor | null }) {
     setNotice(null);
     setEditing(target);
   }
@@ -108,7 +110,7 @@ export default function AdminMentorsPage() {
                     key={m.id}
                     aria-selected={isSelected}
                     onClick={() => setSelectedId(isSelected ? null : m.id)}
-                    onDoubleClick={() => openEditor(m)} // 두 번 누르면 바로 수정 창
+                    onDoubleClick={() => openEditor({ mode: "edit", initial: m })} // 두 번 누르면 바로 수정 창
                     className={`${rowLink} ${isSelected ? "bg-sky" : ""}`}
                   >
                     <td className={`${td} text-center`}>
@@ -159,25 +161,32 @@ export default function AdminMentorsPage() {
 
       {/* 아래 줄: (왼쪽 안내) · 가운데 쪽 번호 · 오른쪽 버튼 두 개 */}
       <div className="mt-4 flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-        <p className="text-[12px] text-muted">{mentors && mentors.length > 0 && !selected && "줄을 눌러 멘토를 고르면 수정할 수 있어요."}</p>
+        <span />
         {mentors ? <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} className="" /> : <span />}
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => selected && openEditor(selected)}
-            disabled={!selected}
-            title={selected ? `${selected.name} 수정` : "수정할 멘토를 먼저 골라 주세요"}
+            onClick={() => openEditor({ mode: "edit", initial: selected })}
+            disabled={!mentors || mentors.length === 0}
             className={pillButton}
           >
             멘토 수정
           </button>
-          <button type="button" onClick={() => openEditor("new")} disabled={!mentors} className={pillButton}>
+          <button type="button" onClick={() => openEditor({ mode: "new" })} disabled={!mentors} className={pillButton}>
             멘토 추가
           </button>
         </div>
       </div>
 
-      {editing && <MentorFormModal key={editing === "new" ? "new" : editing.id} mentor={editing === "new" ? undefined : editing} onClose={close} onSaved={handleSaved} />}
+      {editing && (
+        <MentorFormModal
+          mode={editing.mode}
+          mentors={mentors ?? []}
+          initial={editing.mode === "edit" ? editing.initial : null}
+          onClose={close}
+          onSaved={handleSaved}
+        />
+      )}
     </AdminPage>
   );
 }
