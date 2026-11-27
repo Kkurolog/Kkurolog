@@ -92,8 +92,9 @@ function RuledDivider() {
 }
 
 function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; onOpenSource: Props["onOpenSource"] }) {
-  // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)을 제목 자리에 올린다.
-  const title = card.nickname ? `${card.nickname} 선배` : card.label;
+  // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)만 제목으로 쓴다.
+  // 예전에 저장된 대화에는 status_short 가 없어서, 그때는 one_liner 를 그대로 보여 준다.
+  const status = card.status_short ?? card.one_liner;
 
   return (
     // 바탕·상자 없이 그린다 (흰 상자는 노트 줄 바탕을 가려서 다른 답변과 어울리지 않는다).
@@ -104,10 +105,27 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
         <header className="flex items-center gap-3.5">
           <CardAvatar card={card} order={order} />
           <div className="min-w-0">
-            <h3 className="text-lg leading-7 font-bold break-keep text-ink">{title}</h3>
-            {card.nickname && <p className="text-[15px] leading-6 break-keep text-body">{card.label}</p>}
-            {/* 지금 무엇을 하는지 한 줄. 글에 없으면(null) 줄 자체를 그리지 않는다 */}
-            {card.one_liner && <p className="text-sm leading-6 break-keep text-muted">{card.one_liner}</p>}
+            {/* 첫 줄: "낑깡 선배 · 창업을 꿈으로 키운 길". 별명은 굵게, 길 이름은 보통 굵기 */}
+            <h3 className="text-[17px] leading-7 break-keep text-ink">
+              {card.nickname && (
+                <>
+                  <span className="font-bold">{card.nickname} 선배</span>
+                  <span aria-hidden="true" className="text-muted"> · </span>
+                </>
+              )}
+              <span className={card.nickname ? "text-body" : "font-bold"}>{card.label}</span>
+            </h3>
+            {/* 둘째 줄: [2022년 인터뷰] 배지 + 그때의 상태. 둘 다 없으면 줄 자체를 그리지 않는다 */}
+            {(card.interview_year || status) && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 text-muted">
+                {card.interview_year && (
+                  <span className="shrink-0 rounded-md bg-sky px-2 text-xs leading-6 font-bold whitespace-nowrap text-brand">
+                    {card.interview_year}년 인터뷰
+                  </span>
+                )}
+                {status && <span className="break-keep">{status}</span>}
+              </p>
+            )}
           </div>
         </header>
 
