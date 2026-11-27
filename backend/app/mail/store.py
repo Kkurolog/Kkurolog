@@ -237,6 +237,14 @@ class SupabaseMailStore:
         ) or []
         return result[0] if result else None
 
+    def delete_mentor(self, mentor_id: str) -> bool:
+        """멘토를 지운다. 지웠으면 True, 없는 멘토면 False.
+        문의 기록이 있으면 DB 규칙(inquiries.mentor_id on delete restrict)에 막혀 StoreError(code 23503)가 난다."""
+        result = self._request(
+            "DELETE", "mentors", params={"id": f"eq.{mentor_id}"}, prefer="return=representation"
+        ) or []
+        return bool(result)
+
     def list_settings(self) -> list[dict]:
         return self._request("GET", "mail_settings", params={"select": "key,value,description", "order": "key"}) or []
 

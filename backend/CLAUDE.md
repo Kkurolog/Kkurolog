@@ -28,7 +28,7 @@ backend/
 │  └─ admin/             # 관리자 API /admin/* (명세: apps-script/docs/ADMIN_API.md)
 │     ├─ auth.py         # 공용 비밀번호(ADMIN_PASSWORD) 로그인 → 12시간 로그인 표, 10분 10회 시도 제한
 │     ├─ models.py       # 관리자 요청·응답 형식 (학생용 schemas.py 와 분리)
-│     ├─ router.py       # 문의 목록·상세, 확인필요 목록, 멘토 목록·추가·수정, 설정 보기·수정
+│     ├─ router.py       # 문의 목록·상세, 확인필요 목록, 멘토 목록·추가·수정·삭제(문의 기록 없는 멘토만), 설정 보기·수정
 │     └─ imports.py      # 인터뷰 넣기 /admin/imports/* (txt 업로드 → AI 초안 → 검토 → 공개)
 │  └─ ingest/            # 인터뷰 넣기 규칙·AI·저장 (설명: docs/DATA.md 6장)
 │     ├─ tags.py         # 쓸 수 있는 태그 (docs/TAGS.md 와 같게)

@@ -104,10 +104,14 @@
 ```json
 { "available": false }
 ```
-- 쉬게 할 때는 `available: false` (멘토는 지울 수 없습니다. 문의 기록이 남아 있기 때문).
+- 쉬게 할 때는 `available: false`.
 - `email`에 빈 글자나 `null`을 보내면 메일 주소를 지웁니다.
 - **규칙**: `available: true`이려면 `consent: true`이고 `email`이 있어야 합니다. 어기면 422 "연락 가능으로 두려면 참여 동의와 메일 주소가 모두 있어야 해요."
 - 학생 화면(사이트)에는 바로 반영됩니다: `consent: false`면 어디에도 안 보이고, `available: false`면 "지금 연락을 받지 않아요".
+
+`DELETE /admin/mentors/{id}` → 삭제 (204, 2026-11-27 추가)
+- **문의 기록이 없는 멘토만** 지울 수 있습니다. 기록이 있으면 409 "문의 기록이 있는 멘토는 지울 수 없어요. 쉬게 하려면 '수정'에서 연락 가능을 꺼 주세요." (DB 규칙 `inquiries.mentor_id on delete restrict`가 학생 문의 기록을 지킵니다)
+- 없는 멘토면 404. 지우면 되돌릴 수 없습니다.
 
 ## 6. 메일 설정
 `GET /admin/settings` → 18개
@@ -152,4 +156,4 @@
 `ImportItem`: `{id, filename, status, error, summary: {people, chunks, confirmed, pii} | null, source_id, created_at, updated_at, analyzed_at, published_at}`
 
 ## CORS
-백엔드는 `FRONTEND_ORIGINS`에 있는 주소에서 오는 `GET`, `POST`, `PATCH`, `PUT`, `DELETE` 요청만 받습니다 (`PUT`·`DELETE`는 인터뷰 넣기). 관리자 페이지가 학생 사이트와 다른 주소라면 `FRONTEND_ORIGINS`에 추가합니다.
+백엔드는 `FRONTEND_ORIGINS`에 있는 주소에서 오는 `GET`, `POST`, `PATCH`, `PUT`, `DELETE` 요청만 받습니다 (`PUT`은 인터뷰 넣기, `DELETE`는 인터뷰 넣기·멘토 삭제). 관리자 페이지가 학생 사이트와 다른 주소라면 `FRONTEND_ORIGINS`에 추가합니다.

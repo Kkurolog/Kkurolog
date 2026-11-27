@@ -251,6 +251,11 @@ export function updateMentor(id: string, body: MentorUpdate) {
   });
 }
 
+// 문의 기록이 있는 멘토는 지울 수 없다 (409, '수정'에서 연락 가능을 끄도록 안내)
+export function deleteMentor(id: string) {
+  return request<void>(`/admin/mentors/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function fetchSettings() {
   return request<SettingItem[]>("/admin/settings");
 }
