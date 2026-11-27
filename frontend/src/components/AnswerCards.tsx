@@ -52,13 +52,13 @@ function CardAvatar({ card, order }: { card: AnswerCard; order: number }) {
   );
 }
 
-// 노트 줄 바탕(globals.css 의 paper-lines)은 32px 마다 1px 줄을 긋는다: 각 칸의 31~32px 자리.
-const RULE_GAP = 32;
+// 노트 줄 바탕(globals.css 의 paper-lines)은 64px 마다 1px 줄을 긋는다: 각 칸의 63~64px 자리.
+const RULE_GAP = 64;
 const DIVIDER_HEIGHT = 3; // 구분선 굵기. 바탕 줄(1px)을 가운데에 두고 위아래로 1px 씩 더 굵다
-const DIVIDER_OFFSET = 31 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 30px)
+const DIVIDER_OFFSET = RULE_GAP - 1 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 62px)
 
 // 선배와 선배 사이의 구분선. 새 줄을 따로 긋는 게 아니라, **노트 바탕의 줄 하나를 굵게 만든 것처럼** 보이게 한다.
-// 글의 높이는 32px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
+// 글의 높이는 64px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
 // 그래서 화면에 그려진 뒤 자기 위치를 재고, 바로 아래에 있는 바탕 줄까지 위쪽 여백을 늘려 내려앉는다.
 // 창 크기가 바뀌거나 글이 다시 줄바꿈되면(ResizeObserver) 다시 맞춘다. 노트 바탕 밖에서는 그냥 보통 구분선이다.
 function RuledDivider() {
