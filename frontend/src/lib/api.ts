@@ -30,7 +30,9 @@ export type AnswerCard = {
   senior_label?: string | null; // [추가] "선배 A" 같은 라벨. 카드 제목에 별명 대신 보여 준다
   nickname: string | null; // 선배 별명. 공개 등급 L3 일 때만 오고, 그 외에는 null → label 을 제목으로 쓴다
   label: string; // 그 선배가 택한 길 = 어떻게 갔나 (예: "작게 바로 시작한 길")
-  one_liner: string | null; // 그 선배가 지금 무엇을 하고 있나 (예: "지금은 여행 스타트업을 운영해요"). 글에 없으면 null
+  one_liner: string | null; // status_short 와 같은 값 (예전 화면용). 새 화면은 status_short 를 쓴다
+  status_short?: string | null; // 인터뷰 당시의 상태. 명사형 15자 이내, 회사·학교 이름 없음 (예: "대학 재학 · 프로젝트 활동")
+  interview_year?: number | null; // 그 글이 쓰인 해. "2022년 인터뷰" 배지로 보여 준다
   body: string[]; // 본문 조각 2~4개 (주어 없이 쓴 문장)
   sources: Source[]; // 이 카드가 인용한 글 (카드별 출처, 보통 1개)
   avatar_id: string; // "avatar-1"~"avatar-7". 같은 선배는 항상 같은 값. 그림은 lib/avatar.ts 가 고른다

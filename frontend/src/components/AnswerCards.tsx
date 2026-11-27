@@ -55,13 +55,13 @@ function CardAvatar({ card, order }: { card: AnswerCard; order: number }) {
   );
 }
 
-// 노트 줄 바탕(globals.css 의 paper-lines)은 32px 마다 1px 줄을 긋는다: 각 칸의 31~32px 자리.
-const RULE_GAP = 32;
+// 노트 줄 바탕(globals.css 의 paper-lines)은 64px 마다 1px 줄을 긋는다: 각 칸의 63~64px 자리.
+const RULE_GAP = 64;
 const DIVIDER_HEIGHT = 3; // 구분선 굵기. 바탕 줄(1px)을 가운데에 두고 위아래로 1px 씩 더 굵다
-const DIVIDER_OFFSET = 31 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 30px)
+const DIVIDER_OFFSET = RULE_GAP - 1 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 62px)
 
 // 선배와 선배 사이의 구분선. 새 줄을 따로 긋는 게 아니라, **노트 바탕의 줄 하나를 굵게 만든 것처럼** 보이게 한다.
-// 글의 높이는 32px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
+// 글의 높이는 64px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
 // 그래서 화면에 그려진 뒤 자기 위치를 재고, 바로 아래에 있는 바탕 줄까지 위쪽 여백을 늘려 내려앉는다.
 // 창 크기가 바뀌거나 글이 다시 줄바꿈되면(ResizeObserver) 다시 맞춘다. 노트 바탕 밖에서는 그냥 보통 구분선이다.
 function RuledDivider() {
@@ -136,10 +136,10 @@ export function SourceLinks({
 }
 
 function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; onOpenSource: Props["onOpenSource"] }) {
-  // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)을 제목 자리에 올린다.
-  // 카드 제목은 "선배 A" 라벨. (예전에 저장된 대화에는 라벨이 없어서 별명이나 길 이름을 쓴다)
+  // 카드 제목 앞에는 "선배 A" 라벨을 붙인다. (예전에 저장된 대화에는 라벨이 없어서 별명을 쓰고, 그것도 없으면 길 이름만 쓴다)
   const name = card.senior_label ?? (card.nickname ? `${card.nickname} 선배` : null);
-  const title = name ?? card.label;
+  // 예전에 저장된 대화에는 status_short 가 없어서, 그때는 one_liner 를 그대로 보여 준다.
+  const status = card.status_short ?? card.one_liner;
 
   return (
     // 바탕·상자 없이 그린다 (흰 상자는 노트 줄 바탕을 가려서 다른 답변과 어울리지 않는다).
@@ -150,10 +150,27 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
         <header className="flex items-center gap-3.5">
           <CardAvatar card={card} order={order} />
           <div className="min-w-0">
-            <h3 className="text-lg leading-7 font-bold break-keep text-ink">{title}</h3>
-            {name && <p className="text-[15px] leading-6 break-keep text-body">{card.label}</p>}
-            {/* 지금 무엇을 하는지 한 줄. 글에 없으면(null) 줄 자체를 그리지 않는다 */}
-            {card.one_liner && <p className="text-sm leading-6 break-keep text-muted">{card.one_liner}</p>}
+            {/* 첫 줄: "선배 A · 창업을 꿈으로 키운 길". 라벨은 굵게, 길 이름은 보통 굵기 */}
+            <h3 className="text-[17px] leading-7 break-keep text-ink">
+              {name && (
+                <>
+                  <span className="font-bold">{name}</span>
+                  <span aria-hidden="true" className="text-muted"> · </span>
+                </>
+              )}
+              <span className={name ? "text-body" : "font-bold"}>{card.label}</span>
+            </h3>
+            {/* 둘째 줄: [2022년 인터뷰] 배지 + 그때의 상태. 둘 다 없으면 줄 자체를 그리지 않는다 */}
+            {(card.interview_year || status) && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 text-muted">
+                {card.interview_year && (
+                  <span className="shrink-0 rounded-md bg-sky px-2 text-xs leading-6 font-bold whitespace-nowrap text-brand">
+                    {card.interview_year}년 인터뷰
+                  </span>
+                )}
+                {status && <span className="break-keep">{status}</span>}
+              </p>
+            )}
           </div>
         </header>
 

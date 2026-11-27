@@ -52,6 +52,8 @@ def _to_structured(structured: RagStructured) -> StructuredAnswer:
                 senior_label=card.senior_label or None,
                 label=card.label,
                 one_liner=card.one_liner,
+                status_short=card.status_short,
+                interview_year=card.interview_year,
                 body=card.body,
                 sources=_merge_sources(card.sources),
                 avatar_id=card.avatar_id,

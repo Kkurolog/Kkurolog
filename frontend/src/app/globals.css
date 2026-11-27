@@ -180,13 +180,15 @@
   }
 }
 
-/* 노트 줄무늬 바탕 (메인·채팅 화면). 32px 간격의 연한 블루 줄 */
+/* 노트 줄무늬 바탕 (메인·채팅 화면). 64px 간격의 연한 블루 줄 */
 @utility paper-lines {
+  /* 64px 마다 1px 줄 (각 칸의 63~64px 자리). Figma '꾸로록 답변창 (줄 간격 수정안)'.
+     줄 간격을 바꾸면 components/AnswerCards.tsx 의 RULE_GAP 도 같이 바꾼다 */
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent 31px,
-    color-mix(in srgb, var(--color-line) 70%, transparent) 31px,
-    color-mix(in srgb, var(--color-line) 70%, transparent) 32px
+    transparent 63px,
+    color-mix(in srgb, var(--color-line) 70%, transparent) 63px,
+    color-mix(in srgb, var(--color-line) 70%, transparent) 64px
   );
 }

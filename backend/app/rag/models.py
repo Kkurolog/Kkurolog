@@ -71,7 +71,7 @@ class GeneratedCard(BaseModel):
     """Claude 가 쓴 선배 한 명의 카드."""
 
     label: str = Field(..., description="그 선배가 택한 길 = 어떻게 갔나 (예: '작게 바로 시작한 길')")
-    one_liner: str | None = Field(None, description="지금 무엇을 하고 있나 (예: '지금은 여행 스타트업을 운영해요'). 모르면 None")
+    one_liner: str | None = Field(None, description="인터뷰 당시의 상태, 명사형 15자 이내 (예: '대학 재학 · 프로젝트 활동'). 모르면 None")
     body: list[CardPiece] = Field(default_factory=list)
 
 
@@ -109,7 +109,9 @@ class RagCard(BaseModel):
     nickname: str | None = Field(None, description="공개 등급 L3 인 선배의 별명. 그 외에는 None (화면에는 label 만)")
     senior_label: str = Field("", description="'선배 A' 같은 라벨. 별명 대신 화면에 보여 준다 (답변마다 A 부터 새로 붙인다)")
     label: str
-    one_liner: str | None = None
+    one_liner: str | None = None  # status_short 와 같은 값 (예전 화면용)
+    status_short: str | None = Field(None, description="인터뷰 당시의 상태. 명사형 15자 이내, 회사·학교 이름 없음")
+    interview_year: int | None = Field(None, description="그 글이 쓰인 해. 화면의 'OOOO년 인터뷰' 배지")
     body: list[str]
     sources: list[RagSource] = Field(..., description="이 카드의 조각들이 실제로 인용한 chunk (카드별 출처)")
     avatar_id: str = Field(..., description="'avatar-1'~'avatar-7'. 같은 선배는 어느 답변에서든 같은 값")

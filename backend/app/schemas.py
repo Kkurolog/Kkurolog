@@ -123,9 +123,11 @@ class AnswerCard(BaseModel):
     )
     senior_label: str | None = Field(None, description="'선배 A' 같은 라벨. 카드 제목에 별명 대신 보여 준다")
     label: str = Field(..., description="그 선배가 택한 길 = 어떻게 갔나 (예: '작게 바로 시작한 길')")
-    one_liner: str | None = Field(
-        None, description="그 선배가 지금 무엇을 하고 있나 (예: '지금은 여행 스타트업을 운영해요'). 글에 없으면 null"
+    one_liner: str | None = Field(None, description="status_short 와 같은 값. 예전 화면용이라 새 화면은 쓰지 않는다")
+    status_short: str | None = Field(
+        None, description="인터뷰 당시의 상태. 명사형 15자 이내, 회사·학교 이름 없음 (예: '대학 재학 · 프로젝트 활동'). 모르면 null"
     )
+    interview_year: int | None = Field(None, description="그 글이 쓰인 해 (예: 2022). 화면이 '2022년 인터뷰' 배지로 보여 준다")
     body: list[str] = Field(..., description="본문 조각 2~4개. 근거가 확인된 것만 남는다. 주어 없이 쓴 문장이다")
     sources: list[Source] = Field(..., description="이 카드가 인용한 글 (카드별 출처, 보통 1개)")
     avatar_id: str = Field(

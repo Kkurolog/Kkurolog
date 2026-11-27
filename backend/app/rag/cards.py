@@ -15,8 +15,10 @@
   6. 글로 풀어 쓰기: 카드를 그리지 못하는 화면도 읽을 수 있게 answer 문자열을 만든다
 """
 
+import json
 import logging
 import re
+from pathlib import Path
 
 from app.avatars import avatar_id_for_key, avatar_ids_without_repeats
 from app.rag.models import Chunk, GeneratedCard, GeneratorOutput, RagCard, RagSource, RagStructured
@@ -25,6 +27,42 @@ logger = logging.getLogger("uvicorn.error")
 
 MAX_CARDS = 4
 MAX_PARAGRAPHS = 2  # 카드 한 장의 본문 문단 수. 문단이 길어진 만큼 수를 줄였다 (지시문 6번과 같다)
+
+
+# 인터뷰 당시의 상태를 짧게 적은 표: {글번호: "대학 재학 · 프로젝트 활동"}. 사람이 검토해서 넣은 값이다.
+# 규칙: 명사형, 15자 이내, 회사·학교 이름 없이 직무나 분야만.
+# 표에 없는 글은 답변 모델이 같은 규칙으로 쓴 one_liner 를 대신 쓴다.
+STATUS_SHORT_PATH = Path(__file__).resolve().parent.parent / "data" / "status_short.json"
+STATUS_SHORT_MAX_CHARS = 15
+
+
+def load_status_short(path: Path = STATUS_SHORT_PATH) -> dict[str, str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.exception("status_short.json 을 읽지 못했어요. 답변 모델이 쓴 상태를 대신 씁니다.")
+        return {}
+    return {str(k): v.strip() for k, v in data.items() if isinstance(v, str) and v.strip()}
+
+
+STATUS_SHORT = load_status_short()
+
+
+def interview_year(sources: list[RagSource]) -> int | None:
+    """카드의 첫 출처가 쓰인 해. 화면이 "2022년 인터뷰" 배지로 보여 준다. 날짜를 모르면 None."""
+    for s in sources:
+        match = re.match(r"(\d{4})", s.published_at or "")
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def status_short_for(sources: list[RagSource], written: str | None) -> str | None:
+    """검토된 표에 그 글의 상태가 있으면 그 값, 없으면 답변 모델이 쓴 것(written)."""
+    for s in sources:
+        if s.source_id in STATUS_SHORT:
+            return STATUS_SHORT[s.source_id]
+    return (written or "").strip() or None
 
 
 GREETING_PREFIX = "안녕하세요! "
@@ -88,17 +126,22 @@ def assemble_cards(
     people = [_public_person(ids, given) for _, _, ids in kept]
     # 한 답변 안에서 서로 다른 선배끼리 같은 그림이 나오지 않게 한다 (같은 선배는 같은 그림)
     avatars = avatar_ids_without_repeats([_avatar_key(given[ids[0]]) for _, _, ids in kept])
-    cards = [
-        RagCard(
-            nickname=None,  # 별명은 보여 주지 않는다. 화면에는 '선배 A' 라벨(senior_label)이 나온다 → apply_senior_labels
-            label=card.label.strip(),
-            one_liner=(card.one_liner or "").strip() or None,
-            body=pieces,
-            sources=[to_source(given[i]) for i in ids],
-            avatar_id=avatar,
+    cards = []
+    for (card, pieces, ids), person, avatar in zip(kept, people, avatars):
+        sources = [to_source(given[i]) for i in ids]
+        status = status_short_for(sources, card.one_liner)
+        cards.append(
+            RagCard(
+                nickname=None,  # 별명은 보여 주지 않는다. 화면에는 '선배 A' 라벨(senior_label)이 나온다 → apply_senior_labels
+                label=card.label.strip(),
+                one_liner=status,  # 예전 화면이 읽는 칸. status_short 와 같은 값을 넣는다
+                status_short=status,
+                interview_year=interview_year(sources),
+                body=pieces,
+                sources=sources,
+                avatar_id=avatar,
+            )
         )
-        for (card, pieces, ids), person, avatar in zip(kept, people, avatars)
-    ]
     return RagStructured(
         headline=fill_headline(output.headline, len(cards), greeted),
         compare=(output.compare or "").strip() or None if len(cards) > 1 else None,
@@ -276,8 +319,10 @@ def compose_text(structured: RagStructured) -> str:
     parts += structured.summary  # 문단형이면 문단들만, 혼합형이면 공통 방법 문단이 카드 위에 온다
     for n, card in enumerate(structured.cards, start=1):
         lines = [f"{n}. {card_title(card)}"]
-        if card.one_liner:
-            lines.append(card.one_liner)
+        badge = f"[{card.interview_year}년 인터뷰]" if card.interview_year else ""
+        status_line = " ".join(filter(None, [badge, card.status_short]))
+        if status_line:
+            lines.append(status_line)
         lines += card.body
         lines.append(f"({source_text(card.sources)})")
         parts.append("\n".join(lines))

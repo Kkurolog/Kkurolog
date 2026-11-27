@@ -13,7 +13,7 @@
   {"text": "뭘 물어보면 되나요?", "intent": ["about_service"], "aspect": ["what"]},
   {"text": "너 gpt야?", "intent": ["about_service"], "aspect": ["what"]},
   {"text": "이거 답변 AI가 쓰는 거야?", "intent": ["about_service"], "aspect": ["what", "trust"]},
-  {"text": "멘토 어떻게 찾아?", "intent": ["mentor_request"], "aspect": ["what"]},
+  {"text": "멘토 어떻게 찾아?", "intent": ["mentor_request"]},
   {"text": "선배한테 연락하고 싶어", "intent": ["mentor_request"]},
   {"text": "왜 만든 거야?", "intent": ["about_service"], "aspect": ["why"]},
   {"text": "안녕 왜 만든 거야?", "intent": ["about_service"], "aspect": ["why"], "greeting": true},

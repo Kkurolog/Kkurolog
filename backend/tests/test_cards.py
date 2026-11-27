@@ -147,8 +147,8 @@ def test_compose_text_has_title_pieces_and_per_card_source():
     assert text.split("\n\n") == [
         "선배들의 길이 달랐어요.",
         "두 길이 달라요.",
-        "1. 선배 A · 창업 뒤 대학에 간 길\n창업 뒤 대학에 간 길 한 줄\n창업을 먼저 했대요.\n(2023년 5월, 「p1 제목」)",
-        "2. 선배 B · 쉬어 가며 찾은 길\n쉬어 가며 찾은 길 한 줄\n갭이어를 보냈대요.\n(2023년 5월 글)",
+        "1. 선배 A · 창업 뒤 대학에 간 길\n[2023년 인터뷰] 창업 뒤 대학에 간 길 한 줄\n창업을 먼저 했대요.\n(2023년 5월, 「p1 제목」)",
+        "2. 선배 B · 쉬어 가며 찾은 길\n[2023년 인터뷰] 쉬어 가며 찾은 길 한 줄\n갭이어를 보냈대요.\n(2023년 5월 글)",
         "궁금한 선배에게 더 물어봐요.",  # 선배를 찾는 질문(태그)이 아니면 "더 있어요"를 붙이지 않는다
     ]
 
@@ -393,3 +393,35 @@ def test_instead_sentence_is_lifted_to_sub_headline():
     # 주제를 직접 다룬 답에는 작은 제목이 없다 ("대신"으로 시작하는 문장이 있어도 건드리지 않는다)
     direct = to_ask_response(summary_run([("대신 선배 A는 쉬어 갔다는 이야기가 있어요. 그랬대요.", ["p1-02"])]))
     assert direct.structured.sub_headline is None and len(direct.structured.summary) == 1
+
+
+# ---- 인터뷰 연도 배지와 상태(status_short) ----
+
+
+def test_card_has_interview_year_and_status_short():
+    result = run([card("창업 뒤 대학에 간 길", ("창업을 먼저 했대요.", ["p1-02"]))])
+    only = to_ask_response(result).structured.cards[0]
+    assert only.interview_year == 2023  # p1 은 2023-05-10 글
+    assert only.status_short == "창업 뒤 대학에 간 길 한 줄"  # 표에 없는 글은 답변 모델이 쓴 것
+    assert only.one_liner == only.status_short  # 예전 화면용 칸에도 같은 값
+
+
+def test_reviewed_status_short_wins_over_model_text(monkeypatch):
+    """사람이 검토한 표(status_short.json)에 있는 글은 답변 모델이 쓴 것 대신 그 값을 쓴다."""
+    from app.rag import cards as cards_module
+
+    monkeypatch.setitem(cards_module.STATUS_SHORT, "p1", "대학 재학 · 프로젝트 활동")
+    result = run([card("창업 뒤 대학에 간 길", ("창업을 먼저 했대요.", ["p1-02"]))])
+    assert result.structured.cards[0].status_short == "대학 재학 · 프로젝트 활동"
+    assert "[2023년 인터뷰] 대학 재학 · 프로젝트 활동" in result.answer
+
+
+def test_status_short_file_follows_the_rules():
+    """표에 넣은 값은 15자 이내이고 연도·'기준'·문장 끝맺음이 없다."""
+    import re
+
+    from app.rag.cards import STATUS_SHORT_MAX_CHARS, load_status_short
+
+    for source_id, status in load_status_short().items():
+        assert len(status) <= STATUS_SHORT_MAX_CHARS, (source_id, status)
+        assert not re.search(r"\d{4}|기준|요$|다$", status), (source_id, status)
