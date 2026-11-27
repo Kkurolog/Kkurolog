@@ -1,5 +1,6 @@
 // 메인 화면 (주소 "/"): 꾸로록과 대화하는 채팅 화면.
-// - 대화 전(와이어프레임 01): 가운데에 인사 문구 + 입력창. 아래에 꾸로록 캐릭터(노란 돔 + 눈)와 해시태그 스티커.
+// - 대화 전(와이어프레임 01, Figma '메인페이지_너울'): 가운데에 인사 문구 + 입력창. 입력창 아래에 해시태그 스티커, 맨 아래에 꾸로록 캐릭터(노란 돔 + 눈).
+//   입력창을 누르면(질문 입력 시) 스티커들이 아래로 떨어지며 노란 돔 뒤로 숨는다.
 //   캐릭터를 누르면 추천 질문이 입력창에 한 글자씩 써진다.
 //   오른쪽 아래 접힌 귀퉁이를 넘기면 꾸로록 사용 가이드가 나온다 (GuidePage).
 // - 대화 중(02-0 ~ 02-2): 680px 폭으로 메시지가 위에서 아래로 쌓이고, 입력창은 화면 아래에 붙는다.
@@ -21,12 +22,13 @@ import { useChat } from "@/lib/useChat";
 import { useKeyboardOpen } from "@/lib/useKeyboardOpen";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
-// 메인 화면 주변에 붙은 해시태그 스티커 (꾸밈용, 넓은 화면에서만 보인다). 각자 다른 박자로 둥실둥실 떠 있다
+// 입력창 아래에 놓인 해시태그 스티커 (꾸밈용, 넓은 화면에서만 보인다). 각자 다른 박자로 둥실둥실 떠 있다.
+// 자리는 Figma '꾸로록 메인 — 1' 기준: x = 입력창 폭에 대한 스티커 가운데 위치(%), y = 입력창 아래에서 스티커 가운데까지(px)
 const STICKERS = [
-  { label: "#진로 고민", className: "top-[20%] left-[14%] -rotate-[8deg] bg-accent", delay: "0s" },
-  { label: "#창업", className: "top-[24%] right-[16%] rotate-[8deg] bg-surface", delay: "-1.2s" },
-  { label: "#대학 말고 다른 길", className: "top-[61%] left-[8%] rotate-[6deg] bg-surface", delay: "-2.4s" },
-  { label: "#실패해도 괜찮아", className: "top-[55%] right-[10%] -rotate-[6deg] bg-accent", delay: "-0.6s" },
+  { label: "#거꾸로캠퍼스", x: "13.6%", y: 59, className: "-rotate-[8deg] bg-accent", delay: "0s" },
+  { label: "#창업", x: "37.8%", y: 72, className: "rotate-[8deg] bg-surface", delay: "-1.2s" },
+  { label: "#진로 고민", x: "59.8%", y: 50, className: "-rotate-[9deg] bg-accent", delay: "-2.4s" },
+  { label: "#대학 말고 다른 길", x: "86.3%", y: 69, className: "rotate-[7deg] bg-surface", delay: "-0.6s" },
 ];
 
 // 꾸로록 캐릭터(노란 반원)를 누를 때마다 차례로 입력창에 써 주는 추천 질문.
@@ -60,7 +62,8 @@ function KkuroCharacter({
 }) {
   // 휴대폰에서는 화면 높이에 맞춰 반원이 보이는 높이·눈 크기를 줄인다 (작은 화면에서 입력창과 겹치지 않게)
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[clamp(120px,24dvh,200px)] overflow-hidden lg:h-[267px]">
+    // z-10: 입력창 아래 스티커(z-0)가 떨어질 때 이 돔 뒤로 숨는다
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[clamp(120px,24dvh,200px)] overflow-hidden lg:h-[267px]">
       <button
         type="button"
         onClick={onClick}
@@ -79,6 +82,31 @@ function KkuroCharacter({
           <span className="hidden group-hover:inline group-focus-visible:inline">눌러서 추천 질문 받기</span>
         </span>
       </button>
+    </div>
+  );
+}
+
+// 입력창 아래 해시태그 스티커. tucked 이면 아래로 떨어지며 사라진다 (꾸로록 돔 뒤로 숨음).
+// 겹 세 개: ① 자리 잡기(transform) ② 떨어지기(translate·opacity 전환) ③ 기울기(rotate)·둥실(animate-float 의 translate)
+function Stickers({ tucked }: { tucked: boolean }) {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-full hidden lg:block">
+      {STICKERS.map((s, i) => (
+        <span
+          key={s.label}
+          className={`absolute z-0 block transition-[translate,opacity] duration-500 motion-reduce:transition-none ${
+            tucked ? "translate-y-48 opacity-0 ease-in" : "translate-y-0 opacity-100 ease-out"
+          }`}
+          style={{ left: s.x, top: s.y, transform: "translate(-50%, -50%)", transitionDelay: `${i * 60}ms` }}
+        >
+          <span
+            className={`block rounded-full border-2 border-brand px-[18px] py-2 text-[15px] font-bold whitespace-nowrap text-brand motion-safe:animate-float ${s.className}`}
+            style={{ animationDelay: s.delay }}
+          >
+            {s.label}
+          </span>
+        </span>
+      ))}
     </div>
   );
 }
@@ -159,26 +187,19 @@ export default function Home() {
 
   // 대화 전: 인사 화면
   if (messages.length === 0) {
+    // 질문을 입력하려 하면(입력창에 초점, 추천 질문을 쓰는 중, 쓴 글이 있음) 스티커가 아래로 떨어져 숨는다
+    const stickersTucked = inputFocused || typing || draft.length > 0;
     return (
       <main className="paper-lines relative flex min-h-[480px] flex-1 flex-col items-center overflow-hidden px-5">
-        {STICKERS.map((s) => (
-          // 기울기(rotate)와 둥실 움직임(translate)은 서로 다른 CSS 속성이라 함께 써도 된다
-          <span
-            key={s.label}
-            aria-hidden="true"
-            className={`absolute hidden rounded-full border-2 border-brand px-4 py-1.5 text-[15px] font-bold text-brand motion-safe:animate-float lg:block ${s.className}`}
-            style={{ animationDelay: s.delay }}
-          >
-            {s.label}
-          </span>
-        ))}
-
-        <section className="relative z-10 flex w-full max-w-[680px] flex-col items-center gap-6 pt-[14dvh] text-center sm:pt-[22vh] lg:pt-[30vh]">
-          <p className="rounded-full border-2 border-brand bg-surface px-3 py-1 text-xs font-medium text-brand sm:px-4 sm:text-sm">
+        {/* section 에는 z-index 를 주지 않는다: 그래야 스티커(z-0)가 꾸로록 돔(z-10) 뒤로 숨을 수 있다. 글·입력창은 z-20
+            넓은 화면 윗여백: Figma(832px 높이)처럼 33vh. 키가 낮은 화면에서는 스티커가 돔에 가리지 않게 더 줄인다 (화면 높이 - 540px) */}
+        <section className="relative flex w-full max-w-[680px] flex-col items-center gap-6 pt-[14dvh] text-center sm:pt-[22vh] lg:pt-[max(24px,min(33vh,calc(100dvh_-_540px)))]">
+          {/* 넓은 화면(Figma)에는 이 안내 배지가 없다. 휴대폰·태블릿에서만 보인다 */}
+          <p className="relative z-20 rounded-full border-2 border-brand bg-surface px-3 py-1 text-xs font-medium text-brand sm:px-4 sm:text-sm lg:hidden">
             거꾸로캠퍼스 선배들의 이야기로 답하는 챗봇
           </p>
           {/* 휴대폰에서는 '무엇을 함께 / 고민해볼까요?' 두 줄로 나눠서, 물결 밑줄이 '고민해볼' 아래에 오게 한다 */}
-          <h1 className="relative font-display text-[30px] leading-[44px] text-brand sm:text-[44px] sm:leading-[48px]">
+          <h1 className="relative z-20 font-display text-[30px] leading-[44px] text-brand sm:text-[44px] sm:leading-[48px]">
             <SparkleIcon className="absolute top-1 -left-14 hidden size-4 text-brand motion-safe:animate-twinkle sm:block" />
             무엇을 함께{" "}
             <br className="sm:hidden" />
@@ -201,18 +222,21 @@ export default function Home() {
             까요?
             <SparkleIcon className="absolute -top-8 -right-16 hidden size-9 text-brand motion-safe:animate-twinkle sm:block [animation-delay:-1.2s]" />
           </h1>
-          <div className="mt-4 w-full">
-            <QuestionForm
-              value={draft}
-              onChange={setDraft}
-              onSubmit={ask}
-              loading={loading}
-              typing={typing}
-              inputRef={inputRef}
-              onFocusChange={setInputFocused}
-              placeholder={narrow ? "자기소개를 부탁해 보세요!" : "처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"}
-              autoFocus={!narrow}
-            />
+          <div className="relative mt-4 w-full lg:mt-7">
+            {/* 자동 초점(autoFocus)을 주지 않는다: 처음에는 스티커가 보이고, 입력창을 누르면 떨어지게 (Figma 메인 1 → 2) */}
+            <div className="relative z-20">
+              <QuestionForm
+                value={draft}
+                onChange={setDraft}
+                onSubmit={ask}
+                loading={loading}
+                typing={typing}
+                inputRef={inputRef}
+                onFocusChange={setInputFocused}
+                placeholder={narrow ? "자기소개를 부탁해 보세요!" : "처음이라면, 꾸로록에게 자기소개를 부탁해보세요!"}
+              />
+            </div>
+            <Stickers tucked={stickersTucked} />
           </div>
         </section>
 
