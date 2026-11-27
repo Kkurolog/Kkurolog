@@ -190,7 +190,7 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
 
   const fieldError = (key: keyof typeof errors) => (touched[key] ? errors[key] : null);
   const input = (bad: boolean) =>
-    `h-11 w-full rounded-full border bg-surface px-4 text-[14px] text-ink placeholder:text-placeholder focus:outline-none disabled:bg-canvas disabled:text-muted ${
+    `h-10 w-full rounded-full border bg-surface px-4 text-[14px] text-ink placeholder:text-placeholder focus:outline-none disabled:bg-canvas disabled:text-muted ${
       bad ? "border-danger" : "border-line focus:border-brand"
     }`;
 
@@ -203,9 +203,9 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         noValidate
-        className="flex max-h-[92dvh] w-full max-w-[640px] flex-col rounded-t-3xl border-brand bg-canvas motion-safe:animate-slide-up sm:max-h-[88dvh] sm:rounded-3xl sm:border-2 sm:motion-safe:animate-pop-in"
+        className="flex max-h-[92dvh] w-full max-w-[840px] flex-col rounded-t-3xl border-brand bg-canvas motion-safe:animate-slide-up sm:max-h-[calc(100dvh-32px)] sm:rounded-3xl sm:border-2 sm:motion-safe:animate-pop-in"
       >
-        <div className="flex items-center justify-between border-b border-line px-6 py-4 sm:px-8">
+        <div className="flex items-center justify-between border-b border-line px-6 py-3 sm:px-8">
           <h2 id={`${uid}-title`} className="text-[18px] font-bold text-ink">
             {editing ? "멘토 수정" : "멘토 추가"}
           </h2>
@@ -214,9 +214,10 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
           </button>
         </div>
 
-        <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5 sm:px-8">
+        {/* 넓은 화면은 두 칸씩 놓아서 노트북 화면에서도 스크롤 없이 다 보이게 */}
+        <div className="flex flex-col gap-4 overflow-y-auto px-6 py-3 sm:px-8">
           {editing ? (
-            <Field id={`${uid}-id`} label="멘토 ID" hint="눌러서 수정할 멘토를 골라요. ID 자체는 바꿀 수 없어요.">
+            <Field id={`${uid}-id`} label="멘토 ID" hint="눌러서 수정할 멘토를 골라요 (ID 자체는 못 바꿔요)">
               <MentorPicker id={`${uid}-id`} mentors={mentors} value={mentor} onPick={pickMentor} autoOpen={!mentor} />
             </Field>
           ) : (
@@ -237,7 +238,7 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
           )}
 
           {/* 수정할 멘토를 고르기 전에는 아래 칸을 모두 잠근다 */}
-          <fieldset disabled={locked} className={`flex min-w-0 flex-col gap-5 ${locked ? "opacity-40" : ""}`}>
+          <fieldset disabled={locked} className={`grid min-w-0 grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 ${locked ? "opacity-40" : ""}`}>
 
           <Field id={`${uid}-name`} label="이름 또는 별명" error={fieldError("name")}>
             <input
@@ -267,7 +268,7 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
             />
           </Field>
 
-          <Field id={`${uid}-email`} label="메일 주소" error={fieldError("email")} hint={editing ? "비우고 저장하면 메일 주소를 지워요." : undefined}>
+          <Field id={`${uid}-email`} label="메일 주소" error={fieldError("email")} hint={editing ? "비우고 저장하면 지워요" : undefined}>
             <input
               id={`${uid}-email`}
               type="email"
@@ -281,9 +282,20 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
             />
           </Field>
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-[13px] font-bold text-ink">
-              진로 경로 <span className="font-normal text-muted">(여러 개 고를 수 있어요)</span>
+          <Field id={`${uid}-path`} label="경로 한 줄 요약">
+            <input
+              id={`${uid}-path`}
+              value={form.pathSummary}
+              onChange={(e) => set("pathSummary", e.target.value)}
+              placeholder="예: 거캠 엑시트 → 해외 대학 진학"
+              maxLength={300}
+              className={input(false)}
+            />
+          </Field>
+
+          <fieldset className="flex flex-col gap-2 sm:col-span-2">
+            <legend className="mb-1.5 text-[13px] font-bold text-ink">
+              진로 경로 <span className="text-[12px] font-normal text-muted">여러 개 고를 수 있어요</span>
             </legend>
             <div className="flex flex-wrap gap-2">
               {CAREER_PATHS.map((p) => {
@@ -305,40 +317,30 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
             </div>
           </fieldset>
 
-          <Field id={`${uid}-path`} label="경로 한 줄 요약">
-            <input
-              id={`${uid}-path`}
-              value={form.pathSummary}
-              onChange={(e) => set("pathSummary", e.target.value)}
-              placeholder="예: 거캠 엑시트 → 해외 대학 진학"
-              maxLength={300}
-              className={input(false)}
-            />
-          </Field>
 
-          <Field id={`${uid}-summary`} label="경험 요약">
+          <Field id={`${uid}-summary`} label="경험 요약" className="sm:col-span-2">
             <textarea
               id={`${uid}-summary`}
               value={form.summary}
               onChange={(e) => set("summary", e.target.value)}
               placeholder="멘토의 경험 요약"
               maxLength={1000}
-              rows={3}
+              rows={2}
               className="w-full resize-y rounded-2xl border border-line bg-surface px-4 py-3 text-[14px] leading-6 text-ink placeholder:text-placeholder focus:border-brand focus:outline-none"
             />
           </Field>
 
-          <Field id={`${uid}-tags`} label="주요 경험 태그" hint="쉼표(,)로 나눠 적어요.">
+          <Field id={`${uid}-tags`} label="주요 경험 태그" hint="쉼표(,)로 나눠요">
             <input id={`${uid}-tags`} value={form.tags} onChange={(e) => set("tags", e.target.value)} placeholder="예: 해외 대학, 갭이어" className={input(false)} />
           </Field>
 
-          <Field id={`${uid}-topics`} label="답변 가능 주제" hint="쉼표(,)로 나눠 적어요.">
+          <Field id={`${uid}-topics`} label="답변 가능 주제" hint="쉼표(,)로 나눠요">
             <input id={`${uid}-topics`} value={form.topics} onChange={(e) => set("topics", e.target.value)} placeholder="예: 해외 지원, 갭이어" className={input(false)} />
           </Field>
 
           {/* 경고 문구는 흰 박스 아래에 띄운다 (박스 안에 넣으면 문구가 나올 때 박스가 늘어나 어색하다) */}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-4 py-4">
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-line bg-surface px-4 py-2.5 sm:grid-cols-2 sm:gap-8">
               <Toggle
                 label="참여 동의"
                 hint="끄면 학생 화면 어디에도 이 멘토가 보이지 않아요."
@@ -361,7 +363,7 @@ export default function MentorFormModal({ mode, mentors = [], initial = null, on
           </fieldset>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-line px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8 sm:pb-5">
+        <div className="flex items-center justify-end gap-3 border-t border-line px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-8 sm:pb-4">
           {message && (
             <p role="alert" className="mr-auto text-[13px] text-danger">
               {message}
@@ -474,7 +476,7 @@ function MentorPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={toggle}
-        className={`flex h-11 w-full items-center justify-between gap-3 rounded-full border bg-surface px-4 text-left text-[14px] transition-colors hover:border-brand focus:border-brand focus:outline-none ${
+        className={`flex h-10 w-full items-center justify-between gap-3 rounded-full border bg-surface px-4 text-left text-[14px] transition-colors hover:border-brand focus:border-brand focus:outline-none ${
           open ? "border-brand" : "border-line"
         }`}
       >
@@ -538,19 +540,33 @@ function MentorPicker({
   );
 }
 
-function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string | null; hint?: string; children: React.ReactNode }) {
+// 칸 하나: 이름표(+ 옆에 작은 안내) → 입력 → 오류 문구. 안내를 이름표 옆에 두어 창 높이를 줄인다.
+function Field({
+  id,
+  label,
+  error,
+  hint,
+  className = "",
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string | null;
+  hint?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-[13px] font-bold text-ink">
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <label htmlFor={id} className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-bold text-ink">
         {label}
+        {hint && <span className="text-[12px] font-normal text-muted">{hint}</span>}
       </label>
       {children}
-      {error ? (
+      {error && (
         <p role="alert" className="px-2 text-[12px] text-danger">
           {error}
         </p>
-      ) : (
-        hint && <p className="px-2 text-[12px] text-muted">{hint}</p>
       )}
     </div>
   );
