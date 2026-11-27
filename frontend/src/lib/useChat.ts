@@ -63,6 +63,14 @@ async function buildReply(question: string, context: AskContext): Promise<Assist
       askQuestion(question, context),
       recommendMentors(question).catch(() => ({ recommendations: [], is_fallback: true })),
     ]);
+    // 멘토·프로필을 찾는 말이면, backend 가 정리해 준 말(mentor_query)로 멘토를 다시 추천받는다.
+    // ("프로필 추천해줘"처럼 이어지는 말에는 주제가 없어서, 처음 받은 추천은 '다양한 멘토'일 수 있다)
+    let mentors = recommend.recommendations;
+    if (result.show_mentors && result.mentor_query && result.mentor_query !== question) {
+      mentors = await recommendMentors(result.mentor_query)
+        .then((r) => r.recommendations)
+        .catch(() => mentors);
+    }
     return {
       id: newId(),
       role: "assistant",
@@ -74,13 +82,14 @@ async function buildReply(question: string, context: AskContext): Promise<Assist
       followUps: result.follow_ups ?? [],
       emphasis: result.emphasis ?? null,
       hasEnoughEvidence: result.has_enough_evidence,
+      showMentors: result.show_mentors ?? false,
       noMore: result.no_more ?? false,
       safetyNotice: result.safety_notice ?? false,
       crisisNotice: result.crisis_notice ?? false,
       moreHint: result.more_hint ?? false,
       preface: result.preface ?? null,
       temporaryError: result.temporary_error ?? false,
-      mentors: recommend.recommendations,
+      mentors,
     };
   } catch (err) {
     return {
@@ -161,6 +170,8 @@ function useChatState() {
     ];
     // 이 대화에서 상담 번호 안내를 이미 받았는지 (받았으면 backend 가 같은 긴 안내를 되풀이하지 않는다)
     const safetyNoticeShown = messages.some((m) => m.role === "assistant" && m.safetyNotice);
+    // 바로 앞 답변에 쓴 글 (보인 순서). "첫 번째 선배 프로필 추천해줘"에서 그 선배와 비슷한 멘토를 고르는 데 쓴다
+    const previousSourceIds = lastReply && !lastReply.isError ? lastReply.sources.map((s) => s.interview_id) : [];
     const moreHintShown = messages.some((m) => m.role === "assistant" && m.moreHint);
     const crisisNoticeShown = messages.some((m) => m.role === "assistant" && m.crisisNotice);
     const userMessage: ChatMessage = { id: newId(), role: "user", content: question };
@@ -188,6 +199,7 @@ function useChatState() {
       safetyNoticeShown,
       crisisNoticeShown,
       moreHintShown,
+      previousSourceIds,
     });
     append(id, reply);
     setPendingIds((prev) => prev.filter((p) => p !== id));

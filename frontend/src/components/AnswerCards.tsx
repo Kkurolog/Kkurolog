@@ -15,6 +15,7 @@ import { avatarSrc } from "@/lib/avatar";
 type Props = {
   answer: StructuredAnswer;
   onOpenSource: (source: Source) => void; // 카드의 출처를 눌렀을 때 (오른쪽 출처 패널이 열린다)
+  sources?: Source[]; // 답변 전체의 출처. 정리형 답변(summary)일 때 맨 아래에 모아 보여 준다
 };
 
 // 글 날짜를 읽기 쉽게. "2024-07-31" → "2024년 7월", "2021" → "2021년". 모양이 다르면 그대로 둔다.
@@ -28,7 +29,9 @@ export function formatSourceDate(date: string) {
 // 글 제목과 원문 주소는 backend 가 공개 등급 L3 글에만 보낸다 (제목과 원문에 졸업생 이름이 있어서, 익명 글에는 오지 않는다).
 function cardSourceLabel(source: Source) {
   const when = source.date ? `#${formatSourceDate(source.date)} 글` : "#선배 글"; // 앞의 # 는 출처 표시
-  return source.title ? `${when} · “${source.title}”` : when;
+  const what = source.title ? `${when} · “${source.title}”` : when;
+  // 본문에서 "선배 A"라고 부른 선배의 글이면 같은 라벨을 앞에 붙인다 (누구의 글인지 이어 볼 수 있게)
+  return source.senior_label ? `${source.senior_label} · ${what}` : what;
 }
 
 // 선배 아바타. card.avatar_id("avatar-1"~"avatar-7")에 맞는 그림(public/avatars)을 48px 동그라미로 보여준다.
@@ -52,13 +55,13 @@ function CardAvatar({ card, order }: { card: AnswerCard; order: number }) {
   );
 }
 
-// 노트 줄 바탕(globals.css 의 paper-lines)은 32px 마다 1px 줄을 긋는다: 각 칸의 31~32px 자리.
-const RULE_GAP = 32;
+// 노트 줄 바탕(globals.css 의 paper-lines)은 64px 마다 1px 줄을 긋는다: 각 칸의 63~64px 자리.
+const RULE_GAP = 64;
 const DIVIDER_HEIGHT = 3; // 구분선 굵기. 바탕 줄(1px)을 가운데에 두고 위아래로 1px 씩 더 굵다
-const DIVIDER_OFFSET = 31 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 30px)
+const DIVIDER_OFFSET = RULE_GAP - 1 - (DIVIDER_HEIGHT - 1) / 2; // 구분선의 윗변이 놓일 자리 (칸 안에서 62px)
 
 // 선배와 선배 사이의 구분선. 새 줄을 따로 긋는 게 아니라, **노트 바탕의 줄 하나를 굵게 만든 것처럼** 보이게 한다.
-// 글의 높이는 32px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
+// 글의 높이는 64px 단위로 떨어지지 않아서 CSS 만으로는 줄 위치를 맞출 수 없다.
 // 그래서 화면에 그려진 뒤 자기 위치를 재고, 바로 아래에 있는 바탕 줄까지 위쪽 여백을 늘려 내려앉는다.
 // 창 크기가 바뀌거나 글이 다시 줄바꿈되면(ResizeObserver) 다시 맞춘다. 노트 바탕 밖에서는 그냥 보통 구분선이다.
 function RuledDivider() {
@@ -91,9 +94,52 @@ function RuledDivider() {
   return <div ref={ref} aria-hidden="true" className="bg-line" style={{ height: DIVIDER_HEIGHT }} />;
 }
 
+// 출처 목록. "#2024년 11월 글 · “글 제목”" 한 줄씩. 선배 카드 아래와 정리형 답변 맨 아래에서 같이 쓴다.
+export function SourceLinks({
+  sources,
+  onOpenSource,
+  className = "",
+}: {
+  sources: Source[];
+  onOpenSource: Props["onOpenSource"];
+  className?: string;
+}) {
+  if (sources.length === 0) return null;
+  return (
+    <footer className={`flex flex-col gap-1 text-xs leading-5 text-muted ${className}`}>
+      {sources.map((source) => (
+        <div key={source.interview_id}>
+          {source.visibility === "L3" && source.url ? (
+            // 원문 주소가 있으면(공개 등급 L3): 누르면 원문 글이 새 탭으로 열린다
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="break-keep text-brand underline-offset-4 hover:underline focus-visible:underline"
+            >
+              {cardSourceLabel(source)}
+            </a>
+          ) : (
+            // 원문 주소가 없으면(익명 글): 예전처럼 오른쪽 출처 패널을 연다 ("원문이 공개되지 않아요" 안내)
+            <button
+              type="button"
+              onClick={() => onOpenSource(source)}
+              className="text-left underline-offset-4 hover:underline focus-visible:underline"
+            >
+              {cardSourceLabel(source)}
+            </button>
+          )}
+        </div>
+      ))}
+    </footer>
+  );
+}
+
 function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; onOpenSource: Props["onOpenSource"] }) {
-  // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)을 제목 자리에 올린다.
-  const title = card.nickname ? `${card.nickname} 선배` : card.label;
+  // 카드 제목 앞에는 "선배 A" 라벨을 붙인다. (예전에 저장된 대화에는 라벨이 없어서 별명을 쓰고, 그것도 없으면 길 이름만 쓴다)
+  const name = card.senior_label ?? (card.nickname ? `${card.nickname} 선배` : null);
+  // 예전에 저장된 대화에는 status_short 가 없어서, 그때는 one_liner 를 그대로 보여 준다.
+  const status = card.status_short ?? card.one_liner;
 
   return (
     // 바탕·상자 없이 그린다 (흰 상자는 노트 줄 바탕을 가려서 다른 답변과 어울리지 않는다).
@@ -104,10 +150,27 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
         <header className="flex items-center gap-3.5">
           <CardAvatar card={card} order={order} />
           <div className="min-w-0">
-            <h3 className="text-lg leading-7 font-bold break-keep text-ink">{title}</h3>
-            {card.nickname && <p className="text-[15px] leading-6 break-keep text-body">{card.label}</p>}
-            {/* 지금 무엇을 하는지 한 줄. 글에 없으면(null) 줄 자체를 그리지 않는다 */}
-            {card.one_liner && <p className="text-sm leading-6 break-keep text-muted">{card.one_liner}</p>}
+            {/* 첫 줄: "선배 A · 창업을 꿈으로 키운 길". 라벨은 굵게, 길 이름은 보통 굵기 */}
+            <h3 className="text-[17px] leading-7 break-keep text-ink">
+              {name && (
+                <>
+                  <span className="font-bold">{name}</span>
+                  <span aria-hidden="true" className="text-muted"> · </span>
+                </>
+              )}
+              <span className={name ? "text-body" : "font-bold"}>{card.label}</span>
+            </h3>
+            {/* 둘째 줄: [2022년 인터뷰] 배지 + 그때의 상태. 둘 다 없으면 줄 자체를 그리지 않는다 */}
+            {(card.interview_year || status) && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-6 text-muted">
+                {card.interview_year && (
+                  <span className="shrink-0 rounded-md bg-sky px-2 text-xs leading-6 font-bold whitespace-nowrap text-brand">
+                    {card.interview_year}년 인터뷰
+                  </span>
+                )}
+                {status && <span className="break-keep">{status}</span>}
+              </p>
+            )}
           </div>
         </header>
 
@@ -118,42 +181,52 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
           ))}
         </div>
 
-        <footer className="mt-3 flex flex-col gap-1 text-xs leading-5 text-muted">
-          {card.sources.map((source) => (
-            <div key={source.interview_id}>
-              {source.visibility === "L3" && source.url ? (
-                // 원문 주소가 있으면(공개 등급 L3): 누르면 원문 글이 새 탭으로 열린다
-                <a
-                  href={source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-keep text-brand underline-offset-4 hover:underline focus-visible:underline"
-                >
-                  {cardSourceLabel(source)}
-                </a>
-              ) : (
-                // 원문 주소가 없으면(익명 글): 예전처럼 오른쪽 출처 패널을 연다 ("원문이 공개되지 않아요" 안내)
-                <button
-                  type="button"
-                  onClick={() => onOpenSource(source)}
-                  className="text-left underline-offset-4 hover:underline focus-visible:underline"
-                >
-                  {cardSourceLabel(source)}
-                </button>
-              )}
-            </div>
-          ))}
-        </footer>
+        <SourceLinks sources={card.sources} onOpenSource={onOpenSource} className="mt-3" />
       </article>
     </li>
   );
 }
 
-export default function AnswerCards({ answer, onOpenSource }: Props) {
+// 머리말 바로 아래의 작은 제목 ("대신 ~ 이야기가 있어요."). 머리말(22px, 굵기 700)과 본문(15px, 굵기 400) 사이인 17px·굵기 500 으로 그린다. (불러오는 굵기는 400·500·700 뿐이다)
+function SubHeadline({ text }: { text?: string | null }) {
+  if (!text) return null;
+  return <p className="mt-1 text-[17px] leading-7 font-medium break-keep text-ink">{text}</p>;
+}
+
+export default function AnswerCards({ answer, onOpenSource, sources = [] }: Props) {
+  const summary = answer.summary ?? [];
+  // 문단형 답변: 방법·팁을 묻는 질문. 선배별로 나누지 않고 문단 글로 보여 주고, 출처는 맨 아래에 모은다
+  // (카드도 함께 있으면 혼합형이다 → 아래에서 문단을 카드 위에 그린다)
+  if (summary.length > 0 && answer.cards.length === 0) {
+    return (
+      <section className="flex flex-col text-ink">
+        {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}
+        <SubHeadline text={answer.sub_headline} />
+        <div className="mt-4 flex flex-col gap-3 text-[15px] leading-[1.7] break-keep">
+          {summary.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+          {answer.closing && <p>{answer.closing}</p>}
+        </div>
+        <SourceLinks sources={sources} onOpenSource={onOpenSource} className="mt-4" />
+      </section>
+    );
+  }
+
   return (
     <section className="flex flex-col text-ink">
       {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}
+      <SubHeadline text={answer.sub_headline} />
       {answer.compare && <p className="text-[15px] leading-6 text-muted">{answer.compare}</p>}
+
+      {/* 혼합형: 선배들에게 공통된 방법을 먼저 문단으로 보여 주고, 아래에 선배별 카드를 둔다 */}
+      {summary.length > 0 && (
+        <div className="mt-4 flex flex-col gap-3 text-[15px] leading-[1.7] break-keep">
+          {summary.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+        </div>
+      )}
 
       <ul className="mt-5 flex flex-col gap-5">
         {answer.cards.map((card, i) => (

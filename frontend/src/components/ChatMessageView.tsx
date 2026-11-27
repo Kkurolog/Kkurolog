@@ -6,9 +6,10 @@
 //     3) 그 외 → 글(문단) + 아래에 '출처 · …' 링크 (누르면 오른쪽에 출처 패널이 열린다)
 //   예시 질문(followUps)이 있으면 답변 아래에 버튼으로 그린다.
 // - 근거가 부족하면(hasEnoughEvidence=false) 안내 문구와 함께 이 경험을 가진 선배(멘토)를 보여준다.
-import type { Mentor, Source } from "@/lib/api";
+import Link from "next/link";
+import type { Mentor, MentorRecommendation, Source } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
-import AnswerCards, { formatSourceDate } from "./AnswerCards";
+import AnswerCards, { SourceLinks, formatSourceDate } from "./AnswerCards";
 import { MiniKkuro } from "./Kkuro";
 import MentorCard from "./MentorCard";
 
@@ -58,6 +59,18 @@ export function sourceLabel(source: Source) {
   if (source.title) return ["출처", when, `「${source.title}」`, source.alumni].filter(Boolean).join(" · ");
   if (when) return `출처 · ${when} 글 · ${source.alumni}`;
   return `출처 · ${source.alumni} · ${source.interview_id}`;
+}
+
+// 추천 멘토 카드 묶음 (최대 3명). 근거 부족일 때와, 학생이 멘토·프로필을 찾았을 때(showMentors) 쓴다.
+function MentorGrid({ mentors, onContact }: { mentors: MentorRecommendation[]; onContact: Props["onContact"] }) {
+  if (mentors.length === 0) return null;
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
+      {mentors.map((rec) => (
+        <MentorCard key={rec.mentor.id} mentor={rec.mentor} reason={rec.reason} onContact={onContact} />
+      ))}
+    </div>
+  );
 }
 
 export default function ChatMessageView({
@@ -111,25 +124,18 @@ export default function ChatMessageView({
             연락은 꾸로록이 대신 전달해요.
           </p>
         )}
-        {message.mentors.length > 0 && (
-          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 rounded-3xl border-2 border-brand bg-surface px-6 py-7 sm:grid-cols-3">
-            {message.mentors.map((rec) => (
-              <MentorCard
-                key={rec.mentor.id}
-                mentor={rec.mentor}
-                reason={rec.reason}
-                onContact={onContact}
-              />
-            ))}
-          </div>
-        )}
+        <MentorGrid mentors={message.mentors} onContact={onContact} />
       </div>
     );
   }
 
   // 답변을 어떤 모양으로 그릴지 고른다. 아래 3) 문단 표시는 지우면 안 된다:
   // 근거 부족·위기 안내·무관한 질문은 structured 가 없고, 예전 backend 는 structured 를 아예 보내지 않는다.
-  const cards = message.structured && message.structured.cards.length > 0 ? message.structured : null;
+  // 정리형 답변(summary, 방법·팁 질문)도 같은 컴포넌트가 그린다
+  const cards =
+    message.structured && (message.structured.cards.length > 0 || (message.structured.summary?.length ?? 0) > 0)
+      ? message.structured
+      : null;
   const isAbout = Boolean(message.aboutAspect);
   const followUps = message.followUps ?? [];
 
@@ -143,7 +149,7 @@ export default function ChatMessageView({
       {/* 1) 카드형 답변: 선배별 카드로 그린다. 출처는 카드 안에만 있으므로 아래 출처 목록은 그리지 않는다 */}
       {/* 감정이 담긴 진로 고민이면 카드 위에 한 줄로 먼저 받아 준다 ("막막한 게 당연해요. …") */}
       {cards && message.preface && <p>{message.preface}</p>}
-      {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} />}
+      {cards && <AnswerCards answer={cards} onOpenSource={onOpenSource} sources={message.sources} />}
 
       {/* 2) 꾸로록 자신에 대한 설명: 다른 답변처럼 바탕 없이 글로 그린다 (흰 상자를 두지 않는다. 노트 줄 바탕을 가린다).
              선배 글이 아니라서 출처 대신 작은 안내 한 줄을 붙인다 */}
@@ -167,6 +173,23 @@ export default function ChatMessageView({
           </p>
         ))}
 
+      {/* 학생이 멘토·프로필·연락할 선배를 찾았을 때: 인터뷰 글 대신 멘토 카드를 보여 준다 */}
+      {message.showMentors && (
+        <>
+          {/* 선배 이야기 답변 아래에 붙는 경우(물은 주제를 직접 다룬 글이 적을 때): 멘토에게 직접 물어볼 수 있다고 알린다 */}
+          {cards && <p>이 주제는 비슷한 경험을 가진 선배에게 직접 물어볼 수도 있어요. 첫 연락은 꾸로록이 대신 전해요.</p>}
+          {/* 학생이 답변 속 선배를 가리켰을 때: 그 선배의 글 (누르면 원문이 열린다). 카드 답변은 출처가 이미 위에 있다 */}
+          {!cards && <SourceLinks sources={message.sources} onOpenSource={onOpenSource} />}
+          {message.mentors.length === 0 && <p>지금은 연락할 수 있는 멘토를 찾지 못했어요.</p>}
+          <MentorGrid mentors={message.mentors} onContact={onContact} />
+          <p className="text-sm leading-6">
+            <Link href="/mentors" className="font-bold text-brand underline-offset-4 hover:underline focus-visible:underline">
+              멘토 리스트에서 더 찾아보기
+            </Link>
+          </p>
+        </>
+      )}
+
       {/* 다음에 물어볼 예시 질문: 누르면 그 질문을 바로 보낸다 */}
       {followUps.length > 0 && onAsk && (
         <ul className="flex flex-wrap gap-2">
@@ -185,7 +208,7 @@ export default function ChatMessageView({
         </ul>
       )}
 
-      {!cards && !isAbout && message.sources.length > 0 && (
+      {!cards && !isAbout && !message.showMentors && message.sources.length > 0 && (
         <ul className="flex flex-col gap-1">
           {message.sources.map((source) => (
             <li key={source.interview_id} className="flex flex-col items-start">

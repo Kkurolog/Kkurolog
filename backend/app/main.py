@@ -78,6 +78,7 @@ def ask(request: AskRequest, http_request: Request) -> AskResponse:
         request.safety_notice_shown,
         request.crisis_notice_shown,
         request.more_hint_shown,
+        request.previous_source_ids,
     )
 
 

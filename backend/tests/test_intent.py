@@ -590,3 +590,94 @@ def test_more_hint_is_shown_once_per_conversation():
 
     again = hint_pipeline(["startup"]).answer("창업 대학", more_hint_shown=True)
     assert not again.more_hint and MORE_STORIES_HINT not in (again.structured.closing or "")
+
+
+# ---- 멘토·프로필을 찾는 말 (mentor_request): 인터뷰 대신 멘토 카드 ----
+
+
+def test_mentor_request_skips_search_and_asks_screen_to_show_mentors():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    p, gen, _ = pipeline_with(IntentResult(intent="mentor_request", career_paths=["startup"]))
+    result = p.answer("창업 멘토 추천해줘")
+    assert result.answer == MENTOR_MESSAGE and result.answer_type == "off_topic"
+    assert gen.calls == []  # 인터뷰 검색·답변 모델을 부르지 않는다
+    res = to_ask_response(result)
+    assert res.show_mentors is True and res.intent == "mentor_request"
+    assert res.has_enough_evidence is True and res.sources == []
+    assert res.mentor_query == "창업 멘토 추천해줘 창업"  # 길 이름(한글)을 붙여 멘토 추천이 고르기 쉽게
+
+
+def test_mentor_request_follow_up_uses_previous_topic():
+    intent = IntentResult(intent="mentor_request", standalone_question="창업한 선배의 프로필을 추천해줘")
+    p, _, _ = pipeline_with(intent)
+    res = to_ask_response(p.answer("프로필 추천해줘", previous_question="창업한 선배 있어?"))
+    assert res.show_mentors and res.mentor_query == "창업한 선배의 프로필을 추천해줘"
+
+
+def test_other_answers_do_not_show_mentors():
+    p, _, _ = pipeline_with(IntentResult(intent="career_question"))
+    res = to_ask_response(p.answer("창업 대학"))
+    assert res.show_mentors is False and res.mentor_query is None
+    p, _, _ = pipeline_with(IntentResult(intent="about_service", about_aspect="what"))
+    assert to_ask_response(p.answer("넌 누구야")).show_mentors is False
+
+
+def test_mentor_message_does_not_promise_contact_details():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    assert "연락처는 보이지 않아요" in MENTOR_MESSAGE and "@" not in MENTOR_MESSAGE
+
+
+# ---- 답변 속 선배를 가리킨 멘토 요청: 솔직히 알리고, 그 선배와 같은 길의 멘토를 고르게 한다 ----
+
+
+def mentor_pipeline(**intent):
+    from tests.test_rag_pipeline import make_chunk
+
+    chunks = [
+        make_chunk("a", 1, "창업 이야기").model_copy(update={"career_paths": ["startup"]}),
+        make_chunk("b", 1, "개발 이야기").model_copy(update={"career_paths": ["employment"], "career_fields": ["dev_it"]}),
+    ]
+    analyzer = FakeAnalyzer(IntentResult(intent="mentor_request", **intent))
+    gen = FakeGenerator(answer_output(["a-01"]))
+    return RagPipeline(FakeEmbedder(), InMemoryVectorStore(chunks), gen, RagSettings(similarity_floor=0.5), analyzer), gen
+
+
+def test_pointed_senior_gets_honest_notice_source_link_and_similar_mentors():
+    from app.rag.intent import MENTOR_POINTED_MESSAGE
+
+    p, gen = mentor_pipeline(points_at_shown=True, shown_index=2)
+    result = p.answer("두 번째 선배 프로필 추천해줘", previous_question="선배 있어?", previous_source_ids=["a", "b"])
+    res = to_ask_response(result)
+    assert res.answer == MENTOR_POINTED_MESSAGE and res.show_mentors and gen.calls == []
+    assert [s.interview_id for s in res.sources] == ["b"]  # 가리킨 선배의 글만 (원문 링크)
+    assert res.mentor_query.endswith("취업 개발")  # 그 선배의 길·분야로 멘토를 고른다
+    assert "창업" not in res.mentor_query
+
+
+def test_related_mentor_request_uses_all_previous_seniors_without_notice():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    p, _ = mentor_pipeline()
+    res = to_ask_response(p.answer("관련 있는 선배 프로필 추천해줘", previous_source_ids=["a", "b"]))
+    assert res.answer == MENTOR_MESSAGE and res.sources == []  # 특정 선배를 가리키지 않았으면 알림·링크 없음
+    assert res.mentor_query == "관련 있는 선배 프로필 추천해줘 창업 취업 개발"
+
+
+def test_pointing_without_previous_answer_falls_back_to_plain_mentor_message():
+    from app.rag.intent import MENTOR_MESSAGE
+
+    p, _ = mentor_pipeline(points_at_shown=True, shown_index=1)
+    res = to_ask_response(p.answer("그 선배 프로필 보여줘"))
+    assert res.answer == MENTOR_MESSAGE and res.sources == [] and res.show_mentors
+
+
+def test_pointed_index_out_of_range_uses_all_previous_seniors():
+    p, _ = mentor_pipeline(points_at_shown=True, shown_index=5)
+    res = to_ask_response(p.answer("다섯 번째 선배 프로필", previous_source_ids=["a", "b"]))
+    assert [s.interview_id for s in res.sources] == ["a", "b"]
+
+
+def test_intro_says_gwaje_not_sukje():
+    assert "과제를 대신" in ABOUT["what"].body and "숙제를 대신" not in ABOUT["what"].body

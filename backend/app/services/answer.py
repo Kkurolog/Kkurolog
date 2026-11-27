@@ -188,6 +188,7 @@ def _rag_answer(
     safety_notice_shown: bool = False,
     crisis_notice_shown: bool = False,
     more_hint_shown: bool = False,
+    previous_source_ids: list[str] | None = None,
 ) -> AskResponse:
     from app.rag.adapter import to_ask_response
 
@@ -208,6 +209,7 @@ def _rag_answer(
             safety_notice_shown=safety_notice_shown,
             crisis_notice_shown=crisis_notice_shown,
             more_hint_shown=more_hint_shown,
+            previous_source_ids=previous_source_ids,
         )
     )
 
@@ -220,6 +222,7 @@ def make_answer(
     safety_notice_shown: bool = False,
     crisis_notice_shown: bool = False,
     more_hint_shown: bool = False,
+    previous_source_ids: list[str] | None = None,
 ) -> AskResponse:
     """
     질문을 받아 답변을 돌려준다.
@@ -240,6 +243,7 @@ def make_answer(
             safety_notice_shown,
             crisis_notice_shown,
             more_hint_shown,
+            previous_source_ids,
         )
 
     # ---- 아래는 demo 답변 ----
