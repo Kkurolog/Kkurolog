@@ -71,7 +71,7 @@ export function Pagination({
   className?: string;
 }) {
   const last = Math.max(1, Math.ceil(total / pageSize));
-  if (last <= 1) return null;
+  // 쪽이 하나뿐이어도 늘 보여준다 (목록 아래 자리가 비지 않게, 화살표는 흐리게)
 
   const pages: (number | "gap")[] = [];
   for (let p = 1; p <= last; p++) {
