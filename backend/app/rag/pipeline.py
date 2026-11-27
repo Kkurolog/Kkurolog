@@ -21,10 +21,18 @@ import logging
 import re
 from dataclasses import dataclass, field
 
-from app.rag.cards import assemble_cards, compose_text
+from app.rag.cards import (
+    MAX_MIXED_SUMMARY_PARAGRAPHS,
+    apply_senior_labels,
+    assemble_cards,
+    assemble_summary,
+    compose_text,
+    lift_sub_headline,
+    valid_summary,
+)
 from app.rag.config import RagSettings
 from app.rag.embedding import Embedder
-from app.rag.generator import ContextDoc, Generator
+from app.rag.generator import ContextDoc, Generator, senior_labels
 from app.rag.intent import (
     BUTTON_QUESTIONS,
     LISTEN_BUTTONS,
@@ -32,8 +40,11 @@ from app.rag.intent import (
     IntentAnalyzer,
     IntentResult,
     emotional_reply_for,
+    MENTOR_MESSAGE,
+    MENTOR_POINTED_MESSAGE,
     fixed_reply_for,
     mentor_query,
+    mentor_words,
     has_emotion_word,
     preface_for,
 )
@@ -92,6 +103,7 @@ def to_source(chunk: Chunk) -> RagSource:
         url=chunk.url if chunk.visibility == "L3" else None,
     )
 
+MAX_MENTOR_TARGETS = 4  # 멘토 요청에서 참고할 앞 답변의 글 수 (카드 최대 4장)
 EXCLUDE_SEARCH_FACTOR = 4  # 이미 본 글을 뺄 때는 이만큼 더 넉넉히 찾는다
 
 
@@ -224,6 +236,43 @@ class RagPipeline:
             )
         return docs
 
+    @staticmethod
+    def related_mentor_query(question: str, used: list[RagSource], given: dict[str, Chunk]) -> str:
+        """답변에 쓴 선배들의 길·분야를 멘토 추천에 넘길 말로 만든다 (학생의 말 + 길·분야 이름)."""
+        tags = [t for s in used if s.chunk_id in given for t in [*given[s.chunk_id].career_paths, *given[s.chunk_id].career_fields]]
+        return " ".join([question, *mentor_words(tags)]).strip()
+
+    # ---- 멘토 요청 ----
+    def mentor_answer(self, intent: IntentResult, question: str, previous_source_ids: list[str], meta: dict) -> RagAnswer:
+        """
+        멘토·프로필·연락할 선배를 찾는 말에 대한 답. 화면이 이 글 아래에 멘토 카드를 그린다 (mentor_query 로 추천받는다).
+        - 바로 앞 답변이 있으면, 그 답변에 나온 선배들이 간 길·분야와 같은 멘토를 고르게 한다.
+          ("프로필 추천해줘"에는 주제 낱말이 없어서, 학생의 말만으로 고르면 아무 멘토나 나온다)
+        - 학생이 답변 속 선배를 가리켰으면("첫 번째 선배") 그 선배의 길·분야만 쓰고, 그 선배 본인은 글로만 만날 수 있다고
+          먼저 알린다. 인터뷰 선배와 멘토 목록은 이어져 있지 않다 (이어지면 여기서 그 멘토를 먼저 보여 주게 고친다).
+        """
+        targets = list(dict.fromkeys(previous_source_ids))[:MAX_MENTOR_TARGETS]
+        index = intent.shown_index
+        if intent.points_at_shown and index and 1 <= index <= len(targets):
+            targets = [targets[index - 1]]
+        heads: list[Chunk] = []
+        for source_id in targets:
+            try:
+                found = [c for c in self.store.get_chunks(source_id, [1]) if c.visibility in PUBLIC_VISIBILITY]
+            except Exception:
+                logger.exception("멘토 요청: 앞 답변의 글을 읽지 못했어요 (%s) → 그 글 없이 진행", source_id)
+                found = []
+            heads += found[:1]
+        words = mentor_words([t for c in heads for t in [*c.career_paths, *c.career_fields]])
+        pointed = intent.points_at_shown and bool(heads)
+        return RagAnswer(
+            answer_type="off_topic",
+            answer=MENTOR_POINTED_MESSAGE if pointed else MENTOR_MESSAGE,
+            sources=[to_source(c) for c in heads] if pointed else [],  # 가리킨 선배의 글 (원문 링크)
+            mentor_query=" ".join([mentor_query(intent, question), *words]).strip(),
+            **meta,
+        )
+
     # ---- 전체 ----
     def answer(
         self,
@@ -234,6 +283,7 @@ class RagPipeline:
         safety_notice_shown: bool = False,
         crisis_notice_shown: bool = False,
         more_hint_shown: bool = False,
+        previous_source_ids: list[str] | None = None,
     ) -> RagAnswer:
         """
         previous_question: 같은 대화의 바로 앞 질문. "더 자세히 알려줘" 같은 이어지는 질문을 이해하는 데 쓴다.
@@ -242,6 +292,7 @@ class RagPipeline:
         safety_notice_shown: 이 대화에서 상담 번호를 이미 보여 줬는지. true 면 가벼운 안내(T1)의 번호 줄을 되풀이하지 않는다.
         crisis_notice_shown: 이 대화에서 위기 안내 전체 문구를 이미 보여 줬는지. true 일 때만 위기 안내를 짧게 준다.
         more_hint_shown: 이 대화에서 "다른 선배 이야기도 더 있어요"를 이미 보여 줬는지. 대화당 한 번만 붙인다.
+        previous_source_ids: 바로 앞 답변에 쓴 글 번호 (화면에 보인 순서). 멘토 요청에서 '그 선배와 비슷한 멘토'를 고르는 데 쓴다.
         """
         meta: dict = {}
 
@@ -297,6 +348,9 @@ class RagPipeline:
         if intent is not None and intent.standalone_question:
             question = intent.standalone_question  # 이어지는 질문은 앞 질문과 합쳐 고쳐 쓴 것으로 찾고 답한다
             is_follow_up = True
+        # 멘토·프로필·연락할 선배를 찾는 말: 인터뷰 검색·답변 모델을 건너뛰고 멘토 카드를 보여 준다
+        if intent is not None and intent.intent == "mentor_request":
+            return self.mentor_answer(intent, question, previous_source_ids or [], meta)
         # 인사·서비스 소개·잡담·막연한 고민은 고정 문구로 끝낸다 (검색·큰 모델 호출 없음)
         if intent is not None:
             fixed = fixed_reply_for(intent)
@@ -339,8 +393,20 @@ class RagPipeline:
 
         # ---- 5. 카드 조립: 근거 없는 조각·카드를 버리고, 카드마다 출처를 붙인다 (app/rag/cards.py) ----
         given = {c.chunk_id: c for doc in docs for c in doc.chunks}
-        structured = assemble_cards(output, given, to_source, greeted=bool(intent and intent.has_greeting))
-        if structured is None:  # 근거가 확인된 카드가 한 장도 없다 → 출처 없는 답변은 내보내지 않는다
+        greeted = bool(intent and intent.has_greeting)
+        # 답의 모양은 질문 유형이 정한다 (의도 분석): 방법·팁형 → 문단형, 혼합형 → 문단 + 카드, 그 밖 → 카드형.
+        # 모델이 그 모양으로 쓰지 않았으면 쓴 것으로 답한다 (답이 사라지지 않게).
+        wanted = intent.answer_format if intent else "cards"
+        structured = None
+        if wanted == "paragraph" and output.summary:
+            structured = assemble_summary(output, given, to_source, greeted=greeted)
+        if structured is None:
+            structured = assemble_cards(output, given, to_source, greeted=greeted)
+            if structured is not None and wanted == "mixed":  # 카드 위에 공통 방법 문단을 얹는다
+                structured.summary, _ = valid_summary(output, given, MAX_MIXED_SUMMARY_PARAGRAPHS)
+        if structured is None and output.summary:  # 카드가 모두 버려졌는데 문단은 살아 있으면 문단으로 답한다
+            structured = assemble_summary(output, given, to_source, greeted=greeted)
+        if structured is None:  # 근거가 확인된 카드·문단이 하나도 없다 → 출처 없는 답변은 내보내지 않는다
             return no_evidence()
 
         # 맺음말의 "다른 선배 이야기도 더 있어요"는 시스템이 붙인다 (모델은 더 있는지 알 수 없다). 세 조건을 모두 만족할 때만:
@@ -348,12 +414,19 @@ class RagPipeline:
         #   2) 그 태그에 맞는 선배의 글이 아직 보여 주지 않은 채로 남아 있다
         #   3) 이 대화에서 아직 이 말을 한 적이 없다
         # (예전 기준 '안 쓴 글이 하나라도 있으면'은 답변의 97% 에 붙어서 의미가 없었다 → 2026-11-23 측정)
-        shown = seen | {s.source_id for card in structured.cards for s in card.sources}
+        if output.topic_match == "indirect":  # "대신 ~ 이야기가 있어요."를 머리말 아래 작은 제목으로 올린다
+            structured = lift_sub_headline(structured, output.compare)
+        # 별명 대신 '선배 A/B/C' 라벨을 붙인다 (카드 제목·본문·출처가 같은 라벨을 쓴다)
+        doc_labels = dict(zip([d.source_id for d in docs], senior_labels(len(docs))))
+        structured = apply_senior_labels(structured, doc_labels)
+        used = [s for card in structured.cards for s in card.sources] + structured.summary_sources
+        shown = seen | {s.source_id for s in used}
         has_more = not more_hint_shown and bool(found.tagged_sources - shown)
         structured.closing = with_more_hint(structured.closing, has_more)
 
-        # 전체 출처 = 카드들의 출처를 순서대로 모은 것 (같은 chunk 는 한 번만)
-        all_sources = {s.chunk_id: s for card in structured.cards for s in card.sources}
+        indirect = output.topic_match == "indirect"
+        # 전체 출처 = 카드(또는 정리형 문단)의 출처를 순서대로 모은 것 (같은 chunk 는 한 번만)
+        all_sources = {s.chunk_id: s for s in used}
         return RagAnswer(
             answer_type="answer",
             answer="\n\n".join(filter(None, [preface, compose_text(structured)])),
@@ -361,6 +434,11 @@ class RagPipeline:
             sources=list(all_sources.values()),
             structured=structured,
             more_hint=has_more,
+            answer_format="mixed" if structured.cards and structured.summary else "paragraph" if structured.summary else "cards",
+            question_type=intent.question_type if intent else None,
+            # 글이 물은 주제를 직접 다루지 않으면(유형 F) 솔직히 밝힌 답변 아래에 멘토도 함께 보여 준다
+            topic_indirect=indirect,
+            mentor_query=self.related_mentor_query(question, used, given) if indirect else None,
             **meta,
         )
 

@@ -38,6 +38,11 @@ class AskRequest(BaseModel):
     crisis_notice_shown: bool = Field(False, description="위기 안내 전체 문구를 이미 보여 줬는지")
     # [추가] 이 대화에서 "다른 선배 이야기도 더 있어요"를 이미 봤는지. true 면 다시 붙이지 않는다 (대화당 한 번)
     more_hint_shown: bool = Field(False, description="'다른 선배 이야기도 더 있어요'를 이미 보여 줬는지")
+    # [추가] 바로 앞 답변에 쓴 글 번호 (화면에 보인 순서). "첫 번째 선배 프로필 추천해줘"처럼 멘토를 찾을 때,
+    # 그 선배와 같은 길·분야의 멘토를 고르는 데 쓴다. 저장하지 않는다
+    previous_source_ids: list[Annotated[str, Field(max_length=40)]] = Field(
+        default_factory=list, max_length=10, description="바로 앞 답변에 쓴 글 번호"
+    )
 
 
 class Source(BaseModel):
@@ -61,6 +66,7 @@ class Source(BaseModel):
     interview_id: str = Field(..., description="원본 인터뷰를 찾기 위한 ID")
     # --- 아래는 새로 추가한 선택 필드 (docs/proposals/ask-plan.md) ---
     visibility: Literal["L1", "L2", "L3"] | None = Field(None, description="공개 등급. 없으면 demo 데이터")
+    senior_label: str | None = Field(None, description="이 글의 선배를 부르는 라벨 ('선배 A'). 본문·카드 제목의 라벨과 같다")
     date: str | None = Field(None, description="글·인터뷰 날짜 (예: '2021-05'). 오래된 정보인지 알려주는 용도")
     url: str | None = Field(None, description="원문 글 주소. L3 일 때만 채우고, 그 외에는 null (익명 보호)")
     title: str | None = Field(
@@ -115,6 +121,7 @@ class AnswerCard(BaseModel):
     nickname: str | None = Field(
         None, description="선배 별명 (예: '꿍이'). 공개 등급 L3 일 때만. null 이면 label 을 제목으로 쓴다"
     )
+    senior_label: str | None = Field(None, description="'선배 A' 같은 라벨. 카드 제목에 별명 대신 보여 준다")
     label: str = Field(..., description="그 선배가 택한 길 = 어떻게 갔나 (예: '작게 바로 시작한 길')")
     one_liner: str | None = Field(None, description="status_short 와 같은 값. 예전 화면용이라 새 화면은 쓰지 않는다")
     status_short: str | None = Field(
@@ -132,8 +139,13 @@ class StructuredAnswer(BaseModel):
     """카드형 답변. 제목만 읽어도 선배들의 길이 어떻게 다른지 보이게 한다."""
 
     headline: str = Field(..., description="질문에 대한 한 문장 답")
+    # [추가] 머리말 바로 아래의 작은 제목. 글이 물은 주제를 직접 다루지 않을 때 "대신 ~ 이야기가 있어요."가 온다
+    sub_headline: str | None = Field(None, description="머리말 아래 작은 제목 (주제를 직접 다룬 글이 적을 때)")
     compare: str | None = Field(None, description="선배들의 길이 어떻게 다른지 한 줄. 카드가 2장 이상일 때만")
-    cards: list[AnswerCard] = Field(..., description="선배별 카드 (1~4장)")
+    cards: list[AnswerCard] = Field(..., description="선배별 카드 (1~4장). 정리형 답변이면 빈 목록")
+    # [추가] 정리형 답변: 방법·팁을 묻는 질문에는 선배별로 나누지 않고 문단 글로 답한다.
+    # 값이 있으면 cards 는 비어 있고, 출처는 응답의 sources 를 답변 맨 아래에 보여 준다
+    summary: list[str] = Field(default_factory=list, description="정리형 답변의 문단 (2~3개). 카드형이면 빈 목록")
     closing: str | None = Field(None, description="다음에 해 볼 만한 것 한 문장")
 
 
@@ -166,6 +178,12 @@ class AskResponse(BaseModel):
     more_hint: bool = Field(False, description="'다른 선배 이야기도 더 있어요'를 붙였는지")
     # [추가] 카드 답변 위에 붙이는 한 줄 (감정이 담긴 진로 고민일 때 "막막한 게 당연해요. …"). 없으면 null
     preface: str | None = Field(None, description="카드 답변 위에 붙이는 한 줄")
+    # [추가] 답의 모양. 선배 이야기로 답했을 때만 (그 외에는 null)
+    #   paragraph: 문단형 (방법·팁 질문) / cards: 선배별 카드 / mixed: 위에 공통 방법 문단 + 아래 선배별 카드
+    answer_format: Literal["paragraph", "cards", "mixed"] | None = Field(None, description="답의 모양")
+    question_type: str | None = Field(None, description="질문 유형: how_to | choice | experience | mixed | compare")
+    # [추가] 글이 물은 주제를 직접 다루지 않아 가까운 이야기로 답했는지. true 면 show_mentors 도 true 다 (멘토를 함께 권한다)
+    topic_indirect: bool = Field(False, description="주제를 직접 다룬 글이 적어 가까운 이야기로 답했는지")
     # [추가] 학생이 멘토·프로필·연락할 선배를 찾았을 때 true (intent 는 mentor_request).
     # 화면은 answer 아래에 멘토 카드를 그린다. 멘토는 mentor_query 로 /mentors/recommend 를 불러서 받는다
     show_mentors: bool = Field(False, description="멘토 카드를 보여 줄 답인지")
