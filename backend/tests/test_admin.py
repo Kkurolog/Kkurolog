@@ -71,6 +71,14 @@ class AdminFakeStore(FakeStore):
         mentor.update(values)
         return dict(mentor)
 
+    def delete_mentor(self, mentor_id):
+        if not any(m["id"] == mentor_id for m in self.mentors):
+            return False
+        if any(r["mentor_id"] == mentor_id for r in self.inquiries.values()):
+            raise StoreError("fk", "23503")  # DB 의 on delete restrict 와 같게
+        self.mentors = [m for m in self.mentors if m["id"] != mentor_id]
+        return True
+
     def list_settings(self):
         return [{"key": k, "value": v, "description": f"{k} 설명"} for k, v in sorted(self.settings.items())]
 
@@ -276,6 +284,20 @@ def test_update_mentor(env, headers):
     res = client.patch("/admin/mentors/mt-01", json={"available": False, "email": None}, headers=headers)
     assert res.status_code == 200 and res.json()["email"] is None
     assert client.patch("/admin/mentors/mt-99", json={"name": "x"}, headers=headers).status_code == 404
+
+
+def test_delete_mentor(env, headers):
+    assert client.delete("/admin/mentors/mt-03").status_code == 401  # 로그인 필요
+    assert client.delete("/admin/mentors/mt-03", headers=headers).status_code == 204
+    assert "mt-03" not in [m["id"] for m in client.get("/admin/mentors", headers=headers).json()]
+    assert client.delete("/admin/mentors/mt-03", headers=headers).status_code == 404  # 이미 없음
+
+
+def test_delete_mentor_with_inquiries_is_blocked(env, headers):
+    add_inquiries(env, 1)  # mt-01 에게 문의 1건
+    res = client.delete("/admin/mentors/mt-01", headers=headers)
+    assert res.status_code == 409 and "문의 기록" in res.json()["detail"]
+    assert "mt-01" in [m["id"] for m in client.get("/admin/mentors", headers=headers).json()]
 
 
 # ---------------------------------------------------------------- 설정

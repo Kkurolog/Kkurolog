@@ -1,19 +1,23 @@
 // 관리자 멘토 목록 (주소 "/admin/mentors", 와이어프레임 04-5)
 // 참여 동의하지 않은 멘토와 메일 주소까지 모두 보인다 (관리자만).
-// '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '수정'을 누른다. 멘토는 지울 수 없다.
+// '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '수정'을 누른다.
+// '삭제'는 문의 기록이 없는 멘토만 된다 (기록이 있으면 backend 가 409 로 막고, 연락 가능을 끄라고 안내한다).
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import MentorFormModal from "@/components/admin/MentorFormModal";
 import { AdminPage, ErrorNotice, PageTitle, tableWrap, td, th } from "@/components/admin/ui";
-import { AdminApiError, fetchAdminMentors, type AdminMentor } from "@/lib/adminApi";
+import { AdminApiError, deleteMentor, fetchAdminMentors, type AdminMentor } from "@/lib/adminApi";
 
 export default function AdminMentorsPage() {
   const [mentors, setMentors] = useState<AdminMentor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 열린 창: "new" = 추가, 멘토 = 수정, null = 닫힘
   const [editing, setEditing] = useState<AdminMentor | "new" | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  const [toDelete, setToDelete] = useState<AdminMentor | null>(null); // 삭제 확인 창
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAdminMentors()
@@ -32,8 +36,24 @@ export default function AdminMentorsPage() {
       next[i] = saved;
       return next;
     });
-    setNotice(editing === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`);
+    setNotice({ text: editing === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`, error: false });
     setEditing(null);
+  }
+
+  async function handleDelete() {
+    if (!toDelete) return;
+    const mentor = toDelete;
+    setDeleting(true);
+    try {
+      await deleteMentor(mentor.id);
+      setMentors((list) => list?.filter((m) => m.id !== mentor.id) ?? null);
+      setNotice({ text: `'${mentor.name}' 멘토를 삭제했어요.`, error: false });
+    } catch (err) {
+      setNotice({ text: err instanceof AdminApiError ? err.message : "삭제하지 못했어요.", error: true });
+    } finally {
+      setDeleting(false);
+      setToDelete(null);
+    }
   }
 
   return (
@@ -41,8 +61,11 @@ export default function AdminMentorsPage() {
       <PageTitle>멘토 목록</PageTitle>
 
       {notice && (
-        <p role="status" className="mb-4 rounded-2xl bg-sky px-4 py-3 text-[13px] text-ink">
-          {notice}
+        <p
+          role={notice.error ? "alert" : "status"}
+          className={`mb-4 rounded-2xl px-4 py-3 text-[13px] ${notice.error ? "border border-danger/40 bg-surface text-danger" : "bg-sky text-ink"}`}
+        >
+          {notice.text}
         </p>
       )}
 
@@ -57,7 +80,7 @@ export default function AdminMentorsPage() {
               <col className="w-[100px]" />
               <col />
               <col className="w-[90px]" />
-              <col className="w-[96px]" />
+              <col className="w-[160px]" />
             </colgroup>
             <thead>
               <tr>
@@ -67,7 +90,7 @@ export default function AdminMentorsPage() {
                 <th scope="col" className={th}>메일 주소</th>
                 <th scope="col" className={`${th} text-center`}>연락 가능</th>
                 <th scope="col" className={th}>
-                  <span className="sr-only">수정</span>
+                  <span className="sr-only">수정·삭제</span>
                 </th>
               </tr>
             </thead>
@@ -110,7 +133,7 @@ export default function AdminMentorsPage() {
                       className="size-4 align-middle accent-brand opacity-60"
                     />
                   </td>
-                  <td className={`${td} text-right`}>
+                  <td className={`${td} text-right whitespace-nowrap`}>
                     <button
                       type="button"
                       onClick={() => {
@@ -121,6 +144,17 @@ export default function AdminMentorsPage() {
                       className="h-8 rounded-full border border-brand px-4 text-[12px] font-bold text-brand hover:bg-sky"
                     >
                       수정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotice(null);
+                        setToDelete(m);
+                      }}
+                      aria-label={`${m.name} 삭제`}
+                      className="ml-1.5 h-8 rounded-full px-3 text-[12px] text-muted hover:bg-sky hover:text-danger-dark"
+                    >
+                      삭제
                     </button>
                   </td>
                 </tr>
@@ -145,6 +179,18 @@ export default function AdminMentorsPage() {
       </div>
 
       {editing && <MentorFormModal key={editing === "new" ? "new" : editing.id} mentor={editing === "new" ? undefined : editing} onClose={close} onSaved={handleSaved} />}
+      {toDelete && (
+        <ConfirmDialog
+          title="이 멘토를 삭제할까요?"
+          body="삭제한 멘토는 학생 화면과 이 목록에서 사라지고, 되돌릴 수 없어요. 학생 문의 기록이 있는 멘토는 지울 수 없어요 (쉬게 하려면 '수정'에서 연락 가능을 꺼 주세요)."
+          detail={`${toDelete.name} (${toDelete.id})`}
+          tone="danger"
+          cancelLabel="취소"
+          confirmLabel={deleting ? "삭제하는 중…" : "삭제"}
+          onCancel={() => !deleting && setToDelete(null)}
+          onConfirm={() => !deleting && handleDelete()}
+        />
+      )}
     </AdminPage>
   );
 }

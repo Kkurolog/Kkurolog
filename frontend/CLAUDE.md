@@ -17,7 +17,7 @@ frontend/src/
 │  │  ├─ page.tsx         # "/admin" → "/admin/inquiries" 로 보냄
 │  │  ├─ inquiries/       # 문의 목록(숫자 카드·필터·표·쪽 번호·오른쪽 상세 패널), [id]/ 는 상세 전체 화면
 │  │  ├─ review/          # 확인필요 목록 (자동 전달 못 한 멘토 답장)
-│  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 (지우기 없음)
+│  │  ├─ mentors/         # 멘토 목록 + 추가·수정 창 + 삭제 (문의 기록이 없는 멘토만)
 │  │  ├─ imports/         # 인터뷰 넣기: txt 올리기 + 파일 목록, [id]/ 는 파일별 검토 화면 (원문 | 글 정보·개인정보·사람·조각)
 │  │  └─ settings/        # 메일 설정 (탭 6개)
 │  └─ globals.css         # 전체 공통 스타일 + 디자인 토큰(색·글꼴, @theme) + paper-lines(노트 줄 바탕)
