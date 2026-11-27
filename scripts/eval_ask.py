@@ -330,6 +330,12 @@ def run_intent(args, settings: RagSettings) -> None:
         if wanted and r.emotional_state not in wanted:
             mark = "★ 위기를 놓침 " if "T0" in wanted else ""
             problems.append(f"{mark}감정 단계 {r.emotional_state} (기대 {wanted})")
+        if "points" in case and r.points_at_shown != case["points"]:
+            problems.append(f"답변 속 선배를 가리킴 {r.points_at_shown} (기대 {case['points']})")
+        if "index" in case and r.shown_index != case["index"]:
+            problems.append(f"몇 번째 선배 {r.shown_index} (기대 {case['index']})")
+        if "qtype" in case and r.question_type != case["qtype"]:
+            problems.append(f"질문 유형 {r.question_type} (기대 {case['qtype']})")
         if "format" in case and r.answer_format != case["format"]:
             problems.append(f"답 모양 {r.answer_format} (기대 {case['format']})")
         if "other" in case and r.wants_other != case["other"]:

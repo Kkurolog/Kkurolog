@@ -84,6 +84,8 @@ class GeneratorOutput(BaseModel):
     cards: list[GeneratedCard] = Field(default_factory=list)
     # 정리형 답변(방법·팁 질문)의 문단. 이때는 cards 가 비어 있다
     summary: list[CardPiece] = Field(default_factory=list)
+    # 글이 학생이 물은 주제를 직접 다루는지. indirect 면 '직접 다룬 이야기는 적다'고 밝히고 멘토도 함께 권한다 (유형 F)
+    topic_match: Literal["direct", "indirect"] = "direct"
     closing: str | None = None
 
 
@@ -98,12 +100,14 @@ class RagSource(BaseModel):
     visibility: Literal["L1", "L2", "L3"]
     published_at: str | None = None
     url: str | None = Field(None, description="L3 일 때만")
+    senior_label: str = Field("", description="이 글의 선배를 부르는 라벨 ('선배 A'). 본문의 라벨과 같다")
 
 
 class RagCard(BaseModel):
     """근거 검증을 통과한 카드 한 장 (선배 한 명)."""
 
     nickname: str | None = Field(None, description="공개 등급 L3 인 선배의 별명. 그 외에는 None (화면에는 label 만)")
+    senior_label: str = Field("", description="'선배 A' 같은 라벨. 별명 대신 화면에 보여 준다 (답변마다 A 부터 새로 붙인다)")
     label: str
     one_liner: str | None = None
     body: list[str]
@@ -115,6 +119,8 @@ class RagStructured(BaseModel):
     """카드형 답변. app/rag/adapter.py 가 /ask 응답의 structured 로 바꾼다."""
 
     headline: str
+    # 머리말 바로 아래의 작은 제목. 글이 물은 주제를 직접 다루지 않을 때 "대신 ~ 이야기가 있어요."가 들어간다
+    sub_headline: str | None = None
     compare: str | None = None
     cards: list[RagCard]
     # 정리형 답변: 선배별로 나누지 않고 문단 글로 쓴 것. 이때 cards 는 비어 있고, 출처는 summary_sources 에 모은다
@@ -135,6 +141,10 @@ class RagAnswer(BaseModel):
     about_aspect: str | None = None
     follow_ups: list[str] = Field(default_factory=list)
     emphasis: str | None = None  # 고정 문구 안에서 굵게 강조할 문장
+    # 답의 모양: paragraph(문단형) | cards(카드형) | mixed(문단 + 카드). 선배 이야기로 답했을 때만
+    answer_format: str | None = None
+    question_type: str | None = None  # 질문 유형 (how_to | choice | experience | mixed | compare)
+    topic_indirect: bool = False  # 글이 물은 주제를 직접 다루지 않아, 가까운 이야기로 답했는지 (유형 F)
     # 멘토·프로필을 찾는 말(mentor_request)일 때: 멘토 추천에 넘길 말. 있으면 화면이 멘토 카드를 그린다
     mentor_query: str | None = None
     # 검색·Claude 호출이 실패해서 no_evidence 로 대신 답했는지. API 응답에는 나가지 않는다.

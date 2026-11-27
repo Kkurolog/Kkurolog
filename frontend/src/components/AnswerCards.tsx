@@ -29,7 +29,9 @@ export function formatSourceDate(date: string) {
 // 글 제목과 원문 주소는 backend 가 공개 등급 L3 글에만 보낸다 (제목과 원문에 졸업생 이름이 있어서, 익명 글에는 오지 않는다).
 function cardSourceLabel(source: Source) {
   const when = source.date ? `#${formatSourceDate(source.date)} 글` : "#선배 글"; // 앞의 # 는 출처 표시
-  return source.title ? `${when} · “${source.title}”` : when;
+  const what = source.title ? `${when} · “${source.title}”` : when;
+  // 본문에서 "선배 A"라고 부른 선배의 글이면 같은 라벨을 앞에 붙인다 (누구의 글인지 이어 볼 수 있게)
+  return source.senior_label ? `${source.senior_label} · ${what}` : what;
 }
 
 // 선배 아바타. card.avatar_id("avatar-1"~"avatar-7")에 맞는 그림(public/avatars)을 48px 동그라미로 보여준다.
@@ -93,7 +95,7 @@ function RuledDivider() {
 }
 
 // 출처 목록. "#2024년 11월 글 · “글 제목”" 한 줄씩. 선배 카드 아래와 정리형 답변 맨 아래에서 같이 쓴다.
-function SourceLinks({
+export function SourceLinks({
   sources,
   onOpenSource,
   className = "",
@@ -135,7 +137,9 @@ function SourceLinks({
 
 function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; onOpenSource: Props["onOpenSource"] }) {
   // 별명은 공개 등급 L3 인 선배만 온다. 없으면 그 선배가 택한 길(label)을 제목 자리에 올린다.
-  const title = card.nickname ? `${card.nickname} 선배` : card.label;
+  // 카드 제목은 "선배 A" 라벨. (예전에 저장된 대화에는 라벨이 없어서 별명이나 길 이름을 쓴다)
+  const name = card.senior_label ?? (card.nickname ? `${card.nickname} 선배` : null);
+  const title = name ?? card.label;
 
   return (
     // 바탕·상자 없이 그린다 (흰 상자는 노트 줄 바탕을 가려서 다른 답변과 어울리지 않는다).
@@ -147,7 +151,7 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
           <CardAvatar card={card} order={order} />
           <div className="min-w-0">
             <h3 className="text-lg leading-7 font-bold break-keep text-ink">{title}</h3>
-            {card.nickname && <p className="text-[15px] leading-6 break-keep text-body">{card.label}</p>}
+            {name && <p className="text-[15px] leading-6 break-keep text-body">{card.label}</p>}
             {/* 지금 무엇을 하는지 한 줄. 글에 없으면(null) 줄 자체를 그리지 않는다 */}
             {card.one_liner && <p className="text-sm leading-6 break-keep text-muted">{card.one_liner}</p>}
           </div>
@@ -166,13 +170,21 @@ function Card({ card, order, onOpenSource }: { card: AnswerCard; order: number; 
   );
 }
 
+// 머리말 바로 아래의 작은 제목 ("대신 ~ 이야기가 있어요."). 머리말(22px, 굵기 700)과 본문(15px, 굵기 400) 사이인 17px·굵기 500 으로 그린다. (불러오는 굵기는 400·500·700 뿐이다)
+function SubHeadline({ text }: { text?: string | null }) {
+  if (!text) return null;
+  return <p className="mt-1 text-[17px] leading-7 font-medium break-keep text-ink">{text}</p>;
+}
+
 export default function AnswerCards({ answer, onOpenSource, sources = [] }: Props) {
   const summary = answer.summary ?? [];
-  // 정리형 답변: 방법·팁을 묻는 질문. 선배별로 나누지 않고 문단 글로 보여 주고, 출처는 맨 아래에 모은다
-  if (summary.length > 0) {
+  // 문단형 답변: 방법·팁을 묻는 질문. 선배별로 나누지 않고 문단 글로 보여 주고, 출처는 맨 아래에 모은다
+  // (카드도 함께 있으면 혼합형이다 → 아래에서 문단을 카드 위에 그린다)
+  if (summary.length > 0 && answer.cards.length === 0) {
     return (
       <section className="flex flex-col text-ink">
         {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}
+        <SubHeadline text={answer.sub_headline} />
         <div className="mt-4 flex flex-col gap-3 text-[15px] leading-[1.7] break-keep">
           {summary.map((paragraph, i) => (
             <p key={i}>{paragraph}</p>
@@ -187,7 +199,17 @@ export default function AnswerCards({ answer, onOpenSource, sources = [] }: Prop
   return (
     <section className="flex flex-col text-ink">
       {answer.headline && <h2 className="mb-1 text-[22px] leading-8 font-bold">{answer.headline}</h2>}
+      <SubHeadline text={answer.sub_headline} />
       {answer.compare && <p className="text-[15px] leading-6 text-muted">{answer.compare}</p>}
+
+      {/* 혼합형: 선배들에게 공통된 방법을 먼저 문단으로 보여 주고, 아래에 선배별 카드를 둔다 */}
+      {summary.length > 0 && (
+        <div className="mt-4 flex flex-col gap-3 text-[15px] leading-[1.7] break-keep">
+          {summary.map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
+          ))}
+        </div>
+      )}
 
       <ul className="mt-5 flex flex-col gap-5">
         {answer.cards.map((card, i) => (

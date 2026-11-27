@@ -170,6 +170,8 @@ function useChatState() {
     ];
     // 이 대화에서 상담 번호 안내를 이미 받았는지 (받았으면 backend 가 같은 긴 안내를 되풀이하지 않는다)
     const safetyNoticeShown = messages.some((m) => m.role === "assistant" && m.safetyNotice);
+    // 바로 앞 답변에 쓴 글 (보인 순서). "첫 번째 선배 프로필 추천해줘"에서 그 선배와 비슷한 멘토를 고르는 데 쓴다
+    const previousSourceIds = lastReply && !lastReply.isError ? lastReply.sources.map((s) => s.interview_id) : [];
     const moreHintShown = messages.some((m) => m.role === "assistant" && m.moreHint);
     const crisisNoticeShown = messages.some((m) => m.role === "assistant" && m.crisisNotice);
     const userMessage: ChatMessage = { id: newId(), role: "user", content: question };
@@ -197,6 +199,7 @@ function useChatState() {
       safetyNoticeShown,
       crisisNoticeShown,
       moreHintShown,
+      previousSourceIds,
     });
     append(id, reply);
     setPendingIds((prev) => prev.filter((p) => p !== id));

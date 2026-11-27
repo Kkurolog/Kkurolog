@@ -9,7 +9,7 @@
 import Link from "next/link";
 import type { Mentor, MentorRecommendation, Source } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
-import AnswerCards, { formatSourceDate } from "./AnswerCards";
+import AnswerCards, { SourceLinks, formatSourceDate } from "./AnswerCards";
 import { MiniKkuro } from "./Kkuro";
 import MentorCard from "./MentorCard";
 
@@ -176,6 +176,10 @@ export default function ChatMessageView({
       {/* 학생이 멘토·프로필·연락할 선배를 찾았을 때: 인터뷰 글 대신 멘토 카드를 보여 준다 */}
       {message.showMentors && (
         <>
+          {/* 선배 이야기 답변 아래에 붙는 경우(물은 주제를 직접 다룬 글이 적을 때): 멘토에게 직접 물어볼 수 있다고 알린다 */}
+          {cards && <p>이 주제는 비슷한 경험을 가진 선배에게 직접 물어볼 수도 있어요. 첫 연락은 꾸로록이 대신 전해요.</p>}
+          {/* 학생이 답변 속 선배를 가리켰을 때: 그 선배의 글 (누르면 원문이 열린다). 카드 답변은 출처가 이미 위에 있다 */}
+          {!cards && <SourceLinks sources={message.sources} onOpenSource={onOpenSource} />}
           {message.mentors.length === 0 && <p>지금은 연락할 수 있는 멘토를 찾지 못했어요.</p>}
           <MentorGrid mentors={message.mentors} onContact={onContact} />
           <p className="text-sm leading-6">
@@ -204,7 +208,7 @@ export default function ChatMessageView({
         </ul>
       )}
 
-      {!cards && !isAbout && message.sources.length > 0 && (
+      {!cards && !isAbout && !message.showMentors && message.sources.length > 0 && (
         <ul className="flex flex-col gap-1">
           {message.sources.map((source) => (
             <li key={source.interview_id} className="flex flex-col items-start">

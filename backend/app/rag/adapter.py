@@ -21,7 +21,8 @@ def _merge_source(source_id: str, group: list[RagSource]) -> Source:
     first = group[0]
     excerpts = [s.excerpt for s in group if s.excerpt]
     return Source(
-        alumni=first.alumni,
+        alumni=first.senior_label or first.alumni,  # 별명 대신 '선배 A' 라벨
+        senior_label=first.senior_label or None,
         excerpt=EXCERPT_SEPARATOR.join(excerpts) or None,
         interview_id=source_id,
         visibility=first.visibility,
@@ -42,11 +43,13 @@ def _merge_sources(sources: list[RagSource]) -> list[Source]:
 def _to_structured(structured: RagStructured) -> StructuredAnswer:
     return StructuredAnswer(
         headline=structured.headline,
+        sub_headline=structured.sub_headline,
         compare=structured.compare,
         cards=[
             AnswerCard(
                 id=f"card-{n}",
                 nickname=card.nickname,
+                senior_label=card.senior_label or None,
                 label=card.label,
                 one_liner=card.one_liner,
                 body=card.body,
@@ -65,7 +68,8 @@ def to_ask_response(result: RagAnswer) -> AskResponse:
     return AskResponse(
         answer=result.answer,
         structured=_to_structured(result.structured) if is_answer and result.structured else None,
-        sources=_merge_sources(result.sources) if is_answer else [],
+        # 출처는 답변일 때, 그리고 멘토 요청에서 학생이 가리킨 선배의 글(원문 링크)이 있을 때만 넣는다
+        sources=_merge_sources(result.sources) if is_answer or result.mentor_query is not None else [],
         has_enough_evidence=result.answer_type != "no_evidence",
         answer_type=result.answer_type,
         no_more=result.no_more,
@@ -79,6 +83,9 @@ def to_ask_response(result: RagAnswer) -> AskResponse:
         about_aspect=result.about_aspect,
         follow_ups=result.follow_ups,
         emphasis=result.emphasis,
+        answer_format=result.answer_format,
+        question_type=result.question_type,
+        topic_indirect=result.topic_indirect,
         show_mentors=result.mentor_query is not None,
         mentor_query=result.mentor_query,
     )

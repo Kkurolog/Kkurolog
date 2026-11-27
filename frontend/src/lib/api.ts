@@ -15,6 +15,7 @@ export type Source = {
   excerpt: string | null;
   interview_id: string;
   visibility?: "L1" | "L2" | "L3" | null; // [추가] 공개 등급
+  senior_label?: string | null; // [추가] 이 글의 선배를 부르는 라벨 ("선배 A"). 본문·카드 제목의 라벨과 같다
   date?: string | null; // [추가] 글·인터뷰 날짜 (오래된 정보 표시용)
   url?: string | null; // [추가] 원문 주소. L3(실명 공개)일 때만 오고, 그 외에는 null (익명 보호)
   title?: string | null; // [추가] 원문 글 제목. url 과 같이 L3 일 때만 오고, 그 외에는 null
@@ -26,6 +27,7 @@ export type AnswerType = "answer" | "no_evidence" | "off_topic" | "safety";
 // [추가] 카드형 답변의 카드 한 장 = 선배 한 명의 이야기
 export type AnswerCard = {
   id: string; // "card-1" (목록 key, 순번)
+  senior_label?: string | null; // [추가] "선배 A" 같은 라벨. 카드 제목에 별명 대신 보여 준다
   nickname: string | null; // 선배 별명. 공개 등급 L3 일 때만 오고, 그 외에는 null → label 을 제목으로 쓴다
   label: string; // 그 선배가 택한 길 = 어떻게 갔나 (예: "작게 바로 시작한 길")
   one_liner: string | null; // 그 선배가 지금 무엇을 하고 있나 (예: "지금은 여행 스타트업을 운영해요"). 글에 없으면 null
@@ -37,6 +39,7 @@ export type AnswerCard = {
 // [추가] 카드형 답변. components/AnswerCards.tsx 가 그린다
 export type StructuredAnswer = {
   headline: string; // 질문에 대한 한 문장 답
+  sub_headline?: string | null; // [추가] 머리말 바로 아래 작은 제목 ("대신 ~ 이야기가 있어요."). 머리말보다 작고 덜 굵게 그린다
   compare: string | null; // 선배들의 길이 어떻게 다른지 한 줄 (카드 2장 이상일 때만)
   cards: AnswerCard[]; // 1~4장. 정리형 답변이면 빈 목록
   // [추가] 정리형 답변의 문단 (방법·팁을 묻는 질문). 값이 있으면 선배별 카드 대신 문단 글로 그리고,
@@ -58,6 +61,12 @@ export type AskResponse = {
   // [추가] 이어지는 질문("다른 선배 얘기도 들려줘")에 더 전할 이야기가 없는지. true 면 "여기까지예요"로 안내한다
   // [추가] 학생이 멘토·프로필·연락할 선배를 찾았을 때 true. 답변 글 아래에 멘토 카드를 그린다.
   // 멘토는 mentor_query 로 recommendMentors 를 한 번 더 불러서 받는다 (이어지는 말이면 앞 질문의 주제가 들어 있다)
+  // [추가] 답의 모양. 선배 이야기로 답했을 때만 온다
+  //   paragraph: 문단형 (방법·팁 질문) / cards: 선배별 카드 / mixed: 위에 공통 방법 문단 + 아래 선배별 카드
+  answer_format?: "paragraph" | "cards" | "mixed" | null;
+  question_type?: string | null; // [추가] 질문 유형: how_to | choice | experience | mixed | compare
+  // [추가] 글이 물은 주제를 직접 다루지 않아 가까운 이야기로 답했는지. true 면 show_mentors 도 true 다
+  topic_indirect?: boolean;
   show_mentors?: boolean;
   mentor_query?: string | null;
   no_more?: boolean;
@@ -125,6 +134,7 @@ export type AskContext = {
   previousAnswer?: string | null; // 그 질문에 꾸로록이 한 답 (같은 답을 되풀이하지 않게)
   seenSourceIds?: string[]; // 이미 본 글 번호 ("다른 선배 얘기도 들려줘"일 때 그 글을 빼고 찾게)
   safetyNoticeShown?: boolean; // 상담 번호를 이미 받았는지 (가벼운 안내의 번호 줄을 되풀이하지 않게)
+  previousSourceIds?: string[]; // 바로 앞 답변에 쓴 글 번호 (보인 순서). 멘토를 찾을 때 그 선배와 비슷한 멘토를 고르게
   moreHintShown?: boolean; // "다른 선배 이야기도 더 있어요"를 이미 봤는지 (대화당 한 번만 붙이게)
   crisisNoticeShown?: boolean; // 위기 안내 전체 문구를 이미 받았는지 (받았을 때만 짧은 형태로 다시 준다)
 };
@@ -148,6 +158,7 @@ export async function askQuestion(question: string, context: AskContext = {}): P
         safety_notice_shown: context.safetyNoticeShown ?? false,
         crisis_notice_shown: context.crisisNoticeShown ?? false,
         more_hint_shown: context.moreHintShown ?? false,
+        previous_source_ids: (context.previousSourceIds ?? []).slice(0, 10),
       }),
       signal: AbortSignal.timeout(ASK_TIMEOUT_MS),
     });
