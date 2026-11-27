@@ -189,7 +189,8 @@ export default function AdminMentorsPage() {
       {/* 아래 줄: (왼쪽 안내) · 가운데 쪽 번호 · 오른쪽 버튼 (삭제 · 수정 · 추가) */}
       <div className="mt-4 flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
         <span />
-        {mentors ? <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} className="" /> : <span />}
+        {/* 쪽이 하나뿐이면 Pagination 이 아무것도 그리지 않으므로, 칸 자리를 늘 남겨 둬야 버튼이 오른쪽 칸에 머문다 */}
+        <div>{mentors && <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} className="" />}</div>
         <div className="flex flex-wrap justify-end gap-2">
           {/* 삭제는 줄을 골라야 누를 수 있다 (누르면 확인 창이 먼저 뜬다) */}
           <button
