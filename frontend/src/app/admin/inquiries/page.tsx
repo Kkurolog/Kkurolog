@@ -1,5 +1,6 @@
 // 관리자 문의 목록 (주소 "/admin/inquiries", 와이어프레임 04-2, 상세 패널 04-3)
-// 위: 전체 / 답장 전 / 확인필요 숫자 카드 → 필터(전체·답장 전·답장 받음) → 표(20개씩) → 쪽 번호
+// 위: 전체 / 답장 전 / 확인필요 숫자 카드 → 필터(전체·답장 전·답장 받음·확인 필요) → 표(20개씩) → 쪽 번호
+// '확인 필요' 필터는 자동 전달 못 한 멘토 답장 표(ReviewTable)로 바뀐다 (예전 /admin/review 화면을 여기로 옮김).
 // 줄을 누르면 오른쪽에 문의 상세 패널이 열린다. 패널의 ⤢ 아이콘은 전체 화면(/admin/inquiries/[id])으로.
 // 필터·쪽·열린 문의는 주소(?status=&page=&open=)에 남겨서 새로고침·뒤로 가기에도 그대로 돌아온다.
 "use client";
@@ -9,16 +10,19 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useAdmin } from "@/components/admin/AdminShell";
 import InquiryDetailView from "@/components/admin/InquiryDetailView";
+import ReviewTable from "@/components/admin/ReviewTable";
 import { AdminPage, ErrorNotice, PageTitle, Pagination, rowLink, StatusPill, tableWrap, td, th } from "@/components/admin/ui";
 import { AdminApiError, fetchInquiries, formatDateTime, PAGE_SIZE, type InquiryItem, type Paged } from "@/lib/adminApi";
 
-type Filter = "all" | "pending" | "replied";
+type Filter = "all" | "pending" | "replied" | "review";
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "전체" },
   { value: "pending", label: "답장 전" },
   { value: "replied", label: "답장 받음" },
+  { value: "review", label: "확인 필요" },
 ];
-const REPLIED: Record<Filter, boolean | undefined> = { all: undefined, pending: false, replied: true };
+type InquiryFilter = Exclude<Filter, "review">;
+const REPLIED: Record<InquiryFilter, boolean | undefined> = { all: undefined, pending: false, replied: true };
 
 export default function InquiriesPage() {
   // useSearchParams 를 쓰는 화면은 Suspense 로 감싸야 한다 (Next.js 규칙)
@@ -35,7 +39,7 @@ function Inquiries() {
   const params = useSearchParams();
   const { reviewTotal } = useAdmin();
 
-  const filter: Filter = (["pending", "replied"] as const).find((f) => f === params.get("status")) ?? "all";
+  const filter: Filter = (["pending", "replied", "review"] as const).find((f) => f === params.get("status")) ?? "all";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const openId = params.get("open");
 
@@ -56,9 +60,10 @@ function Inquiries() {
     [params, pathname, router],
   );
 
-  // 표 내용 (필터·쪽이 바뀔 때마다)
+  // 표 내용 (필터·쪽이 바뀔 때마다). '확인 필요'는 ReviewTable 이 따로 불러온다
   const key = `${filter}-${page}`;
   useEffect(() => {
+    if (filter === "review") return;
     let alive = true;
     fetchInquiries({ replied: REPLIED[filter], page })
       .then((data) => alive && setList({ key, data }))
@@ -96,11 +101,11 @@ function Inquiries() {
         <div className="grid grid-cols-3 gap-3 md:gap-4">
           <SummaryCard label="전체" value={counts?.all} />
           <SummaryCard label="답장 전" value={counts?.pending} />
-          <SummaryCard label="확인필요" value={reviewTotal ?? undefined} href="/admin/review" />
+          <SummaryCard label="확인필요" value={reviewTotal ?? undefined} href="/admin/inquiries?status=review" />
         </div>
 
         {/* 필터 */}
-        <div role="group" aria-label="답장 여부로 거르기" className="mt-8 mb-4 flex gap-2">
+        <div role="group" aria-label="문의 거르기" className="mt-8 mb-4 flex gap-2">
           {FILTERS.map((f) => (
             <button
               key={f.value}
@@ -112,13 +117,30 @@ function Inquiries() {
               }`}
             >
               {f.label}
+              {f.value === "review" && !!reviewTotal && (
+                <span
+                  aria-label={`${reviewTotal}건`}
+                  className="ml-1.5 inline-block min-w-5 rounded-full bg-butter px-1.5 text-center text-[11px] leading-5 font-bold text-ink"
+                >
+                  {reviewTotal}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {current?.error && <ErrorNotice message={current.error} />}
+        {filter === "review" && (
+          <ReviewTable
+            page={page}
+            openId={openId}
+            onPageChange={(p) => setQuery({ page: p === 1 ? null : String(p) })}
+            onOpen={(id) => setQuery({ open: id })}
+          />
+        )}
 
-        {!current?.error && (
+        {filter !== "review" && current?.error && <ErrorNotice message={current.error} />}
+
+        {filter !== "review" && !current?.error && (
           <div className={tableWrap}>
             <table className="w-full min-w-[820px] table-fixed">
               <colgroup>
@@ -185,7 +207,7 @@ function Inquiries() {
           </div>
         )}
 
-        {current?.data && (
+        {filter !== "review" && current?.data && (
           <Pagination page={page} total={current.data.total} pageSize={PAGE_SIZE} onChange={(p) => setQuery({ page: p === 1 ? null : String(p) })} />
         )}
       </AdminPage>

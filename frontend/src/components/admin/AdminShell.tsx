@@ -2,7 +2,7 @@
 // - 로그인 token 이 없으면 어느 주소로 들어와도 로그인 화면(AdminLogin)만 보여준다.
 // - 로그인했으면 왼쪽 관리자 사이드바(240px, 접으면 72px 아이콘 레일) + 오른쪽 페이지 내용.
 // - 휴대폰·좁은 화면(md 미만)에서는 사이드바 대신 위쪽 막대에 메뉴 아이콘을 둔다.
-// - 확인필요 답장 수(사이드바 배지)는 AdminContext 로 각 페이지와 나눠 쓴다.
+// - 확인필요 답장 수(사이드바 '문의 목록' 배지)는 AdminContext 로 각 페이지와 나눠 쓴다.
 // 진짜 보안은 backend 가 지킨다. 여기서 막는 건 화면뿐이다.
 "use client";
 
@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { createContext, Suspense, useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { fetchReview, getToken, logout, subscribeAuth } from "@/lib/adminApi";
 import Logo from "../Logo";
-import { AlertIcon, InboxIcon, LogoutIcon, MailIcon, SidebarIcon, UploadIcon, UserIcon } from "../icons";
+import { InboxIcon, LogoutIcon, MailIcon, SidebarIcon, UploadIcon, UserIcon } from "../icons";
 import AdminLogin from "./AdminLogin";
 
 type AdminContextValue = {
@@ -31,8 +31,7 @@ export function useAdmin() {
 }
 
 const MENU = [
-  { href: "/admin/inquiries", label: "문의 목록", Icon: InboxIcon },
-  { href: "/admin/review", label: "확인필요 목록", Icon: AlertIcon, badge: true },
+  { href: "/admin/inquiries", label: "문의 목록", Icon: InboxIcon, badge: true }, // 배지 = 확인필요 답장 수 (문의 목록의 '확인 필요' 필터)
   { href: "/admin/mentors", label: "멘토 목록", Icon: UserIcon },
   { href: "/admin/imports", label: "인터뷰 넣기", Icon: UploadIcon },
   { href: "/admin/settings", label: "메일 설정", Icon: MailIcon },
