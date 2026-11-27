@@ -2,26 +2,33 @@
 // 참여 동의하지 않은 멘토와 메일 주소까지 모두 보인다 (관리자만).
 // 오른쪽 아래 '멘토 수정'을 누르면 수정 창이 뜨고, 창의 멘토 ID 드롭다운에서 수정할 멘토를 고른다.
 // 표에서 줄을 미리 눌러 두면 그 멘토가 골라진 채로 열린다 (두 번 누르면 바로 열림). '멘토 추가'는 그 옆.
-// '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '멘토 수정'. 멘토는 지울 수 없다.
+// '연락 가능'은 읽기 전용 체크 표시. 바꾸려면 '멘토 수정'.
+// '멘토 삭제'는 줄을 고른 뒤 누른다. 문의 기록이 없는 멘토만 된다 (기록이 있으면 backend 가 409 로 막고, 연락 가능을 끄라고 안내한다).
 // backend 는 멘토 전체를 한 번에 주므로, 쪽 나누기(10명씩)는 화면에서만 한다.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import MentorFormModal from "@/components/admin/MentorFormModal";
 import { AdminPage, ErrorNotice, PageTitle, Pagination, rowLink, tableWrap, td, th } from "@/components/admin/ui";
-import { AdminApiError, fetchAdminMentors, PAGE_SIZE, type AdminMentor } from "@/lib/adminApi";
+import { AdminApiError, deleteMentor, fetchAdminMentors, PAGE_SIZE, type AdminMentor } from "@/lib/adminApi";
 
 const pillButton =
   "h-11 shrink-0 rounded-full bg-brand px-6 text-[14px] font-bold text-white hover:bg-brand-dark disabled:bg-line disabled:text-muted";
+// 삭제는 되돌릴 수 없는 일이라 수정·추가보다 덜 눈에 띄게 (테두리만)
+const deleteButton =
+  "h-11 shrink-0 rounded-full border border-line px-5 text-[14px] font-bold text-body hover:border-danger-dark hover:text-danger-dark disabled:cursor-not-allowed disabled:text-muted disabled:opacity-60 disabled:hover:border-line disabled:hover:text-muted";
 
 export default function AdminMentorsPage() {
   const [mentors, setMentors] = useState<AdminMentor[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 열린 창: 추가 / 수정(처음 고른 멘토, 없으면 null) / 닫힘(null)
   const [editing, setEditing] = useState<{ mode: "new" } | { mode: "edit"; initial: AdminMentor | null } | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null); // 고른 멘토 (줄을 눌러 고른다)
+  const [toDelete, setToDelete] = useState<AdminMentor | null>(null); // 삭제 확인 창
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchAdminMentors()
@@ -40,9 +47,26 @@ export default function AdminMentorsPage() {
       next[i] = saved;
       return next;
     });
-    setNotice(editing?.mode === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`);
+    setNotice({ text: editing?.mode === "new" ? `'${saved.name}' 멘토를 추가했어요.` : `'${saved.name}' 멘토 정보를 저장했어요.`, error: false });
     setSelectedId(saved.id);
     setEditing(null);
+  }
+
+  async function handleDelete() {
+    if (!toDelete) return;
+    const mentor = toDelete;
+    setDeleting(true);
+    try {
+      await deleteMentor(mentor.id);
+      setMentors((list) => list?.filter((m) => m.id !== mentor.id) ?? null);
+      setSelectedId(null);
+      setNotice({ text: `'${mentor.name}' 멘토를 삭제했어요.`, error: false });
+    } catch (err) {
+      setNotice({ text: err instanceof AdminApiError ? err.message : "삭제하지 못했어요.", error: true });
+    } finally {
+      setDeleting(false);
+      setToDelete(null);
+    }
   }
 
   // 지금 쪽에 보일 멘토 (쪽이 범위를 넘으면 마지막 쪽으로)
@@ -62,8 +86,11 @@ export default function AdminMentorsPage() {
       <PageTitle>멘토 목록</PageTitle>
 
       {notice && (
-        <p role="status" className="mb-4 rounded-2xl bg-sky px-4 py-3 text-[13px] text-ink">
-          {notice}
+        <p
+          role={notice.error ? "alert" : "status"}
+          className={`mb-4 rounded-2xl px-4 py-3 text-[13px] ${notice.error ? "border border-danger/40 bg-surface text-danger" : "bg-sky text-ink"}`}
+        >
+          {notice.text}
         </p>
       )}
 
@@ -159,11 +186,24 @@ export default function AdminMentorsPage() {
         </div>
       )}
 
-      {/* 아래 줄: (왼쪽 안내) · 가운데 쪽 번호 · 오른쪽 버튼 두 개 */}
+      {/* 아래 줄: (왼쪽 안내) · 가운데 쪽 번호 · 오른쪽 버튼 (삭제 · 수정 · 추가) */}
       <div className="mt-4 flex flex-col gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
         <span />
         {mentors ? <Pagination page={shownPage} total={mentors.length} pageSize={PAGE_SIZE} onChange={setPage} className="" /> : <span />}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {/* 삭제는 줄을 골라야 누를 수 있다 (누르면 확인 창이 먼저 뜬다) */}
+          <button
+            type="button"
+            onClick={() => {
+              setNotice(null);
+              setToDelete(selected);
+            }}
+            disabled={!selected}
+            title={selected ? undefined : "표에서 삭제할 멘토를 먼저 골라 주세요"}
+            className={deleteButton}
+          >
+            멘토 삭제
+          </button>
           <button
             type="button"
             onClick={() => openEditor({ mode: "edit", initial: selected })}
@@ -185,6 +225,18 @@ export default function AdminMentorsPage() {
           initial={editing.mode === "edit" ? editing.initial : null}
           onClose={close}
           onSaved={handleSaved}
+        />
+      )}
+      {toDelete && (
+        <ConfirmDialog
+          title="이 멘토를 삭제할까요?"
+          body="삭제한 멘토는 학생 화면과 이 목록에서 사라지고, 되돌릴 수 없어요. 학생 문의 기록이 있는 멘토는 지울 수 없어요 (쉬게 하려면 '멘토 수정'에서 연락 가능을 꺼 주세요)."
+          detail={`${toDelete.name} (${toDelete.id})`}
+          tone="danger"
+          cancelLabel="취소"
+          confirmLabel={deleting ? "삭제하는 중…" : "삭제"}
+          onCancel={() => !deleting && setToDelete(null)}
+          onConfirm={() => !deleting && handleDelete()}
         />
       )}
     </AdminPage>

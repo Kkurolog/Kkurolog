@@ -37,13 +37,18 @@ export default function InquiryDetailModal({ id, onClose }: Props) {
     dialogRef.current?.focus();
   }, []);
 
-  // Esc 로 닫기
+  // Esc 로 닫기 + 창이 열려 있는 동안 뒤 화면은 스크롤되지 않게
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
   }, [onClose]);
 
   const current = result?.id === id ? result : null;

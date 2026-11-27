@@ -175,6 +175,20 @@ def test_update_mentor_returns_row_or_none():
     assert store.update_mentor("mt-99", {"name": "x"}) is None
 
 
+def test_delete_mentor_returns_whether_deleted():
+    store, calls = make_store([(200, [{"id": "mt-03"}]), (200, [])])
+    assert store.delete_mentor("mt-03") is True
+    assert calls[0].method == "DELETE" and ("id", "eq.mt-03") in query(calls[0])
+    assert store.delete_mentor("mt-99") is False
+
+
+def test_delete_mentor_with_inquiries_keeps_fk_code():
+    store, _ = make_store([(409, {"code": "23503", "message": "violates foreign key"})])
+    with pytest.raises(StoreError) as info:
+        store.delete_mentor("mt-01")
+    assert info.value.code == "23503"
+
+
 def test_store_error_keeps_postgres_code():
     store, _ = make_store([(400, {"code": "23514", "message": "violates check"})])
     with pytest.raises(StoreError) as info:

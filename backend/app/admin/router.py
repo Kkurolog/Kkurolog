@@ -10,6 +10,7 @@
 | GET   /admin/mentors             | 멘토 전체 (메일 주소 포함)                          |
 | POST  /admin/mentors             | 멘토 추가                                        |
 | PATCH /admin/mentors/{id}        | 멘토 수정 (보낸 칸만)                              |
+| DELETE /admin/mentors/{id}       | 멘토 삭제 (문의 기록이 없는 멘토만. 있으면 409)       |
 | GET   /admin/settings            | 메일 문구·숫자 설정                                |
 | PATCH /admin/settings            | 설정 값 수정 (바로 다음 메일부터 적용)               |
 """
@@ -20,7 +21,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from app.admin.auth import (
     AdminNotConfigured,
@@ -182,6 +183,24 @@ def update_mentor(mentor_id: str, body: MentorUpdate) -> AdminMentor:
     if not row:
         raise HTTPException(status_code=404, detail="멘토를 찾을 수 없어요.")
     return AdminMentor(**row)
+
+
+HAS_INQUIRIES = "문의 기록이 있는 멘토는 지울 수 없어요. 쉬게 하려면 '수정'에서 연락 가능을 꺼 주세요."
+
+
+@router.delete("/mentors/{mentor_id}", status_code=204, dependencies=[Depends(require_admin)])
+def delete_mentor(mentor_id: str) -> Response:
+    """문의 기록이 없는 멘토만 지울 수 있다 (2026-11-27 결정). 기록이 있으면 409 — 학생 문의 기록을 지키기 위해서다."""
+    store = _store()
+    try:
+        deleted = store.delete_mentor(mentor_id)
+    except StoreError as err:
+        if err.code == "23503":  # 외래 키: 이 멘토를 가리키는 문의 기록이 있음
+            raise HTTPException(status_code=409, detail=HAS_INQUIRIES) from None
+        raise _store_error(err) from None
+    if not deleted:
+        raise HTTPException(status_code=404, detail="멘토를 찾을 수 없어요.")
+    return Response(status_code=204)
 
 
 # ---------------------------------------------------------------- 설정

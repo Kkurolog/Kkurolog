@@ -21,5 +21,5 @@ function Redirect() {
   useEffect(() => {
     router.replace(`/admin/inquiries?open=${encodeURIComponent(decodeURIComponent(id))}`);
   }, [id, router]);
-  return null;
+  return <p className="px-8 pt-8 text-[14px] text-muted">문의 목록으로 가는 중…</p>;
 }

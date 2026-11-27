@@ -80,6 +80,8 @@ function Inquiries() {
   }, []);
 
   const current = list?.key === key ? list : null;
+  // 팝업이 effect 에서 이 함수를 쓰므로, 매번 새로 만들지 않게 묶어 둔다
+  const closeDetail = useCallback(() => setQuery({ open: null }), [setQuery]);
 
   return (
     <>
@@ -202,8 +204,8 @@ function Inquiries() {
         )}
       </AdminPage>
 
-      {/* 문의 상세 창 (주소의 ?open= 에 문의번호가 있으면 뜬다) */}
-      {openId && <InquiryDetailModal id={openId} onClose={() => setQuery({ open: null })} />}
+      {/* 문의 상세 팝업 (화면 가운데. 휴대폰은 아래에서 올라오는 시트) */}
+      {openId && <InquiryDetailModal id={openId} onClose={closeDetail} />}
     </>
   );
 }
